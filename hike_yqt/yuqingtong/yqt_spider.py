@@ -29,15 +29,11 @@ class YQTSpider(object):
             self.spider_driver = spider_driver  # type:MyWebDriver
         # self.spider_driver = self.driver  # type:MyWebDriver
         self.wait = WebDriverWait(self.spider_driver, config.WAIT_TIME)
-        # print(__name__)
-        # self.data_dir = config.DATA_DIR
-        # self.data_file_path = None
 
         self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), f"data\{config.info['project_name']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
                                            f"{self}_{config.info['yuqingtong_username']}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(':','_'))
         self.process_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                               "process.txt")
-
 
         # 上次终止时间
         self.last_end_time = None  # type:datetime.datetime
@@ -127,7 +123,8 @@ class YQTSpider(object):
             return True
         else:
             return self._login(count=count + 1)
-    # 解析页面进行数据抓取和保存
+
+    # 解析页面进行数据抓取和保存,没有进行driver操作，只是解析源码
     def _parse(self, page_source):
         doc = pq(page_source)
 
@@ -419,7 +416,6 @@ class YQTSpider(object):
         while 1:
             input_end_time = pyautogui.prompt(f'起始时间：{input_start_time}\n请输入终止日期\n格式：2020-12-01', "终止时间",
                                               default=self.interval[1].strftime('%Y-%m-%d'))
-            # input_end_time = config.info['end_time'].strftime('%Y-%m-%d')
             try:
                 end_time = datetime.datetime.strptime(input_end_time, "%Y-%m-%d") + datetime.timedelta(
                     days=1)
@@ -506,6 +502,7 @@ class YQTSpider(object):
             # print("页面加载完成")
 
             logger.info(f"当前第【{self.next_page_num}】页,共{max_page_num}页")
+            #抓取数据
             data_list = self.parse_data()
             logger.info(f"解析到{len(data_list)}条数据")
             SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path)
