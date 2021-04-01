@@ -74,7 +74,7 @@ class SpiderHelper(object):
             wb.close()
         else:
             wb=load_workbook(out_file)
-            sheet=wb["流通贸易"]
+            sheet=wb[info['sheet_name']]
             for data in data_list:
                 values = (data[k] for k in head_xlsx)
                 sheet.append(values)

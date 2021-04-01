@@ -1,0 +1,9 @@
+requests==2.25.1
+selenium==3.141.0
+PyAutoGUI==0.9.52
+openpyxl==3.0.7
+pyquery==1.4.3
+pandas==1.1.5
+dbutils==2.0
+greenlet==1.0.0
+pymssql==2.1.5
