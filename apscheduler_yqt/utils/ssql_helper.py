@@ -63,7 +63,7 @@ cursor=connect.cursor()
 '''
 
 
-def find_info_count(start_time,industry_name):
+def find_info_count(start_time,end_time,industry_name):
 # def find_info_count():
     tables={
         "餐饮业":"dbo.TS_industry_news_catering",
@@ -84,8 +84,8 @@ def find_info_count(start_time,industry_name):
         "其它":"dbo.TS_industry_news_other",
     }
     table_name=tables[industry_name]
-    end_time=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    sql="select count(*) from {table_name} where create_time between '{start_time}' and '{end_time}' ".format(table_name=table_name,start_time=start_time,end_time=end_time)
+    sql="select count(*) from {table_name} where publish_time between '{start_time}' and '{end_time}' ".format(table_name=table_name,start_time=start_time,end_time=end_time)
+
     # sql="select count(*) from dbo.TS_industry_news_circulation where create_time>='2021-04-02 10:00:00' and create_time<='2021-04-02 11:00:00'"
     # sql="select count(*) from dbo.TS_industry_news_circulation where create_time between '2021-04-02 10:00:00' and '2021-04-02 11:00:00' "
     print(sql)
@@ -95,6 +95,7 @@ def find_info_count(start_time,industry_name):
     count=cursor.fetchall()[0][0]
     cursor.close()
     connect.close()
+    print(count)
     return count
 # print(find_info_count())
 #
