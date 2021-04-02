@@ -3,6 +3,8 @@ import time
 import datetime
 import os
 
+from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.triggers.cron import CronTrigger
 from pyquery import PyQuery as pq
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -585,7 +587,8 @@ class YQTSpider(object):
                 logger.info("上传数据")
                 post_url="http://localhost:8086/localproject/industry/industryBigDataExcelByEasyExcel"
                 files={'file':open(self.data_file_path,'rb')}
-                post_info=requests.post(post_url,files=files).text
+                proxies = {"http": None, "https": None}
+                post_info=requests.post(post_url,files=files,proxies=proxies).text
                 post_info = eval(post_info)
                 logger.info("开始记录")
                 #舆情通数量
@@ -611,7 +614,7 @@ class YQTSpider(object):
                 last_task_process = f.readline()
             return last_task_process
 
-    def start(self, start_time,end_time,time_sleep):
+    def start(self,start_time,end_time,time_sleep):
         try:
             # 1.登录
             if not self._login():
@@ -649,16 +652,20 @@ def xlsx_work():
         config.info['start_time'] = tim['start_time']
         config.info['end_time'] = tim['end_time']
 
+def work_it():
+    end_time = datetime.datetime.now().strftime('%Y-%m-%d %H') + ":00:00"
+    one_hour_ago = datetime.datetime.now() - datetime.timedelta(hours=1)
 
+    start_time = one_hour_ago.strftime('%Y-%m-%d %H') + ":00:00"
+
+    start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+    end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+    yqt_spider = YQTSpider(start_time=start_time, end_time=end_time)
+    yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2)
+def apscheduler():
+    trigger1 = CronTrigger(hour='9-18', minute='*/59', second=0, jitter=30)
+    sched = BlockingScheduler()
+    sched.add_job(work_it, trigger1, id='my_job_id')
+    sched.start()
 if __name__ == '__main__':
-    time_list = config.get_time_list()
-    cishu=1
-    # print(time_list)
-    for tim in time_list:
-        print('抓取次数')
-        print(tim['start_time'])
-        yqt_spider = YQTSpider(start_time=tim['start_time'], end_time=tim['end_time'])
-        yqt_spider.start(start_time=tim['start_time'], end_time=tim['end_time'], time_sleep=tim['time_delay'])
-        config.info['start_time'] = tim['start_time']
-        config.info['end_time'] = tim['end_time']
-
+    apscheduler()
