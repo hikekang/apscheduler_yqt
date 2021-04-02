@@ -622,9 +622,23 @@ def work_it():
     yqt_spider = YQTSpider(start_time=start_time, end_time=end_time)
     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2)
 
-if __name__ == '__main__':
+def apscheduler():
     trigger1 = CronTrigger(hour='9-18', minute='*/59', second=0, jitter=30)
     sched = BlockingScheduler()
     sched.add_job(work_it, trigger1, id='my_job_id')
     sched.start()
+
+def xlsx_work():
+    time_list = config.get_time_list()
+    cishu = 1
+    # print(time_list)
+    for tim in time_list:
+        print('抓取次数')
+        print(tim['start_time'])
+        yqt_spider = YQTSpider(start_time=tim['start_time'], end_time=tim['end_time'])
+        yqt_spider.start(start_time=tim['start_time'], end_time=tim['end_time'], time_sleep=tim['time_delay'])
+        config.info['start_time'] = tim['start_time']
+        config.info['end_time'] = tim['end_time']
+if __name__ == '__main__':
+    xlsx_work()
 
