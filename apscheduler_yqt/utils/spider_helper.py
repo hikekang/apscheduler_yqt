@@ -59,7 +59,7 @@ class SpiderHelper(object):
 
         dir = os.path.dirname(out_file)
         if not os.path.exists(dir):
-            os.mkdir(dir)
+            os.makedirs(dir)
         if not os.path.exists(out_file):
             wb=Workbook(out_file)
             sheet=wb.create_sheet(title=info['sheet_name'])
@@ -78,6 +78,55 @@ class SpiderHelper(object):
             for data in data_list:
                 values = (data[k] for k in head_xlsx)
                 sheet.append(values)
+            wb.save(out_file)
+            wb.close()
+    @staticmethod
+    def save_record(out_file,yq_number,xlsx_num,post_num,sql_num,data_list):
+        '''
+        创建一个路径+文件
+        拿到
+            ①拿到舆情通数量
+            ②xlsx 数量
+            ③post返回数量
+            ④seq入库查询数量
+        记录数值
+        计算差值 70%以上
+            数据量相差太多预警并且记录
+        '''
+        head_xlsx=['项目名称','抓取时间','开始时间','结束时间','舆情通数量','xlsx数量','post数量','seq数量','最终差异']
+        dir = os.path.dirname(out_file)
+        if not os.path.exists(dir):
+            os.mkdir(dir)
+        if not os.path.exists(out_file):
+            wb = Workbook(out_file)
+            sheet = wb.create_sheet(title='record')
+            # 写入表头
+            # for i,item in enumerate(head_xlsx):
+            #     sheet.cell(row=1,column=i+1,value=item)
+            sheet.append(head_xlsx)
+            data_list.append(yq_number)
+            data_list.append(xlsx_num)
+            data_list.append(post_num)
+            data_list.append(sql_num)
+            chayi=yq_number-sql_num
+            if chayi/yq_number>=0.3:
+                print('预警')
+            data_list.append(chayi)
+            sheet.append(data_list)
+            wb.save(out_file)
+            wb.close()
+        else:
+            wb = load_workbook(out_file)
+            sheet = wb['record']
+            data_list.append(yq_number)
+            data_list.append(xlsx_num)
+            data_list.append(post_num)
+            data_list.append(sql_num)
+            chayi = yq_number - sql_num
+            if chayi/yq_number>=0.3:
+                print('预警')
+            data_list.append(chayi)
+            sheet.append(data_list)
             wb.save(out_file)
             wb.close()
 
