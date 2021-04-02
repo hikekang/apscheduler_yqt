@@ -272,8 +272,14 @@ class YQTSpider(object):
         time.sleep(0.2)
         driver.find_element_by_css_selector('span[ng-click="confirmTime(1)"]').click()
         time.sleep(0.2)
+        # -----------点击全部------------------
+        driver.find_element_by_css_selector('#informationContentType0').click()
+        time.sleep(0.2)
+        driver.find_element_by_css_selector('#select0').click()
+        time.sleep(0.2)
+        # ------------------------------------
         driver.find_element_by_css_selector("#searchListButton").click()
-        # time.sleep(2)
+        time.sleep(2)
         return True
 
     def _adapt_time_interval(self):
