@@ -599,7 +599,7 @@ class YQTSpider(object):
                 record_file_path=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                              f"record\{config.info['project_name']}",f"{self}_'记录'.xlsx")
 
-                sql_number=ssql_helper.find_info_count(self.interval[0],self.interval[1])
+                sql_number=ssql_helper.find_info_count(self.interval[0],config.info['sheet_name'])
                 data_list=[config.info['project_name'],datetime.datetime.now().strftime('%Y-%m-%d'),self.last_end_time,self.next_end_time]
                 SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],sql_number,data_list=data_list)
                 return True
