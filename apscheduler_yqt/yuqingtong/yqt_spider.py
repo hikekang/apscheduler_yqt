@@ -597,9 +597,8 @@ class YQTSpider(object):
                 wb=load_workbook(self.data_file_path)
                 xlsx_num=wb[wb.sheetnames[0]].max_row
                 record_file_path=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                             f"record\{config.info['project_name']}",f"{self}_'记录'.xlsx")
-
-                sql_number=ssql_helper.find_info_count(self.interval[0],config.info['sheet_name'])
+                             f"record\{config.info['project_name']}",f"{self}_记录.xlsx")
+                sql_number=ssql_helper.find_info_count(self.interval[0],self.interval[1],config.info['sheet_name'])
                 data_list=[config.info['project_name'],datetime.datetime.now().strftime('%Y-%m-%d'),self.last_end_time,self.next_end_time]
                 SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],sql_number,data_list=data_list)
                 return True
@@ -663,7 +662,7 @@ def work_it():
     yqt_spider = YQTSpider(start_time=start_time, end_time=end_time)
     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2)
 def apscheduler():
-    trigger1 = CronTrigger(hour='9-18', minute='*/1', second=0, jitter=30)
+    trigger1 = CronTrigger(hour='9-18', minute='*/5', second=0, jitter=30)
     sched = BlockingScheduler()
     sched.add_job(work_it, trigger1, id='my_job_id')
     sched.start()
