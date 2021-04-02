@@ -16,8 +16,9 @@ from utils.webdriverhelper import MyWebDriver
 from utils.my_pyautogui import pyautogui
 from utils.webdriverhelper import WebDriverHelper
 from yuqingtong import config
-
-
+import requests
+from openpyxl import load_workbook
+from utils import ssql_helper
 class YQTSpider(object):
 
     def __init__(self, spider_driver=None, start_time=None,end_time=None,  *args, **kwargs):
@@ -235,7 +236,6 @@ class YQTSpider(object):
                 }
             # print(data)
             data_list.append(data)
-            print("此页数据解析完毕")
         return data_list
 
     def parse_data(self):
@@ -289,6 +289,7 @@ class YQTSpider(object):
             logger.info("设置时间区间...")
             self._save_process()
             # self._set_conditions(start_time, end_time)
+            # 设置时间
             self._set_conditions(self.last_end_time, self.next_end_time)
             if not self._is_page_loaded():
                 logger.info("设置时间时页面加载出现问题")
@@ -297,6 +298,7 @@ class YQTSpider(object):
                 logger.info(f"小于{config.MAX_DATA_COUNT}条,符合条件")
                 break
             logger.info(f"页面数据大于{config.MAX_DATA_COUNT}条，调整时间区段")
+            # 大于五千条进行调整 目前没有实现
             timedelta = self.next_end_time - self.last_end_time
             if timedelta.days <= 1:
                 timedelta_hours = timedelta.total_seconds() / 60 / 60
@@ -324,6 +326,9 @@ class YQTSpider(object):
         # 获取最大页数
         return int(self.spider_driver.find_element_by_css_selector('span.page-number-total.ng-binding').text)
 
+    @property
+    def _count_number(self):
+        return int(self.spider_driver.find_element_by_css_selector('span[ng-bind="originStat.total"]').text)
     def _is_data_count_outside(self):
         """
         数据量是否超出5000
@@ -489,7 +494,6 @@ class YQTSpider(object):
         with open(self.process_file_path, "w", encoding="utf-8") as f:
             f.write(f"{self.interval[0]}至{self.interval[1]}|"
                     f"{self.last_end_time}_{self.next_end_time}_{self.next_page_num}_{self.data_file_path}")
-
     def _turn_page(self, max_page_num,time_sleep):
         """
         翻页
@@ -559,7 +563,7 @@ class YQTSpider(object):
             max_page_num = self._maxpage
             print(f"最大页数：{max_page_num}")
 
-            # 翻页开始
+            # 翻页并抓取数据
             resp = self._turn_page(max_page_num,time_sleep)
             if resp == "restart_browser":
                 return resp
@@ -578,6 +582,23 @@ class YQTSpider(object):
             self.next_page_num = 1
             if self.next_end_time >= self.interval[1]:
                 logger.info("解析到终止时间，抓取完成")
+                logger.info("上传数据")
+                post_url="http://localhost:8086/localproject/industry/industryBigDataExcelByEasyExcel"
+                files={'file':open(self.data_file_path,'rb')}
+                post_info=requests.post(post_url,files=files).text
+                post_info = eval(post_info)
+                logger.info("开始记录")
+                #舆情通数量
+                yqt_count=self._count_number
+                #xlsx数据量
+                wb=load_workbook(self.data_file_path)
+                xlsx_num=wb[wb.sheetnames[0]].max_row
+                record_file_path=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                             f"record\{config.info['project_name']}",f"{self}_'记录'.xlsx")
+
+                sql_number=ssql_helper.find_info_count(tim['start_time'],tim['end_time'])
+                data_list=[config.info['project_name'],datetime.datetime.now().strftime('%Y-%m-%d'),self.last_end_time,self.next_end_time]
+                SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],sql_number,data_list=data_list)
                 return True
             else:
                 self.last_end_time = self.next_end_time  # 上次终止时间就是下次起始时间
@@ -616,12 +637,10 @@ class YQTSpider(object):
         finally:
             if self.spider_driver.service.is_connectable():
                 self.spider_driver.quit()
-
-
-
-if __name__ == '__main__':
+def xlsx_work():
     time_list = config.get_time_list()
-    cishu=1
+    cishu = 1
+    # print(time_list)
     for tim in time_list:
         print('抓取次数')
         print(tim['start_time'])
@@ -629,3 +648,17 @@ if __name__ == '__main__':
         yqt_spider.start(start_time=tim['start_time'], end_time=tim['end_time'], time_sleep=tim['time_delay'])
         config.info['start_time'] = tim['start_time']
         config.info['end_time'] = tim['end_time']
+
+
+if __name__ == '__main__':
+    time_list = config.get_time_list()
+    cishu=1
+    # print(time_list)
+    for tim in time_list:
+        print('抓取次数')
+        print(tim['start_time'])
+        yqt_spider = YQTSpider(start_time=tim['start_time'], end_time=tim['end_time'])
+        yqt_spider.start(start_time=tim['start_time'], end_time=tim['end_time'], time_sleep=tim['time_delay'])
+        config.info['start_time'] = tim['start_time']
+        config.info['end_time'] = tim['end_time']
+
