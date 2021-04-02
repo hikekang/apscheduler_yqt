@@ -96,7 +96,7 @@ class SpiderHelper(object):
         head_xlsx=['项目名称','抓取时间','开始时间','结束时间','舆情通数量','xlsx数量','post数量','seq数量','最终差异']
         dir = os.path.dirname(out_file)
         if not os.path.exists(dir):
-            os.mkdir(dir)
+            os.makedirs(dir)
         if not os.path.exists(out_file):
             wb = Workbook(out_file)
             sheet = wb.create_sheet(title='record')
