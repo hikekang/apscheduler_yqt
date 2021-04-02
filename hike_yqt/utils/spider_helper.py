@@ -62,7 +62,7 @@ class SpiderHelper(object):
 
         dir = os.path.dirname(out_file)
         if not os.path.exists(dir):
-            os.mkdir(dir)
+            os.makedirs(dir)
         if not os.path.exists(out_file):
             wb = Workbook(out_file)
             sheet = wb.create_sheet(title=info['sheet_name'])
