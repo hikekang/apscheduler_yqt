@@ -611,6 +611,7 @@ class YQTSpider(object):
                 logger.info("解析到终止时间，抓取完成")
                 logger.info("上传数据")
                 post_url="http://localhost:8086/localproject/industry/industryBigDataExcelByEasyExcel"
+                post_url2="http://localhost:8086/localproject/industry/industryBigDataExcelByEasyExcel_2.1"
                 files={'file':open(self.data_file_path,'rb')}
                 proxies = {"http": None, "https": None}
                 post_info=requests.post(post_url,files=files,proxies=proxies).text
@@ -644,15 +645,22 @@ class YQTSpider(object):
         根据关键词进行修改
         """
         driver = self.spider_driver
-        li = driver.find_element_by_xpath('//li[@class="site-menu-item is-shown open"]')
+        # li = driver.find_element_by_xpath('//li[@class="site-menu-item is-shown open"]')
+        print("点击")
+        li = driver.find_element_by_xpath('//li[contains(@id,"kw_li_")]')
         span = li.find_element_by_xpath('//span[@class="fa-tree-plan-tools-bar"]')
         action = ActionChains(driver)
         action.move_to_element(li).perform()
+        time.sleep(0.3)
         span.click()
+        time.sleep(0.3)
         driver.find_element_by_xpath('//li[@class="add-plan-trigger"]/a').click()
+        time.sleep(0.3)
         keywords = driver.find_element_by_xpath('//div[@class="edit_textarea mb5 ng-binding"]')
         keywords.clear()
+        time.sleep(0.3)
         keywords.send_keys(self.keyword)
+        time.sleep(0.3)
         # 保存
         driver.find_element_by_id("saveHighSetKeyword").click()
         time.sleep(1)
@@ -756,7 +764,7 @@ def work_it_2():
 
     #
 def apscheduler():
-    trigger1 = CronTrigger(hour='9-18', minute='*/43', second=00, jitter=30)
+    trigger1 = CronTrigger(hour='9-18', minute='59', second=30, jitter=30)
     sched = BlockingScheduler()
     sched.add_job(work_it_2, trigger1, id='my_job_id')
     sched.start()
