@@ -272,6 +272,12 @@ class YQTSpider(object):
         time.sleep(0.2)
         driver.find_element_by_css_selector('span[ng-click="confirmTime(1)"]').click()
         time.sleep(0.2)
+        # -----------点击全部------------------
+        driver.find_element_by_css_selector('#informationContentType0').click()
+        time.sleep(0.2)
+        driver.find_element_by_css_selector('#select0').click()
+        time.sleep(0.2)
+        # ------------------------------------
         driver.find_element_by_css_selector("#searchListButton").click()
         # time.sleep(2)
         return True
@@ -656,9 +662,11 @@ def work_it():
     one_hour_ago = datetime.datetime.now() - datetime.timedelta(hours=1)
 
     start_time = one_hour_ago.strftime('%Y-%m-%d %H') + ":00:00"
-
+    # 开始时间
     start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+    # 结束时间
     end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+
     yqt_spider = YQTSpider(start_time=start_time, end_time=end_time)
     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2)
 def apscheduler():
@@ -668,4 +676,5 @@ def apscheduler():
     sched.start()
 
 if __name__ == '__main__':
-    apscheduler()
+    # apscheduler()
+    xlsx_work()
