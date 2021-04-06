@@ -115,6 +115,7 @@ class SpiderHelper(object):
             sheet.append(data_list)
             wb.save(out_file)
             wb.close()
+            print("记录完成")
         else:
             wb = load_workbook(out_file)
             sheet = wb['record']
@@ -129,6 +130,7 @@ class SpiderHelper(object):
             sheet.append(data_list)
             wb.save(out_file)
             wb.close()
+            print("记录完成")
 
 if __name__ == '__main__':
     SpiderHelper.save_csv([{"name": 12}], os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "resle.csv"))
