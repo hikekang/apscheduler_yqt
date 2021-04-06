@@ -11,6 +11,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.common.action_chains import ActionChains
 
 from utils.mylogger import logger
 from utils.spider_helper import SpiderHelper
@@ -23,15 +24,16 @@ from openpyxl import load_workbook
 from utils import ssql_helper
 class YQTSpider(object):
 
-    def __init__(self, spider_driver=None, start_time=None,end_time=None,  *args, **kwargs):
+    def __init__(self,info,spider_driver=None, start_time=None,end_time=None,  *args, **kwargs):
         if spider_driver is None:
             self.spider_driver = WebDriverHelper.init_webdriver(is_headless=config.HEAD_LESS)  # type:MyWebDriver
         else:
             self.spider_driver = spider_driver  # type:MyWebDriver
         self.wait = WebDriverWait(self.spider_driver, config.WAIT_TIME)
-
-        self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), f"data\{config.info['project_name']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
-                                           f"{self}_{config.info['yuqingtong_username']}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(':','_'))
+        self.info=info
+        # 需要替换
+        self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), f"data\{info['project_name']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
+                                           f"{self}_{info['yuqingtong_username']}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(':','_'))
         self.process_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                               "process.txt")
 
@@ -75,8 +77,8 @@ class YQTSpider(object):
 
         submit_buttion = driver.find_element_by_xpath("//button[contains(@class,'login-form-button')]")
 
-        username.send_keys(config.USERNAME)
-        password.send_keys(config.PASSWORD)
+        username.send_keys(self.info['yuqingtong_username'])
+        password.send_keys(self.info['yuqingtong_password'])
 
         logger.info("获取验证码....")
         while 1:
@@ -92,7 +94,7 @@ class YQTSpider(object):
             logger.info("验证码图片没加载出来，刷新...")
             driver.refresh()
         code_img_base64 = code_img.screenshot_as_base64
-        code = SpiderHelper.recognise_code(code_img_base64)
+        code = SpiderHelper.recognise_code(code_img_base64,self.info)
         logger.info(f"获取验证码:{code}")
         if not code:
             code = "1234hi"
@@ -282,6 +284,7 @@ class YQTSpider(object):
         # time.sleep(2)
         return True
 
+    # 细化时间，分开爬取
     def _adapt_time_interval(self):
         """
         改变时间的区间
@@ -297,8 +300,13 @@ class YQTSpider(object):
             logger.info("设置时间区间...")
             self._save_process()
             # self._set_conditions(start_time, end_time)
+            """
+                假如多项目切换，提前换词
+            """
             # 设置时间
             self._set_conditions(self.last_end_time, self.next_end_time)
+
+
             if not self._is_page_loaded():
                 logger.info("设置时间时页面加载出现问题")
                 return False
@@ -306,7 +314,8 @@ class YQTSpider(object):
                 logger.info(f"小于{config.MAX_DATA_COUNT}条,符合条件")
                 break
             logger.info(f"页面数据大于{config.MAX_DATA_COUNT}条，调整时间区段")
-            # 大于五千条进行调整 目前没有实现
+
+            #时间设置
             timedelta = self.next_end_time - self.last_end_time
             if timedelta.days <= 1:
                 timedelta_hours = timedelta.total_seconds() / 60 / 60
@@ -314,6 +323,7 @@ class YQTSpider(object):
                     logger.info("时间区间小于一小时，无法调整")
                     break
                 logger.info("时间区间小于一天，继续细化调整")
+                # 下次开始时间
                 self.next_end_time = self.last_end_time + datetime.timedelta(hours=timedelta_hours / 2)
             else:
                 # return None
@@ -460,6 +470,7 @@ class YQTSpider(object):
         :return:
         """
         self.spider_driver.refresh()
+        self.spider_driver.refresh()
         if not self._is_page_loaded():
             return False
         return True
@@ -605,7 +616,7 @@ class YQTSpider(object):
                 record_file_path=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                              f"record\{config.info['project_name']}",f"{self}_记录.xlsx")
                 sql_number=ssql_helper.find_info_count(self.interval[0],self.interval[1],config.info['sheet_name'])
-                data_list=[config.info['project_name'],datetime.datetime.now().strftime('%Y-%m-%d'),self.last_end_time,self.next_end_time]
+                data_list=[config.info['project_name'],datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),self.last_end_time,self.next_end_time]
                 SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],sql_number,data_list=data_list)
                 return True
             else:
@@ -618,6 +629,25 @@ class YQTSpider(object):
             with open(self.process_file_path, "r", encoding="utf-8") as f:
                 last_task_process = f.readline()
             return last_task_process
+    # 关键词修改
+    def modifi_keywords(self,keywords):
+        """
+        读取config。xlsx文件关键词
+        根据关键词进行修改
+        """
+        driver = self.spider_driver
+        li = driver.find_element_by_xpath('//li[@class="site-menu-item is-shown open"]')
+        span = li.find_element_by_xpath('//span[@class="fa-tree-plan-tools-bar"]')
+        action = ActionChains(driver)
+        action.move_to_element(li).perform()
+        span.click()
+        driver.find_element_by_xpath('//li[@class="add-plan-trigger"]/a').click()
+        keywords = driver.find_element_by_xpath('//div[@class="edit_textarea mb5 ng-binding"]')
+        keywords.clear()
+        keywords.send_keys(keywords)
+        # 保存
+        driver.find_element_by_id("saveHighSetKeyword").click()
+        time.sleep(1)
 
     def start(self,start_time,end_time,time_sleep):
         try:
@@ -645,18 +675,22 @@ class YQTSpider(object):
         finally:
             if self.spider_driver.service.is_connectable():
                 self.spider_driver.quit()
+
+
+#修改xlsx文件进行自动抓取
 def xlsx_work():
     time_list = config.get_time_list()
-    cishu = 1
     # print(time_list)
-    for tim in time_list:
-        print('抓取次数')
-        print(tim['start_time'])
-        yqt_spider = YQTSpider(start_time=tim['start_time'], end_time=tim['end_time'])
-        yqt_spider.start(start_time=tim['start_time'], end_time=tim['end_time'], time_sleep=tim['time_delay'])
-        config.info['start_time'] = tim['start_time']
-        config.info['end_time'] = tim['end_time']
-
+    infos = config.row_list
+    for info in infos:
+        for tim in time_list:
+            print('抓取次数')
+            print(tim['start_time'])
+            yqt_spider = YQTSpider(info,start_time=tim['start_time'], end_time=tim['end_time'])
+            yqt_spider.start(start_time=tim['start_time'], end_time=tim['end_time'], time_sleep=tim['time_delay'])
+            config.info['start_time'] = tim['start_time']
+            config.info['end_time'] = tim['end_time']
+# 自定义时间抓取任务
 def work_it():
     end_time = datetime.datetime.now().strftime('%Y-%m-%d %H') + ":00:00"
     one_hour_ago = datetime.datetime.now() - datetime.timedelta(hours=1)
@@ -666,9 +700,11 @@ def work_it():
     start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
     # 结束时间
     end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
-
-    yqt_spider = YQTSpider(start_time=start_time, end_time=end_time)
-    yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2)
+    infos=config.row_list
+    for info in infos:
+        yqt_spider = YQTSpider(info,start_time=start_time, end_time=end_time)
+        yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2)
+    #
 def apscheduler():
     trigger1 = CronTrigger(hour='9-18', minute='*/5', second=0, jitter=30)
     sched = BlockingScheduler()

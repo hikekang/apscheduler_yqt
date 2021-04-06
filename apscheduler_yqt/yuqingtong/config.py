@@ -7,21 +7,35 @@ from openpyxl import load_workbook
 #数据加载
 
 wb=load_workbook('../config.xlsx',data_only=True)
-sheet=wb['Sheet1']
-row_info=[]
-for row in sheet.iter_rows(min_row=2,max_col=7,max_row=2):
+sheet=wb['info']
+
+# 获取用户名信息
+row_list=[]
+pinyin=['yuqingtong_username','yuqingtong_password','dama_username','dama_password','softid','project_name','sheet_name','keywords']
+for row in sheet.iter_rows(min_row=2,max_col=8):
+    row_info = []
     for cell in row:
         row_info.append(cell.value)
+    info = dict(list(zip(pinyin, row_info)))
+    row_list.append(info)
 
-pinyin=['yuqingtong_username','yuqingtong_password','dama_username','dama_password','softid','project_name','sheet_name']
-info=dict(list(zip(pinyin,row_info)))
+# for data in sheet[2:5]:
+#     print(type(data))
+#     print(data)
+#     d=dict(list(zip(pinyin,data)))
+#     print(d)
+# print(row_info)
 
-USERNAME = info['yuqingtong_username']
-PASSWORD = info['yuqingtong_password']
+# print(info)
+# USERNAME = info['yuqingtong_username']
+# PASSWORD = info['yuqingtong_password']
 
-time_data_all=sheet.iter_rows(min_row=7)
 
+
+# 获取设置的时间
 def get_time_list():
+    sheet=wb['time']
+    time_data_all = sheet.iter_rows(min_row=2)
     times = []
     for row in time_data_all:
         time = {
@@ -38,10 +52,10 @@ def get_time_list():
                 time['time_delay']=cell.value
         times.append(time)
     return times
+get_time_list()
 
-
-USERNAME = info['yuqingtong_username']
-PASSWORD = info['yuqingtong_password']
+# USERNAME = info['yuqingtong_username']
+# PASSWORD = info['yuqingtong_password']
 # 浏览器相关
 HEAD_LESS = False
 

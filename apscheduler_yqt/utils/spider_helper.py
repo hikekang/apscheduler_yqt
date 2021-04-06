@@ -9,7 +9,7 @@ from openpyxl import Workbook
 class SpiderHelper(object):
 
     @staticmethod
-    def recognise_code(image_base64):
+    def recognise_code(image_base64,info):
         # base64_data = base64.b64encode(img_bytes)
         # img_b64_data = base64_data.decode()
         data = {

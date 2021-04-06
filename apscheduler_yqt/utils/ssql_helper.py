@@ -93,8 +93,6 @@ def find_info_count(start_time,end_time,industry_name):
     cursor.execute(sql)
     # print(type(cursor.fetchall()))
     count=cursor.fetchall()[0][0]
-    cursor.close()
-    connect.close()
     print(count)
     return count
 # print(find_info_count())
