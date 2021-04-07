@@ -209,7 +209,7 @@ class YQTSpider(object):
                     data['链接']=td_title.find('.news-item-tools.font-size-0 div:nth-child(2)>div>ul>li:nth-child(3) a').attr("href")
                     biaoti=td_title.find('div.item-title.news-item-title.dot.ng-binding').text().replace('\n', '')
                     data['标题']=biaoti
-
+                    data['发布人']=td_title.find('a[ng-if="icc.commentAuthor != null"]').text()
             else:
                 data = {
                     '时间': parse_time(td_time),
@@ -218,7 +218,7 @@ class YQTSpider(object):
                     '链接': td_title.find('.news-item-tools.font-size-0 div:nth-child(2)>div>ul>li:nth-child(4) a').attr(
                         "href"),
                     '转发内容': repost_content,
-                    '发布人': td_title.find('a[ng-bind="icc.author"]').text(),
+                    '发布人': td_title.find('div[class="profile-title inline-block"]>a>span:first-child').text(),
                     'attitude': td_title.find(
                         'div[ng-show="view.resultPresent != 3"] div.sensitive-status-content:not(.ng-hide)>span:first-child').text(),
                     'images': ",".join([img.attr('src') for img in item.find('.actizPicShow img').items()]),
@@ -772,7 +772,7 @@ def work_it_2():
 
     #
 def apscheduler():
-    trigger1 = CronTrigger(hour='9-18', minute='59', second=30, jitter=30)
+    trigger1 = CronTrigger(hour='9-18', minute='11', second=30, jitter=30)
     sched = BlockingScheduler()
     sched.add_job(work_it_2, trigger1, id='my_job_id')
     sched.start()
