@@ -892,3 +892,137 @@ yqt_spider.py[line:515] - INFO - 2021-04-01 09:37:01 - 保存完毕
 yqt_spider.py[line:518] - INFO - 2021-04-01 09:37:01 - 抓取到最大页，停止
 yqt_spider.py[line:580] - INFO - 2021-04-01 09:37:03 - 解析到终止时间，抓取完成
 yqt_spider.py[line:67] - INFO - 2021-04-01 09:37:12 - 开始登录....1
+base.py[line:445] - INFO - 2021-04-06 16:09:02 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+base.py[line:886] - INFO - 2021-04-06 16:09:02 - Added job "work_it_2" to job store "default"
+base.py[line:171] - INFO - 2021-04-06 16:09:02 - Scheduler started
+base.py[line:445] - INFO - 2021-04-06 16:09:13 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+base.py[line:886] - INFO - 2021-04-06 16:09:13 - Added job "work_it_2" to job store "default"
+base.py[line:171] - INFO - 2021-04-06 16:09:13 - Scheduler started
+base.py[line:123] - INFO - 2021-04-06 16:10:18 - Running job "work_it_2 (trigger: cron[hour='9-18', minute='*/10', second='0'], next run at: 2021-04-06 16:20:00 CST)" (scheduled at 2021-04-06 16:10:18.204155+08:00)
+yqt_spider.py[line:73] - INFO - 2021-04-06 16:10:19 - 开始登录....1
+yqt_spider.py[line:84] - INFO - 2021-04-06 16:10:24 - 获取验证码....
+yqt_spider.py[line:99] - INFO - 2021-04-06 16:10:29 - 获取验证码:fijqzq
+base.py[line:144] - INFO - 2021-04-06 16:10:32 - Job "work_it_2 (trigger: cron[hour='9-18', minute='*/10', second='0'], next run at: 2021-04-06 16:20:00 CST)" executed successfully
+base.py[line:445] - INFO - 2021-04-06 16:12:32 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+base.py[line:886] - INFO - 2021-04-06 16:12:32 - Added job "work_it_2" to job store "default"
+base.py[line:171] - INFO - 2021-04-06 16:12:32 - Scheduler started
+base.py[line:123] - INFO - 2021-04-06 16:13:28 - Running job "work_it_2 (trigger: cron[hour='9-18', minute='*/13', second='0'], next run at: 2021-04-06 16:26:27 CST)" (scheduled at 2021-04-06 16:13:28.774780+08:00)
+yqt_spider.py[line:73] - INFO - 2021-04-06 16:13:30 - 开始登录....1
+yqt_spider.py[line:84] - INFO - 2021-04-06 16:13:35 - 获取验证码....
+yqt_spider.py[line:99] - INFO - 2021-04-06 16:13:41 - 获取验证码:AR34H5
+yqt_spider.py[line:570] - INFO - 2021-04-06 16:13:45 - 任务时间区间：2021-04-06 15:00:00 --- 2021-04-06 16:00:00
+yqt_spider.py[line:402] - INFO - 2021-04-06 16:13:52 - 页面加载完全
+base.py[line:144] - INFO - 2021-04-06 16:13:53 - Job "work_it_2 (trigger: cron[hour='9-18', minute='*/13', second='0'], next run at: 2021-04-06 16:26:27 CST)" executed successfully
+base.py[line:445] - INFO - 2021-04-06 16:15:10 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+base.py[line:886] - INFO - 2021-04-06 16:15:10 - Added job "work_it_2" to job store "default"
+base.py[line:171] - INFO - 2021-04-06 16:15:10 - Scheduler started
+base.py[line:123] - INFO - 2021-04-06 16:16:16 - Running job "work_it_2 (trigger: cron[hour='9-18', minute='*/16', second='0'], next run at: 2021-04-06 16:16:16 CST)" (scheduled at 2021-04-06 16:16:16.097370+08:00)
+yqt_spider.py[line:73] - INFO - 2021-04-06 16:16:17 - 开始登录....1
+yqt_spider.py[line:84] - INFO - 2021-04-06 16:16:23 - 获取验证码....
+yqt_spider.py[line:99] - INFO - 2021-04-06 16:16:27 - 获取验证码:2hx34v
+base.py[line:144] - INFO - 2021-04-06 16:16:31 - Job "work_it_2 (trigger: cron[hour='9-18', minute='*/16', second='0'], next run at: 2021-04-06 16:32:28 CST)" executed successfully
+base.py[line:445] - INFO - 2021-04-06 16:19:15 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+base.py[line:886] - INFO - 2021-04-06 16:19:15 - Added job "work_it_2" to job store "default"
+base.py[line:171] - INFO - 2021-04-06 16:19:15 - Scheduler started
+base.py[line:123] - INFO - 2021-04-06 16:20:18 - Running job "work_it_2 (trigger: cron[hour='9-18', minute='*/20', second='0'], next run at: 2021-04-06 16:40:18 CST)" (scheduled at 2021-04-06 16:20:18.910642+08:00)
+yqt_spider.py[line:73] - INFO - 2021-04-06 16:20:20 - 开始登录....1
+yqt_spider.py[line:84] - INFO - 2021-04-06 16:20:26 - 获取验证码....
+yqt_spider.py[line:99] - INFO - 2021-04-06 16:20:30 - 获取验证码:h9gbyl
+base.py[line:144] - INFO - 2021-04-06 16:20:33 - Job "work_it_2 (trigger: cron[hour='9-18', minute='*/20', second='0'], next run at: 2021-04-06 16:40:18 CST)" executed successfully
+base.py[line:445] - INFO - 2021-04-06 16:37:37 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+base.py[line:886] - INFO - 2021-04-06 16:37:37 - Added job "work_it_2" to job store "default"
+base.py[line:171] - INFO - 2021-04-06 16:37:37 - Scheduler started
+base.py[line:445] - INFO - 2021-04-06 16:38:20 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+base.py[line:886] - INFO - 2021-04-06 16:38:20 - Added job "work_it_2" to job store "default"
+base.py[line:171] - INFO - 2021-04-06 16:38:20 - Scheduler started
+base.py[line:123] - INFO - 2021-04-06 16:38:38 - Running job "work_it_2 (trigger: cron[hour='9-18', minute='*/38', second='30'], next run at: 2021-04-06 17:00:59 CST)" (scheduled at 2021-04-06 16:38:38.435607+08:00)
+yqt_spider.py[line:73] - INFO - 2021-04-06 16:38:40 - 开始登录....1
+yqt_spider.py[line:84] - INFO - 2021-04-06 16:38:45 - 获取验证码....
+yqt_spider.py[line:99] - INFO - 2021-04-06 16:38:49 - 获取验证码:33latq
+base.py[line:445] - INFO - 2021-04-06 16:39:53 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+base.py[line:886] - INFO - 2021-04-06 16:39:53 - Added job "work_it_2" to job store "default"
+base.py[line:171] - INFO - 2021-04-06 16:39:53 - Scheduler started
+base.py[line:123] - INFO - 2021-04-06 16:40:41 - Running job "work_it_2 (trigger: cron[hour='9-18', minute='*/40', second='30'], next run at: 2021-04-06 16:40:41 CST)" (scheduled at 2021-04-06 16:40:41.364503+08:00)
+yqt_spider.py[line:73] - INFO - 2021-04-06 16:40:42 - 开始登录....1
+yqt_spider.py[line:84] - INFO - 2021-04-06 16:40:47 - 获取验证码....
+yqt_spider.py[line:99] - INFO - 2021-04-06 16:40:54 - 获取验证码:g64qv5
+base.py[line:144] - INFO - 2021-04-06 16:40:56 - Job "work_it_2 (trigger: cron[hour='9-18', minute='*/40', second='30'], next run at: 2021-04-06 17:00:47 CST)" executed successfully
+base.py[line:445] - INFO - 2021-04-06 16:41:56 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+base.py[line:886] - INFO - 2021-04-06 16:41:56 - Added job "work_it_2" to job store "default"
+base.py[line:171] - INFO - 2021-04-06 16:41:56 - Scheduler started
+base.py[line:123] - INFO - 2021-04-06 16:42:50 - Running job "work_it_2 (trigger: cron[hour='9-18', minute='*/42', second='30'], next run at: 2021-04-06 16:42:50 CST)" (scheduled at 2021-04-06 16:42:50.619371+08:00)
+yqt_spider.py[line:73] - INFO - 2021-04-06 16:42:52 - 开始登录....1
+yqt_spider.py[line:84] - INFO - 2021-04-06 16:42:58 - 获取验证码....
+yqt_spider.py[line:99] - INFO - 2021-04-06 16:43:03 - 获取验证码:LKMUC3
+base.py[line:144] - INFO - 2021-04-06 16:43:05 - Job "work_it_2 (trigger: cron[hour='9-18', minute='*/42', second='30'], next run at: 2021-04-06 17:00:43 CST)" executed successfully
+base.py[line:445] - INFO - 2021-04-06 16:43:31 - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+base.py[line:886] - INFO - 2021-04-06 16:43:31 - Added job "work_it_2" to job store "default"
+base.py[line:171] - INFO - 2021-04-06 16:43:31 - Scheduler started
+base.py[line:123] - INFO - 2021-04-06 16:44:40 - Running job "work_it_2 (trigger: cron[hour='9-18', minute='*/44', second='30'], next run at: 2021-04-06 16:44:40 CST)" (scheduled at 2021-04-06 16:44:40.444504+08:00)
+yqt_spider.py[line:73] - INFO - 2021-04-06 16:44:42 - 开始登录....1
+yqt_spider.py[line:84] - INFO - 2021-04-06 16:44:46 - 获取验证码....
+yqt_spider.py[line:99] - INFO - 2021-04-06 16:44:49 - 获取验证码:wsx7rr
+yqt_spider.py[line:570] - INFO - 2021-04-06 16:44:56 - 任务时间区间：2021-04-06 15:00:00 --- 2021-04-06 16:00:00
+yqt_spider.py[line:402] - INFO - 2021-04-06 16:45:00 - 页面加载完全
+yqt_spider.py[line:402] - INFO - 2021-04-06 16:45:06 - 页面加载完全
+yqt_spider.py[line:431] - INFO - 2021-04-06 16:45:06 - 更改100条数据/每页
+yqt_spider.py[line:301] - INFO - 2021-04-06 16:45:06 - 设置时间区间...
+yqt_spider.py[line:402] - INFO - 2021-04-06 16:45:13 - 页面加载完全
+yqt_spider.py[line:365] - INFO - 2021-04-06 16:45:13 - 当前数据量:66
+yqt_spider.py[line:321] - INFO - 2021-04-06 16:45:13 - 小于5000条,符合条件
+yqt_spider.py[line:346] - INFO - 2021-04-06 16:45:13 - 当前时间区间:2021-04-06 15:00:00  -- 2021-04-06 16:00:00
+yqt_spider.py[line:402] - INFO - 2021-04-06 16:45:13 - 页面加载完全
+yqt_spider.py[line:517] - INFO - 2021-04-06 16:45:13 - 进入成功
+yqt_spider.py[line:542] - INFO - 2021-04-06 16:45:13 - 当前第【1】页,共1页
+yqt_spider.py[line:544] - INFO - 2021-04-06 16:45:15 - 解析到66条数据
+yqt_spider.py[line:546] - INFO - 2021-04-06 16:45:15 - 保存完毕
+yqt_spider.py[line:549] - INFO - 2021-04-06 16:45:15 - 抓取到最大页，停止
+yqt_spider.py[line:611] - INFO - 2021-04-06 16:45:17 - 解析到终止时间，抓取完成
+yqt_spider.py[line:612] - INFO - 2021-04-06 16:45:17 - 上传数据
+yqt_spider.py[line:618] - INFO - 2021-04-06 16:45:17 - 开始记录
+base.py[line:144] - INFO - 2021-04-06 16:45:17 - Job "work_it_2 (trigger: cron[hour='9-18', minute='*/44', second='30'], next run at: 2021-04-06 17:00:44 CST)" executed successfully
+base.py[line:123] - INFO - 2021-04-06 17:00:44 - Running job "work_it_2 (trigger: cron[hour='9-18', minute='*/44', second='30'], next run at: 2021-04-06 17:00:44 CST)" (scheduled at 2021-04-06 17:00:44.822412+08:00)
+yqt_spider.py[line:73] - INFO - 2021-04-06 17:00:46 - 开始登录....1
+yqt_spider.py[line:84] - INFO - 2021-04-06 17:00:51 - 获取验证码....
+yqt_spider.py[line:99] - INFO - 2021-04-06 17:00:56 - 获取验证码:ebcuna
+yqt_spider.py[line:570] - INFO - 2021-04-06 17:01:04 - 任务时间区间：2021-04-06 16:00:00 --- 2021-04-06 17:00:00
+yqt_spider.py[line:402] - INFO - 2021-04-06 17:01:05 - 页面加载完全
+yqt_spider.py[line:402] - INFO - 2021-04-06 17:01:07 - 页面加载完全
+yqt_spider.py[line:431] - INFO - 2021-04-06 17:01:07 - 更改100条数据/每页
+yqt_spider.py[line:301] - INFO - 2021-04-06 17:01:07 - 设置时间区间...
+yqt_spider.py[line:402] - INFO - 2021-04-06 17:01:31 - 页面加载完全
+yqt_spider.py[line:365] - INFO - 2021-04-06 17:01:31 - 当前数据量:0
+yqt_spider.py[line:321] - INFO - 2021-04-06 17:01:31 - 小于5000条,符合条件
+yqt_spider.py[line:346] - INFO - 2021-04-06 17:01:31 - 当前时间区间:2021-04-06 16:00:00  -- 2021-04-06 17:00:00
+yqt_spider.py[line:402] - INFO - 2021-04-06 17:01:51 - 页面加载完全
+yqt_spider.py[line:515] - WARNING - 2021-04-06 17:01:51 - 页面上当前页面和应该进入的页面不一样，请检查
+yqt_spider.py[line:493] - INFO - 2021-04-06 17:01:51 - 重新进入此页面：2021-04-06 16:00:00 - 2021-04-06 17:00:00 第1页
+yqt_spider.py[line:402] - INFO - 2021-04-06 17:01:55 - 页面加载完全
+yqt_spider.py[line:301] - INFO - 2021-04-06 17:01:55 - 设置时间区间...
+yqt_spider.py[line:402] - INFO - 2021-04-06 17:02:19 - 页面加载完全
+yqt_spider.py[line:365] - INFO - 2021-04-06 17:02:19 - 当前数据量:0
+yqt_spider.py[line:321] - INFO - 2021-04-06 17:02:19 - 小于5000条,符合条件
+yqt_spider.py[line:346] - INFO - 2021-04-06 17:02:19 - 当前时间区间:2021-04-06 16:00:00  -- 2021-04-06 17:00:00
+yqt_spider.py[line:402] - INFO - 2021-04-06 17:02:39 - 页面加载完全
+yqt_spider.py[line:515] - WARNING - 2021-04-06 17:02:40 - 页面上当前页面和应该进入的页面不一样，请检查
+yqt_spider.py[line:493] - INFO - 2021-04-06 17:02:40 - 重新进入此页面：2021-04-06 16:00:00 - 2021-04-06 17:00:00 第1页
+yqt_spider.py[line:402] - INFO - 2021-04-06 17:02:45 - 页面加载完全
+yqt_spider.py[line:301] - INFO - 2021-04-06 17:02:45 - 设置时间区间...
+yqt_spider.py[line:402] - INFO - 2021-04-06 17:03:09 - 页面加载完全
+yqt_spider.py[line:365] - INFO - 2021-04-06 17:03:09 - 当前数据量:0
+yqt_spider.py[line:321] - INFO - 2021-04-06 17:03:09 - 小于5000条,符合条件
+yqt_spider.py[line:346] - INFO - 2021-04-06 17:03:09 - 当前时间区间:2021-04-06 16:00:00  -- 2021-04-06 17:00:00
+yqt_spider.py[line:402] - INFO - 2021-04-06 17:03:29 - 页面加载完全
+yqt_spider.py[line:515] - WARNING - 2021-04-06 17:03:29 - 页面上当前页面和应该进入的页面不一样，请检查
+yqt_spider.py[line:493] - INFO - 2021-04-06 17:03:29 - 重新进入此页面：2021-04-06 16:00:00 - 2021-04-06 17:00:00 第1页
+yqt_spider.py[line:402] - INFO - 2021-04-06 17:03:33 - 页面加载完全
+yqt_spider.py[line:301] - INFO - 2021-04-06 17:03:33 - 设置时间区间...
+yqt_spider.py[line:402] - INFO - 2021-04-06 17:03:57 - 页面加载完全
+yqt_spider.py[line:365] - INFO - 2021-04-06 17:03:57 - 当前数据量:0
+yqt_spider.py[line:321] - INFO - 2021-04-06 17:03:57 - 小于5000条,符合条件
+yqt_spider.py[line:346] - INFO - 2021-04-06 17:03:57 - 当前时间区间:2021-04-06 16:00:00  -- 2021-04-06 17:00:00
+yqt_spider.py[line:402] - INFO - 2021-04-06 17:04:17 - 页面加载完全
+yqt_spider.py[line:515] - WARNING - 2021-04-06 17:04:17 - 页面上当前页面和应该进入的页面不一样，请检查
+yqt_spider.py[line:584] - WARNING - 2021-04-06 17:04:17 - 设置时间区间时，连续出现问题3次，退出
+yqt_spider.py[line:570] - INFO - 2021-04-06 17:04:21 - 任务时间区间：2021-04-06 16:00:00 --- 2021-04-06 17:00:00
+yqt_spider.py[line:402] - INFO - 2021-04-06 17:04:21 - 页面加载完全

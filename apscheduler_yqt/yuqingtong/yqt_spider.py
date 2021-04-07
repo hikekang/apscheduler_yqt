@@ -615,7 +615,10 @@ class YQTSpider(object):
                 files={'file':open(self.data_file_path,'rb')}
                 proxies = {"http": None, "https": None}
                 post_info=requests.post(post_url,files=files,proxies=proxies).text
+                files={'file':open(self.data_file_path,'rb')}
+                post_info2=requests.post(post_url2,files=files,proxies=proxies).text
                 post_info = eval(post_info)
+                post_info2 = eval(post_info2)
                 logger.info("开始记录")
                 #舆情通数量
                 yqt_count=self._count_number
@@ -623,10 +626,10 @@ class YQTSpider(object):
                 wb=load_workbook(self.data_file_path)
                 xlsx_num=wb[wb.sheetnames[0]].max_row
                 record_file_path=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                             f"record\{config.info['project_name']}",f"{self}_记录.xlsx")
-                sql_number=ssql_helper.find_info_count(self.interval[0],self.interval[1],config.info['sheet_name'])
-                data_list=[config.info['project_name'],datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),self.last_end_time,self.next_end_time]
-                SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],sql_number,data_list=data_list)
+                             f"record\{self.info['project_name']}",f"{self}_记录.xlsx")
+                sql_number=ssql_helper.find_info_count(self.interval[0],self.interval[1],self.info['sheet_name'])
+                data_list=[self.info['project_name'],datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),self.last_end_time,self.next_end_time]
+                SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
                 return True
             else:
                 self.last_end_time = self.next_end_time  # 上次终止时间就是下次起始时间

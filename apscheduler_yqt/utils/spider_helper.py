@@ -81,7 +81,7 @@ class SpiderHelper(object):
             wb.save(out_file)
             wb.close()
     @staticmethod
-    def save_record(out_file,yq_number,xlsx_num,post_num,sql_num,data_list):
+    def save_record(out_file,yq_number,xlsx_num,post_num,post_num2,sql_num,data_list):
         '''
         创建一个路径+文件
         拿到
@@ -107,6 +107,7 @@ class SpiderHelper(object):
             data_list.append(yq_number)
             data_list.append(xlsx_num)
             data_list.append(post_num)
+            data_list.append(post_num2)
             data_list.append(sql_num)
             chayi=yq_number-sql_num
             if chayi/yq_number>=0.3:
@@ -122,6 +123,7 @@ class SpiderHelper(object):
             data_list.append(yq_number)
             data_list.append(xlsx_num)
             data_list.append(post_num)
+            data_list.append(post_num2)
             data_list.append(sql_num)
             chayi = yq_number - sql_num
             if chayi/yq_number>=0.3:
