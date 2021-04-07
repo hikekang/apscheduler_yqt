@@ -101,6 +101,7 @@ class YQTSpider(object):
             code = "1234hi"
 
         yqzcode.send_keys(code)
+        time.sleep(0.2)
         submit_buttion.click()
 
         try:
@@ -413,15 +414,11 @@ class YQTSpider(object):
         点击每页100条按钮
         :return:
         """
-        print('更改100')
         if not self._is_page_loaded():
             logger.info("更改100条数据/每页前，页面加载有问题")
             return False
-        print('开始更改')
         self.spider_driver.find_element_by_css_selector('div[ng-show="selectType == 1"]').click()
-        print('点击')
         time.sleep(1)
-        print('查找sleep')
         self.spider_driver.find_element_by_css_selector(
             'div[ng-show="selectType == 1"] li[data-original-index="2"]>a').click()
         print('选择100')
@@ -429,7 +426,6 @@ class YQTSpider(object):
             logger.info("更改100条数据/每页后，页面加载有问题")
             return False
         logger.info("更改100条数据/每页")
-        print('更改完毕')
         return True
 
     def _get_input_time_range(self):
@@ -565,7 +561,7 @@ class YQTSpider(object):
         return True
 
     def _crawl2(self,time_sleep):
-
+        # 记录任务时间区
         logger.info(
             f'任务时间区间：{self.interval[0].strftime(config.DATETIME_FORMAT)} --- '
             f'{self.interval[1].strftime(config.DATETIME_FORMAT)}')
@@ -592,6 +588,7 @@ class YQTSpider(object):
 
             # 翻页并抓取数据
             resp = self._turn_page(max_page_num,time_sleep)
+
             if resp == "restart_browser":
                 return resp
             elif not resp:
@@ -612,11 +609,14 @@ class YQTSpider(object):
                 logger.info("上传数据")
                 post_url="http://localhost:8086/localproject/industry/industryBigDataExcelByEasyExcel"
                 post_url2="http://localhost:8086/localproject/industry/industryBigDataExcelByEasyExcel_2.1"
+
                 files={'file':open(self.data_file_path,'rb')}
                 proxies = {"http": None, "https": None}
+
                 post_info=requests.post(post_url,files=files,proxies=proxies).text
                 files={'file':open(self.data_file_path,'rb')}
                 post_info2=requests.post(post_url2,files=files,proxies=proxies).text
+
                 post_info = eval(post_info)
                 post_info2 = eval(post_info2)
                 logger.info("开始记录")
@@ -625,6 +625,7 @@ class YQTSpider(object):
                 #xlsx数据量
                 wb=load_workbook(self.data_file_path)
                 xlsx_num=wb[wb.sheetnames[0]].max_row
+                # 记录文件路径
                 record_file_path=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                              f"record\{self.info['project_name']}",f"{self}_记录.xlsx")
                 sql_number=ssql_helper.find_info_count(self.interval[0],self.interval[1],self.info['sheet_name'])
@@ -653,6 +654,7 @@ class YQTSpider(object):
         li = driver.find_element_by_xpath('//li[contains(@id,"kw_li_")]')
         span = li.find_element_by_xpath('//span[@class="fa-tree-plan-tools-bar"]')
         action = ActionChains(driver)
+        time.sleep(0.3)
         action.move_to_element(li).perform()
         time.sleep(0.3)
         span.click()
@@ -678,9 +680,11 @@ class YQTSpider(object):
             self.next_end_time = self.interval[1]
             # 抓取数据
             print("获取关键词")
-            self.info=infos
-            print(11)
+            self.infos=infos
+            # 循环进行项目采取数据
             for info in infos:
+                self.info = info
+                # 重新设置项目路径
                 self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                                    f"data\{info['project_name']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
                                                    f"{self}_{info['yuqingtong_username']}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
@@ -760,6 +764,7 @@ def work_it_2():
     start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
     # 结束时间
     end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+    # 获取项目信息
     infos = config.row_list
     yqt_spider = YQTSpider(infos[0],start_time=start_time, end_time=end_time)
 
