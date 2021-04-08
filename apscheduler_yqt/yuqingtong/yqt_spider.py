@@ -241,8 +241,37 @@ class YQTSpider(object):
 
                 }
             # print(data)
+
             data_list.append(data)
         return data_list
+    def clear_data(self,data_list):
+        new_data_list=self.quchong(data_list,"链接")
+        for data in new_data_list:
+            if data["标题"]=="" or data["链接"]=="":
+                new_data_list.remove(data)
+            elif data["标题"]=="转发微博" and data["转发内容"]=="":
+                new_data_list.remove(data)
+            elif data["标题"]=="转发微博":
+                data["标题"]=data["转发内容"][0:20]
+            if "weibo.com" in data["链接"] and data["sort"]!="":
+                if data["sort"]=="原创":
+                    data['is_original']=1
+                elif data["sort"]=="转发":
+                    data['is_original']=0
+                else:
+                    data['is_original']=2
+            else:
+                data['is_original']=2
+        return new_data_list
+
+    def quchong(self,dir_list,key):
+        new_dirlist=[]
+        values=[]
+        for d in dir_list:
+            if d[key] not in values:
+                new_dirlist.append(d)
+                values.append(d[key])
+        return new_dirlist
 
     def parse_data(self):
         """
@@ -537,6 +566,11 @@ class YQTSpider(object):
 
             logger.info(f"当前第【{self.next_page_num}】页,共{max_page_num}页")
             data_list = self.parse_data()
+            # 数据进行处理
+            data_list=self.clear_data(data_list)
+
+            # 插入到数据库，返回一个成功插入的值
+
             logger.info(f"解析到{len(data_list)}条数据")
             SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path)
             logger.info(f"保存完毕")
