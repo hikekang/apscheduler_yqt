@@ -6,6 +6,7 @@
    time：          2021/4/1 14:44
 """
 import datetime
+import chardet
 
 import pymssql
 config={
@@ -95,6 +96,32 @@ def find_info_count(start_time,end_time,industry_name):
     count=cursor.fetchall()[0][0]
     print(count)
     return count
+def insert_data_list(data_list):
+
+    pass
+
+def get_industry_name():
+    config = {
+        'server': '223.223.180.9',
+        'user': 'tuser1',
+        'password': 'tsuser1@123aA',
+        'database': 'TS_B2.0',
+        'port': '39999'
+    }
+    connect=pymssql.connect(server='223.223.180.9',user='tsuser1',password='tsuser1@123aA',database='TS_B2.0',port='39999',charset='utf8')
+    cursor=connect.cursor()
+    sql="select * from TS_Customers"
+    cursor.execute(sql)
+    data=cursor.fetchall()
+    new_data=[]
+    for d in iter(data):
+        # 处理乱码
+        print(type(d))
+        print(d[2].encode('latin1').decode('gbk'))
+
+    # print(data)
+get_industry_name()
+
 # print(find_info_count())
 #
 # count=find_info_count('2021-04-02 10:00:00','2021-04-02 11:00:00','流通贸易')
