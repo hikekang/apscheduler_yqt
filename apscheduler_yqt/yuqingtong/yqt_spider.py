@@ -22,6 +22,7 @@ from yuqingtong import config
 import requests
 from openpyxl import load_workbook
 from utils import ssql_helper
+import re
 class YQTSpider(object):
 
     def __init__(self,info,spider_driver=None, start_time=None,end_time=None,  *args, **kwargs):
@@ -218,7 +219,8 @@ class YQTSpider(object):
                     '链接': td_title.find('.news-item-tools.font-size-0 div:nth-child(2)>div>ul>li:nth-child(4) a').attr(
                         "href"),
                     '转发内容': repost_content,
-                    '发布人': td_title.find('div[class="profile-title inline-block"]>a>span:first-child').text(),
+                    # '发布人': td_title.find('div[class="profile-title inline-block"]>a>span:first-child').text(),
+                    '发布人': td_title.find('div[class="profile-title inline-block"]>a>span[ng-if*="icc.author"]').text(),
                     'attitude': td_title.find(
                         'div[ng-show="view.resultPresent != 3"] div.sensitive-status-content:not(.ng-hide)>span:first-child').text(),
                     'images': ",".join([img.attr('src') for img in item.find('.actizPicShow img').items()]),
@@ -241,7 +243,8 @@ class YQTSpider(object):
 
                 }
             # print(data)
-
+            publish_man=re.sub(':|：','',data['发布人'])
+            data['发布人']=publish_man
             data_list.append(data)
         return data_list
     def clear_data(self,data_list):
@@ -806,7 +809,7 @@ def work_it_2():
 
     #
 def apscheduler():
-    trigger1 = CronTrigger(hour='9-18', minute='11', second=30, jitter=30)
+    trigger1 = CronTrigger(hour='9-18', minute='52', second=10, jitter=5)
     sched = BlockingScheduler()
     sched.add_job(work_it_2, trigger1, id='my_job_id')
     sched.start()
