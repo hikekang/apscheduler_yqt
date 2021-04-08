@@ -53,7 +53,7 @@ class SpiderHelper(object):
             for data in data_list:
                 writer.writerow(data)
     @staticmethod
-    def save_xlsx(data_list, out_file):
+    def save_xlsx(data_list, out_file,sheet_name):
         head_xlsx = ['时间', '标题', '描述', '链接', '转发内容', '发布人', 'attitude', 'images', 'reposts_count', 'comments_count',
                      'sort', 'industry', 'related_words', 'site_name', 'area']
 
@@ -62,7 +62,7 @@ class SpiderHelper(object):
             os.makedirs(dir)
         if not os.path.exists(out_file):
             wb=Workbook(out_file)
-            sheet=wb.create_sheet(title=info['sheet_name'])
+            sheet=wb.create_sheet(title=sheet_name)
             #写入表头
             # for i,item in enumerate(head_xlsx):
             #     sheet.cell(row=1,column=i+1,value=item)
@@ -74,7 +74,7 @@ class SpiderHelper(object):
             wb.close()
         else:
             wb=load_workbook(out_file)
-            sheet=wb[info['sheet_name']]
+            sheet=wb[sheet_name]
             for data in data_list:
                 values = (data[k] for k in head_xlsx)
                 sheet.append(values)

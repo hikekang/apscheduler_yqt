@@ -572,7 +572,7 @@ class YQTSpider(object):
             # 插入到数据库，返回一个成功插入的值
 
             logger.info(f"解析到{len(data_list)}条数据")
-            SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path)
+            SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path,sheet_name=self.info['sheet_name'])
             logger.info(f"保存完毕")
 
             if self.next_page_num >= max_page_num:
