@@ -5,10 +5,10 @@
    Author :       hike
    time：          2021/4/1 14:44
 """
-import datetime
-import chardet
-
+import re
+from utils.snowflake import IdWorker
 import pymssql
+from utils import post_mq
 config={
     'server':'223.223.180.9',
     'user':'tuser1',
@@ -54,6 +54,12 @@ cursor=connect.cursor()
 # for d in cursor.fetchall():
 #     for k,v in d.items():
 #         print(v)
+connect_A=pymssql.connect(server='223.223.180.9',user='tsuser1',password='tsuser1@123aA',database='TS_A',port='39999',charset='utf8')
+connect_B=pymssql.connect(server='223.223.180.9',user='tsuser1',password='tsuser1@123aA',database='TS_B2.0',port='39999',charset='utf8')
+connect_QBBA=pymssql.connect(server='223.223.180.9',user='tsuser1',password='tsuser1@123aA',database='QBB_A',port='39999',charset='utf8')
+cursor_A=connect_A.cursor()
+cursor_B=connect_B.cursor()
+cursor_QBBA=connect_QBBA.cursor()
 
 '''
 优速 流通贸易
@@ -62,28 +68,28 @@ cursor=connect.cursor()
 
 
 '''
-
+tables = {
+        "餐饮业": "dbo.TS_industry_news_catering",
+        "保险业": "dbo.TS_industry_news_insurance",
+        "房地产": "dbo.TS_industry_news_estate",
+        "服务业": "dbo.TS_industry_news_service",
+        "公关传统": "dbo.TS_industry_news_PR",
+        "IT业": "dbo.TS_industry_news_IT",
+        "教育": "dbo.TS_industry_news_education",
+        "金融业": "dbo.TS_industry_news_financial",
+        "机械制造": "dbo.TS_industry_news_machine",
+        "流通贸易": "dbo.TS_industry_news_circulation",
+        "旅游业": "dbo.TS_industry_news_tourism",
+        "汽车业": "dbo.TS_industry_news_automotive",
+        "食品业": "dbo.TS_industry_news_food",
+        "文化出版": "dbo.TS_industry_news_cultural",
+        "医疗保健": "dbo.TS_industry_news_medical",
+        "其它": "dbo.TS_industry_news_other",
+    }
 
 def find_info_count(start_time,end_time,industry_name):
-# def find_info_count():
-    tables={
-        "餐饮业":"dbo.TS_industry_news_catering",
-        "保险业":"dbo.TS_industry_news_insurance",
-        "房地产":"dbo.TS_industry_news_estate",
-        "服务业":"dbo.TS_industry_news_service",
-        "公关传统":"dbo.TS_industry_news_PR",
-        "IT业":"dbo.TS_industry_news_IT",
-        "教育":"dbo.TS_industry_news_education",
-        "金融业":"dbo.TS_industry_news_financial",
-        "机械制造":"dbo.TS_industry_news_machine",
-        "流通贸易":"dbo.TS_industry_news_circulation",
-        "旅游业":"dbo.TS_industry_news_tourism",
-        "汽车业":"dbo.TS_industry_news_automotive",
-        "食品业":"dbo.TS_industry_news_food",
-        "文化出版":"dbo.TS_industry_news_cultural",
-        "医疗保健":"dbo.TS_industry_news_medical",
-        "其它":"dbo.TS_industry_news_other",
-    }
+    connect=pymssql.connect(server='223.223.180.9',user='tsuser1',password='tsuser1@123aA',database='TS_A',port='39999')
+    cursor=connect.cursor()
     table_name=tables[industry_name]
     sql="select count(*) from {table_name} where publish_time between '{start_time}' and '{end_time}' ".format(table_name=table_name,start_time=start_time,end_time=end_time)
 
@@ -100,29 +106,68 @@ def insert_data_list(data_list):
 
     pass
 
+# B库中查询项目名称以及行业名称
 def get_industry_name():
-    config = {
-        'server': '223.223.180.9',
-        'user': 'tuser1',
-        'password': 'tsuser1@123aA',
-        'database': 'TS_B2.0',
-        'port': '39999'
-    }
-    connect=pymssql.connect(server='223.223.180.9',user='tsuser1',password='tsuser1@123aA',database='TS_B2.0',port='39999',charset='utf8')
-    cursor=connect.cursor()
-    sql="select * from TS_Customers"
-    cursor.execute(sql)
-    data=cursor.fetchall()
+
+    sql_B="select * from TS_Customers where IsEnable=1"
+    cursor_B.execute(sql_B)
+    # get enable project
+    data=cursor_B.fetchall()
+
     new_data=[]
     for d in iter(data):
         # 处理乱码
-        print(type(d))
-        print(d[2].encode('latin1').decode('gbk'))
+        new_d={
+            'id':'',
+            'customer':'',
+            'industry_name':'',
+            'keywords':'',
+            'excludewords':'',
+            'simultaneouswords':'',
+        }
+        for i,dd in enumerate(d):
+            if i==0:
+                new_d['id']=dd
+                # 单字段去重
+                # sql_A="select distinct Word from TS_Keywords where C_ID={}".format(dd).encode('GBK')
+                # sql_A="select Word,Simultaneouswords,Excludewords from TS_Keywords where C_ID={} group by Word".format(dd)
+                sql_A="select Word,SimultaneousWord,Excludeword from TS_A.dbo.TS_Keywords where C_ID={} group by Word,SimultaneousWord,Excludeword".format(dd)
+                # sql_A="select Word,SimultaneousWord,Excludeword from TS_A.dbo.TS_Keywords where C_ID='1149212304344420353' group by Word,SimultaneousWord,Excludeword"
+                cursor_A.execute(sql_A)
+                data_A=cursor_A.fetchall()
+                for da in data_A:
+                    for i,d_a in enumerate(da):
+                        if d_a and i==0:
+                            new_d['keywords']+=re.sub('、','|',d_a.encode('latin1').decode('gbk'))+'|'
+                        if d_a and i==1:
+                            new_d['excludewords']+=re.sub('、','|',d_a.encode('latin1').decode('gbk'))+'|'
+                        if d_a and i==2:
+                            new_d['simultaneouswords']+=re.sub('、','|',d_a.encode('latin1').decode('gbk'))+'|'
+            if i==1:
+                new_d['customer']=(d[1].encode('latin1').decode('gbk'))
+            else:
+                new_d['industry_name']=(d[2].encode('latin1').decode('gbk'))
+        new_data.append(new_d)
+    return new_data
+def post_data(data_list,industry_name):
+    table_name = tables[industry_name]
+    sql_industry_id="select id from TS_Industry where name='"+industry_name+"'"
+    print(sql_industry_id)
+    # sql_industry_id="select id from TS_Industry wh"
 
-    # print(data)
-get_industry_name()
+    cursor_B.execute(sql_industry_id)
 
-# print(find_info_count())
-#
-# count=find_info_count('2021-04-02 10:00:00','2021-04-02 11:00:00','流通贸易')
-# print(count)
+    industry_id =cursor_B.fetchone()[0]
+    for data in data_list:
+        worker = IdWorker(1, 2, 0)
+        id=worker.get_id()
+        sql_ts_a ="insert into {}(id,industry_id,title,summary,content,url,author,publish_time) values (id,industry_id,data['标题'],data['描述'],data['转发内容'],data['链接'],data['发布人'],data['时间']) ".format(table_name)
+        sql_qbb_a ="insert into {}(id,industry_id,title,summary,content,url,author,publish_time,is_original,loaction) values (id,industry_id,data['标题'],data['描述'],data['转发内容'],data['链接'],data['发布人'],data['时间'],data['is_original'],data['area']) ".format(table_name)
+        cursor_A.execute(sql_ts_a)
+        data={
+            'id':id,
+            'industry_id':industry_id
+        }
+        post_mq('reptile.stay.process',data)
+        cursor_QBBA.execute(sql_qbb_a)
+        post_mq('reptile.stay.process_2.1',data)
