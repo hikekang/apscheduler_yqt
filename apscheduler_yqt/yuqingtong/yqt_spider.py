@@ -160,9 +160,9 @@ class YQTSpider(object):
                     logger.warning(e)
                     logger.warning(td_time)
 
-            # 转发类型
+            # 转发类型  原创
             sort = td_title.find('div.news-item-tools.font-size-0 span.tag-yuan').text()
-
+            # 转发内容
             repost_content = td_title.find('div.item-title.resend-news-item-title').text().replace('\n', '')
             pinglun=td_title.find('div.inline-block.mr10.tag-ping').text().replace('\n','')#评论
 
@@ -170,7 +170,7 @@ class YQTSpider(object):
                 sort = "转发"
             if pinglun:
                 sort = "评论"
-
+            # 微博原创类型的内容、转发类型的评论内容、其他类型的内容
             content = td_title.find('div.item-title.news-item-title.contenttext.ng-binding').text().replace('\n', ''),
 
             title = td_title.find('span[ng-bind-html="icc.title | trustAsHtml"]').text().replace('\n', '')
@@ -180,7 +180,7 @@ class YQTSpider(object):
                 data = {
                     '时间': parse_time(td_time),
                     '标题': content[0],
-                    '描述': '',
+                    '描述': content[0],#微博原创
                     '链接': td_title.find('.news-item-tools.font-size-0 div:nth-child(2)>div>ul>li:nth-child(4) a').attr(
                         "href"),
                     '转发内容': repost_content,
@@ -193,7 +193,6 @@ class YQTSpider(object):
 
                     'comments_count': item.find(
                         'div.news-item-title.color-gray-6.font-size-12.ng-scope span:nth-child(3)>span').text(),
-
                     'sort': sort,
 
                     'industry': td_title.find(
@@ -206,11 +205,16 @@ class YQTSpider(object):
                     'area': td_origins.find('div[ng-bind="icc.province"]').text(),
 
                 }
+                # 针对微博而言
                 if sort=='评论':
                     data['链接']=td_title.find('.news-item-tools.font-size-0 div:nth-child(2)>div>ul>li:nth-child(3) a').attr("href")
+                    # 评论的内容
                     biaoti=td_title.find('div.item-title.news-item-title.dot.ng-binding').text().replace('\n', '')
                     data['标题']=biaoti
                     data['发布人']=td_title.find('a[ng-if="icc.commentAuthor != null"]').text()
+                    data['描述']=biaoti
+                elif sort=='原创':
+                    data['转发内容']=data['描述']
             else:
                 data = {
                     '时间': parse_time(td_time),
@@ -250,12 +254,28 @@ class YQTSpider(object):
     def clear_data(self,data_list):
         new_data_list=self.quchong(data_list,"链接")
         for data in new_data_list:
+            # 1.标题或url为空的舍去
             if data["标题"]=="" or data["链接"]=="":
                 new_data_list.remove(data)
+            #     2.转发微博并且转发内容为空的使舍去
             elif data["标题"]=="转发微博" and data["转发内容"]=="":
                 new_data_list.remove(data)
+            #     3.转发类型的微博，取前内容的前20个字符作为标题
             elif data["标题"]=="转发微博":
-                data["标题"]=data["转发内容"][0:20]
+                if len(data["转发内容"])>=20:
+                    data["标题"]=data["转发内容"][0:20]
+                else:
+                    data["标题"] = data["转发内容"]
+                data['描述']=data["转发内容"]
+
+            # if "weibo.com" in data["链接"] and data['描述']!="":
+            #     data["转发内容"]=data["描述"]
+
+            if data['描述']!="" and data["转发内容"]=="":
+                data["转发内容"]=data['描述']
+            if data['转发内容']!=""and data['描述']=="":
+                data['描述']=data['转发内容']
+
             if "weibo.com" in data["链接"] and data["sort"]!="":
                 if data["sort"]=="原创":
                     data['is_original']=1
@@ -575,8 +595,11 @@ class YQTSpider(object):
             # 插入到数据库，返回一个成功插入的值
 
             logger.info(f"解析到{len(data_list)}条数据")
-            SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path,sheet_name=self.info['sheet_name'])
-            logger.info(f"保存完毕")
+            # SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path,sheet_name=self.info['sheet_name'])
+            # logger.info(f"保存完毕")
+
+            # 上传数据
+            ssql_helper.post_data(data_list,self.info['industry_name'])
 
             if self.next_page_num >= max_page_num:
                 logger.info("抓取到最大页，停止")
@@ -644,30 +667,28 @@ class YQTSpider(object):
             if self.next_end_time >= self.interval[1]:
                 logger.info("解析到终止时间，抓取完成")
                 logger.info("上传数据")
-                post_url="http://localhost:8086/localproject/industry/industryBigDataExcelByEasyExcel"
-                post_url2="http://localhost:8086/localproject/industry/industryBigDataExcelByEasyExcel_2.1"
-
-                files={'file':open(self.data_file_path,'rb')}
-                proxies = {"http": None, "https": None}
-
-                post_info=requests.post(post_url,files=files,proxies=proxies).text
-                files={'file':open(self.data_file_path,'rb')}
-                post_info2=requests.post(post_url2,files=files,proxies=proxies).text
-
-                post_info = eval(post_info)
-                post_info2 = eval(post_info2)
-                logger.info("开始记录")
-                #舆情通数量
-                yqt_count=self._count_number
-                #xlsx数据量
-                wb=load_workbook(self.data_file_path)
-                xlsx_num=wb[wb.sheetnames[0]].max_row
-                # 记录文件路径
-                record_file_path=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                             f"record\{self.info['project_name']}",f"{self}_记录.xlsx")
-                sql_number=ssql_helper.find_info_count(self.interval[0],self.interval[1],self.info['sheet_name'])
-                data_list=[self.info['project_name'],datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),self.last_end_time,self.next_end_time]
-                SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
+                # post_url="http://localhost:8086/localproject/industry/industryBigDataExcelByEasyExcel"
+                # post_url2="http://localhost:8086/localproject/industry/industryBigDataExcelByEasyExcel_2.1"
+                # files={'file':open(self.data_file_path,'rb')}
+                # proxies = {"http": None, "https": None}
+                # post_info=requests.post(post_url,files=files,proxies=proxies).text
+                # files={'file':open(self.data_file_path,'rb')}
+                # post_info2=requests.post(post_url2,files=files,proxies=proxies).text
+                #
+                # post_info = eval(post_info)
+                # post_info2 = eval(post_info2)
+                # logger.info("开始记录")
+                # #舆情通数量
+                # yqt_count=self._count_number
+                # #xlsx数据量
+                # wb=load_workbook(self.data_file_path)
+                # xlsx_num=wb[wb.sheetnames[0]].max_row
+                # # 记录文件路径
+                # record_file_path=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                #              f"record\{self.info['project_name']}",f"{self}_记录.xlsx")
+                # sql_number=ssql_helper.find_info_count(self.interval[0],self.interval[1],self.info['sheet_name'])
+                # data_list=[self.info['project_name'],datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),self.last_end_time,self.next_end_time]
+                # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
                 return True
             else:
                 self.last_end_time = self.next_end_time  # 上次终止时间就是下次起始时间
@@ -723,8 +744,8 @@ class YQTSpider(object):
                 self.info = info
                 # 重新设置项目路径
                 self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                                   f"data\{info['project_name']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
-                                                   f"{self}_{info['yuqingtong_username']}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
+                                                   f"data\{info['customer']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
+                                                   f"{self}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
                                                        ':', '_'))
                 self.keyword=info['keywords']
                 # 设置关键词
@@ -803,13 +824,17 @@ def work_it_2():
     end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
     # 获取项目信息
     infos = config.row_list
+
     yqt_spider = YQTSpider(infos[0],start_time=start_time, end_time=end_time)
 
-    yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2,infos=infos)
+    # yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2,infos=infos)
+
+    project_list=ssql_helper.get_industry_name()
+    yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2,infos=project_list)
 
     #
 def apscheduler():
-    trigger1 = CronTrigger(hour='9-18', minute='52', second=10, jitter=5)
+    trigger1 = CronTrigger(hour='9-18', minute='37', second=10, jitter=5)
     sched = BlockingScheduler()
     sched.add_job(work_it_2, trigger1, id='my_job_id')
     sched.start()
