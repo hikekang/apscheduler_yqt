@@ -9,6 +9,10 @@ import re
 from utils.snowflake import IdWorker
 import pymssql
 from utils import post_mq
+from utils import baidu_emition
+import redis
+pool=redis.ConnectionPool(host='localhost',port=6379,decode_responses=True)
+r=redis.Redis(connection_pool=pool)
 config={
     'server':'223.223.180.9',
     'user':'tuser1',
@@ -102,9 +106,6 @@ def find_info_count(start_time,end_time,industry_name):
     count=cursor.fetchall()[0][0]
     print(count)
     return count
-def insert_data_list(data_list):
-
-    pass
 
 # B库中查询项目名称以及行业名称
 def get_industry_name():
@@ -160,14 +161,47 @@ def post_data(data_list,industry_name):
     industry_id =cursor_B.fetchone()[0]
     for data in data_list:
         worker = IdWorker(1, 2, 0)
+        # 生成雪花id
         id=worker.get_id()
-        sql_ts_a ="insert into {}(id,industry_id,title,summary,content,url,author,publish_time) values (id,industry_id,data['标题'],data['描述'],data['转发内容'],data['链接'],data['发布人'],data['时间']) ".format(table_name)
-        sql_qbb_a ="insert into {}(id,industry_id,title,summary,content,url,author,publish_time,is_original,loaction) values (id,industry_id,data['标题'],data['描述'],data['转发内容'],data['链接'],data['发布人'],data['时间'],data['is_original'],data['area']) ".format(table_name)
+        positive_prob=baidu_emition.emotion(data['转发内容'][0:1000])
+        sql_ts_a ="insert into %s (id,industry_id,title,summary,content,url,author,publish_time,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s)"%(table_name,id,industry_id,data['标题'],data['描述'],data['转发内容'],data['链接'],data['发布人'],data['时间'],positive_prob)
+        sql_qbb_a ="insert into %s (id,industry_id,title,summary,content,url,author,publish_time,is_original,loaction,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s)"%(table_name,id,industry_id,data['标题'],data['描述'],data['转发内容'],data['链接'],data['发布人'],data['时间'],data['is_original'],data['area'],positive_prob)
         cursor_A.execute(sql_ts_a)
+        cursor_QBBA.execute(sql_ts_a)
         data={
             'id':id,
             'industry_id':industry_id
         }
-        post_mq('reptile.stay.process',data)
+        # 滤重
+        post_mq.send_to_queue('reptile.stay.process',str(data))
         cursor_QBBA.execute(sql_qbb_a)
-        post_mq('reptile.stay.process_2.1',data)
+        # 拉取信息到B库
+        post_mq.send_to_queue('reptile.stay.process_2.1',str(data))
+
+def testsql():
+    sql_ts_a = "insert into %s (id,industry_id,title,summary,content,url,author,publish_time) values (%s,%s,%s,%s,%s,%s,%s,%s)" %('hike','hike','hike','hike','hike','hike','hike','hike','hike',)
+    print(sql_ts_a)
+
+# 将所有行业的数据加载到内存中
+def get_month_data():
+    for tb in tables.values():
+        sql="select industry_id,url from %s where publish_time between '%s' and '%s'"%(tb,'2021-03-11','2021-04-11')
+        print(sql)
+        cursor_A.execute(sql)
+        datas=cursor_A.fetchall()
+        for d in datas:
+            r.sadd(d[0], d[1])
+
+def data_isexists(industry_id,url):
+    if r.sismember(industry_id,url)==1:
+        return True
+    else:
+        return False
+
+
+# import time
+# t1=time.time()
+# get_month_data()
+# t2=time.time()
+# print(t2-t1)
+
