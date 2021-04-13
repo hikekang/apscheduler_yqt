@@ -179,11 +179,11 @@ class YQTSpider(object):
             if (site_name == '新浪微博' or site_name=='今日头条'):
                 data = {
                     '时间': parse_time(td_time),
-                    '标题': content[0],
-                    '描述': content[0],#微博原创
+                    '标题': content[0].replace("'",""),
+                    '描述': content[0].replace("'",""),#微博原创
                     '链接': td_title.find('.news-item-tools.font-size-0 div:nth-child(2)>div>ul>li:nth-child(4) a').attr(
                         "href"),
-                    '转发内容': repost_content,
+                    '转发内容': repost_content.replace("'",""),
                     '发布人': td_title.find('a[ng-bind="icc.author"]').text(),
                     'attitude': td_title.find(
                         'div[ng-show="view.resultPresent != 3"] div.sensitive-status-content:not(.ng-hide)>span:first-child').text(),
@@ -209,7 +209,7 @@ class YQTSpider(object):
                 if sort=='评论':
                     data['链接']=td_title.find('.news-item-tools.font-size-0 div:nth-child(2)>div>ul>li:nth-child(3) a').attr("href")
                     # 评论的内容
-                    biaoti=td_title.find('div.item-title.news-item-title.dot.ng-binding').text().replace('\n', '')
+                    biaoti=td_title.find('div.item-title.news-item-title.dot.ng-binding').text().replace('\n', '').replace("'","")
                     data['标题']=biaoti
                     data['发布人']=td_title.find('a[ng-if="icc.commentAuthor != null"]').text()
                     data['描述']=biaoti
@@ -218,11 +218,11 @@ class YQTSpider(object):
             else:
                 data = {
                     '时间': parse_time(td_time),
-                    '标题': title,
-                    '描述': content[0],
+                    '标题': title.replace("'",""),
+                    '描述': content[0].replace("'",""),
                     '链接': td_title.find('.news-item-tools.font-size-0 div:nth-child(2)>div>ul>li:nth-child(4) a').attr(
                         "href"),
-                    '转发内容': repost_content,
+                    '转发内容': repost_content.replace("'",""),
                     # '发布人': td_title.find('div[class="profile-title inline-block"]>a>span:first-child').text(),
                     '发布人': td_title.find('div[class="profile-title inline-block"]>a>span[ng-if*="icc.author"]').text(),
                     'attitude': td_title.find(
@@ -250,14 +250,13 @@ class YQTSpider(object):
             publish_man=re.sub(':|：','',data['发布人'])
             data['发布人']=publish_man
             # 查看近一个月中是否存在，滤重
-
             data_list.append(data)
         return data_list
 
     # 数据处理
     def clear_data(self,data_list):
         new_data_list=self.quchong(data_list,"链接")
-        print("数据处理")
+        logger.info("数据处理")
         # 第二次滤重
         second_data_list=ssql_helper.filter_by_url(new_data_list,self.info['industry_name'])
         for data in second_data_list:
@@ -362,9 +361,6 @@ class YQTSpider(object):
             logger.info("设置时间区间...")
             self._save_process()
             # self._set_conditions(start_time, end_time)
-            """
-                假如多项目切换，提前换词
-            """
             # self.modifi_keywords()
 
             """
@@ -597,7 +593,7 @@ class YQTSpider(object):
 
             logger.info(f"当前第【{self.next_page_num}】页,共{max_page_num}页")
             data_list = self.parse_data()
-            print('数据抓取完毕11')
+            logger.info('数据抓取完毕')
             # 数据进行处理
             data_list=self.clear_data(data_list)
 
@@ -761,7 +757,7 @@ class YQTSpider(object):
             # 设置关键词
             self.modifi_keywords()
 
-            # 再次设置时间
+            # 再次设置时间（定时抓取）
             end_time1 = datetime.datetime.now().strftime('%Y-%m-%d %H') + ":00:00"
             one_hour_ago1 = datetime.datetime.now() - datetime.timedelta(hours=1)
             start_time1 = one_hour_ago1.strftime('%Y-%m-%d %H') + ":00:00"
@@ -821,7 +817,7 @@ def work_it():
     infos=config.row_list
     for info in infos:
         yqt_spider = YQTSpider(info,start_time=start_time, end_time=end_time)
-        yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2,info="11")
+        yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2,info=info)
 
 def work_it_2():
     end_time = datetime.datetime.now().strftime('%Y-%m-%d %H') + ":00:00"
@@ -835,13 +831,15 @@ def work_it_2():
     # 获取项目信息
     infos = config.row_list
 
-    today=datetime.datetime.now().strftime('%Y-%m-%d')
+    today=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     time1=(datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%Y-%m-%d')
+    print(today)
+    print(time1)
     ssql_helper.get_month_data(time1,today)
-    yqt_spider = YQTSpider(infos[0],start_time=start_time, end_time=end_time)
+    yqt_spider = YQTSpider(infos[-1],start_time=start_time, end_time=end_time)
 
     # yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2,infos=infos)
-
+    # 从数据库中获取使用项目信息
     project_list=ssql_helper.get_industry_keywords()
     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2,infos=project_list)
 
@@ -854,5 +852,6 @@ def apscheduler():
     sched.start()
 
 if __name__ == '__main__':
-    apscheduler()
+    # apscheduler()
     # xlsx_work()
+    work_it_2()
