@@ -258,14 +258,17 @@ class YQTSpider(object):
         new_data_list=self.quchong(data_list,"链接")
         logger.info("数据处理")
         # 第二次滤重
-        second_data_list=ssql_helper.filter_by_url(new_data_list,self.info['industry_name'])
-        for data in second_data_list:
+        new_data_list=ssql_helper.filter_by_url(new_data_list,self.info['industry_name'])
+        sec_list=[]
+        for data in new_data_list:
             # 1.标题或url为空的舍去
             if data["标题"]=="" or data["链接"]=="":
-                new_data_list.remove(data)
+                # new_data_list.remove(data)
+                continue
             #     2.转发微博并且转发内容为空的使舍去
             elif data["标题"]=="转发微博" and data["转发内容"]=="":
-                new_data_list.remove(data)
+                # new_data_list.remove(data)
+                continue
             #     3.转发类型的微博，取前内容的前20个字符作为标题
             elif data["标题"]=="转发微博":
                 if len(data["转发内容"])>=20:
@@ -274,12 +277,10 @@ class YQTSpider(object):
                     data["标题"] = data["转发内容"]
                 data['描述']=data["转发内容"]
 
-            # if "weibo.com" in data["链接"] and data['描述']!="":
-            #     data["转发内容"]=data["描述"]
-
-            if data['描述']!="" and data["转发内容"]=="":
+            if data['描述']!="" and data["转发内容"]==""and len(data["转发内容"])==0:
                 data["转发内容"]=data['描述']
-            if data['转发内容']!=""and data['描述']=="":
+
+            if data['转发内容']!=""and data['描述']==""and len(data['转发内容'])!=0:
                 data['描述']=data['转发内容']
 
             if "weibo.com" in data["链接"] and data["sort"]!="":
@@ -291,7 +292,8 @@ class YQTSpider(object):
                     data['is_original']=2
             else:
                 data['is_original']=2
-        return new_data_list
+            sec_list.append(data)
+        return sec_list
 
     # 第一次根据爬取链接去重
     def quchong(self,dir_list,key):
@@ -757,18 +759,21 @@ class YQTSpider(object):
             # 设置关键词
             self.modifi_keywords()
 
-            # 再次设置时间（定时抓取）
-            end_time1 = datetime.datetime.now().strftime('%Y-%m-%d %H') + ":00:00"
-            one_hour_ago1 = datetime.datetime.now() - datetime.timedelta(hours=1)
-            start_time1 = one_hour_ago1.strftime('%Y-%m-%d %H') + ":00:00"
-            # 开始时间
-            start_time1 = datetime.datetime.strptime(start_time1, "%Y-%m-%d %H:%M:%S")
-            # 结束时间
-            end_time1 = datetime.datetime.strptime(end_time1, "%Y-%m-%d %H:%M:%S")
-
-            self.interval = [start_time1, end_time1]
-            self.last_end_time = self.interval[0]
-            self.next_end_time = self.interval[1]
+            # -------------再次设置时间（定时抓取）----------------
+            # end_time1 = datetime.datetime.now().strftime('%Y-%m-%d %H') + ":00:00"
+            # one_hour_ago1 = datetime.datetime.now() - datetime.timedelta(hours=1)
+            # start_time1 = one_hour_ago1.strftime('%Y-%m-%d %H') + ":00:00"
+            # # 开始时间
+            # start_time1 = datetime.datetime.strptime(start_time1, "%Y-%m-%d %H:%M:%S")
+            # # 结束时间
+            # end_time1 = datetime.datetime.strptime(end_time1, "%Y-%m-%d %H:%M:%S")
+            # 
+            # self.interval = [start_time1, end_time1]
+            # self.last_end_time = self.interval[0]
+            # self.next_end_time = self.interval[1]
+            #-----------定时抓取时间设置完毕----------------------
+            
+            
             # 抓取数据
             resp = self._crawl2(time_sleep)
 
@@ -794,16 +799,15 @@ class YQTSpider(object):
 #修改xlsx文件进行自动抓取
 def xlsx_work():
     time_list = config.get_time_list()
+    today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    time1 = (datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%Y-%m-%d')
+    ssql_helper.get_month_data(time1, today)
     # print(time_list)
     infos = config.row_list
-    for info in infos:
-        for tim in time_list:
-            print('抓取次数')
-            print(tim['start_time'])
-            yqt_spider = YQTSpider(info,start_time=tim['start_time'], end_time=tim['end_time'])
-            yqt_spider.start(start_time=tim['start_time'], end_time=tim['end_time'], time_sleep=tim['time_delay'],keyword=None)
-            # config.info['start_time'] = tim['start_time']
-            # config.info['end_time'] = tim['end_time']
+    yqt_spider = YQTSpider(infos[-1])
+    project_list = ssql_helper.get_industry_keywords()
+    for tim in time_list:
+        yqt_spider.start(start_time=tim['start_time'], end_time=tim['end_time'], time_sleep=tim['time_delay'],infos=project_list)
 # 自定义时间抓取任务
 def work_it():
     end_time = datetime.datetime.now().strftime('%Y-%m-%d %H') + ":00:00"
@@ -833,8 +837,6 @@ def work_it_2():
 
     today=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     time1=(datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%Y-%m-%d')
-    print(today)
-    print(time1)
     ssql_helper.get_month_data(time1,today)
     yqt_spider = YQTSpider(infos[-1],start_time=start_time, end_time=end_time)
 
@@ -853,5 +855,5 @@ def apscheduler():
 
 if __name__ == '__main__':
     # apscheduler()
-    # xlsx_work()
-    work_it_2()
+    xlsx_work()
+    # work_it_2()
