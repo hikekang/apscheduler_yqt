@@ -475,6 +475,9 @@ class YQTSpider(object):
         if not self._is_page_loaded():
             logger.info("更改100条数据/每页前，页面加载有问题")
             return False
+
+        self.spider_driver.scroll_to_bottom()
+        time.sleep(1)
         self.spider_driver.find_element_by_css_selector('div[ng-show="selectType == 1"]').click()
         time.sleep(1)
         self.spider_driver.find_element_by_css_selector(
@@ -580,7 +583,7 @@ class YQTSpider(object):
         翻页
         :return:
         """
-
+        self.post_number=0
         # 翻页开始
         while 1:
             if self.crawl_page_count > config.MAX_CRAWL_PAGE_COUNT:
@@ -604,6 +607,7 @@ class YQTSpider(object):
             ssql_helper.post_data(data_list, self.info['industry_name'])
 
             logger.info(f"解析到{len(data_list)}条数据")
+            self.post_number+=len(data_list)
             # SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path,sheet_name=self.info['sheet_name'])
             # logger.info(f"保存完毕")
 
@@ -685,17 +689,18 @@ class YQTSpider(object):
                 #
                 # post_info = eval(post_info)
                 # post_info2 = eval(post_info2)
-                # logger.info("开始记录")
-                # #舆情通数量
-                # yqt_count=self._count_number
+                logger.info("开始记录")
+                #舆情通数量
+                yqt_count=self._count_number
                 # #xlsx数据量
                 # wb=load_workbook(self.data_file_path)
                 # xlsx_num=wb[wb.sheetnames[0]].max_row
-                # # 记录文件路径
-                # record_file_path=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                #              f"record\{self.info['project_name']}",f"{self}_记录.xlsx")
-                # sql_number=ssql_helper.find_info_count(self.interval[0],self.interval[1],self.info['sheet_name'])
-                # data_list=[self.info['project_name'],datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),self.last_end_time,self.next_end_time]
+                # 记录文件路径
+                record_file_path=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                             f"record\{self.info['customer']}",f"{self}_记录.xlsx")
+                sql_number=ssql_helper.find_info_count(self.interval[0],self.interval[1],self.info['industry_name'])
+                data_list=[self.info['customer'],datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),self.last_end_time,self.next_end_time]
+                SpiderHelper.save_record_auto(record_file_path,yqt_count,self.post_number,sql_number,data_list=data_list)
                 # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
                 return True
             else:
@@ -720,9 +725,9 @@ class YQTSpider(object):
         li = driver.find_element_by_xpath('//li[contains(@id,"kw_li_")]')
         span = li.find_element_by_xpath('//span[@class="fa-tree-plan-tools-bar"]')
         action = ActionChains(driver)
-        time.sleep(0.3)
+        time.sleep(1)
         action.move_to_element(li).perform()
-        time.sleep(0.3)
+        time.sleep(1)
         span.click()
         time.sleep(0.3)
         driver.find_element_by_xpath('//li[@class="add-plan-trigger"]/a').click()
@@ -786,7 +791,6 @@ class YQTSpider(object):
             elif resp is True:
                 os.remove(self.process_file_path)
                 # pyautogui.alert("抓取完成...")
-                os.system(f'explorer /select,{self.data_file_path}')
         # except Exception as e:
         #     # logger.warning(e)
         #     print(e)
@@ -855,5 +859,7 @@ def apscheduler():
 
 if __name__ == '__main__':
     # apscheduler()
+    t1=time.time()
     xlsx_work()
+    print(time.time()-t1)
     # work_it_2()
