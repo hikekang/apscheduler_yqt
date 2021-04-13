@@ -249,11 +249,18 @@ class YQTSpider(object):
             # print(data)
             publish_man=re.sub(':|：','',data['发布人'])
             data['发布人']=publish_man
+            # 查看近一个月中是否存在，滤重
+
             data_list.append(data)
         return data_list
+
+    # 数据处理
     def clear_data(self,data_list):
         new_data_list=self.quchong(data_list,"链接")
-        for data in new_data_list:
+        print("数据处理")
+        # 第二次滤重
+        second_data_list=ssql_helper.filter_by_url(new_data_list,self.info['industry_name'])
+        for data in second_data_list:
             # 1.标题或url为空的舍去
             if data["标题"]=="" or data["链接"]=="":
                 new_data_list.remove(data)
@@ -287,6 +294,7 @@ class YQTSpider(object):
                 data['is_original']=2
         return new_data_list
 
+    # 第一次根据爬取链接去重
     def quchong(self,dir_list,key):
         new_dirlist=[]
         values=[]
@@ -589,17 +597,19 @@ class YQTSpider(object):
 
             logger.info(f"当前第【{self.next_page_num}】页,共{max_page_num}页")
             data_list = self.parse_data()
+            print('数据抓取完毕11')
             # 数据进行处理
             data_list=self.clear_data(data_list)
 
             # 插入到数据库，返回一个成功插入的值
+            # 上传数据
+            ssql_helper.post_data(data_list, self.info['industry_name'])
 
             logger.info(f"解析到{len(data_list)}条数据")
             # SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path,sheet_name=self.info['sheet_name'])
             # logger.info(f"保存完毕")
 
-            # 上传数据
-            ssql_helper.post_data(data_list,self.info['industry_name'])
+
 
             if self.next_page_num >= max_page_num:
                 logger.info("抓取到最大页，停止")
@@ -666,7 +676,7 @@ class YQTSpider(object):
             self.next_page_num = 1
             if self.next_end_time >= self.interval[1]:
                 logger.info("解析到终止时间，抓取完成")
-                logger.info("上传数据")
+                logger.info("全部抓取完毕上传数据")
                 # post_url="http://localhost:8086/localproject/industry/industryBigDataExcelByEasyExcel"
                 # post_url2="http://localhost:8086/localproject/industry/industryBigDataExcelByEasyExcel_2.1"
                 # files={'file':open(self.data_file_path,'rb')}
@@ -729,56 +739,56 @@ class YQTSpider(object):
         time.sleep(1)
 
     def start(self,start_time,end_time,time_sleep,infos):
-        try:
-            # 1.登录
-            if not self._login():
-                raise Exception("登录环节出现问题")
-            self.interval = [start_time, end_time]
+        # try:
+        # 1.登录
+        if not self._login():
+            raise Exception("登录环节出现问题")
+        self.interval = [start_time, end_time]
+        self.last_end_time = self.interval[0]
+        self.next_end_time = self.interval[1]
+        # 抓取数据
+        print("获取关键词")
+        self.infos=infos
+        # 循环进行项目采取数据
+        for info in infos:
+            self.info = info
+            # 重新设置项目路径
+            self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                               f"data\{info['customer']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
+                                               f"{self}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
+                                                   ':', '_'))
+            self.keyword=info['keywords']
+            # 设置关键词
+            self.modifi_keywords()
+
+            # 再次设置时间
+            end_time1 = datetime.datetime.now().strftime('%Y-%m-%d %H') + ":00:00"
+            one_hour_ago1 = datetime.datetime.now() - datetime.timedelta(hours=1)
+            start_time1 = one_hour_ago1.strftime('%Y-%m-%d %H') + ":00:00"
+            # 开始时间
+            start_time1 = datetime.datetime.strptime(start_time1, "%Y-%m-%d %H:%M:%S")
+            # 结束时间
+            end_time1 = datetime.datetime.strptime(end_time1, "%Y-%m-%d %H:%M:%S")
+
+            self.interval = [start_time1, end_time1]
             self.last_end_time = self.interval[0]
             self.next_end_time = self.interval[1]
             # 抓取数据
-            print("获取关键词")
-            self.infos=infos
-            # 循环进行项目采取数据
-            for info in infos:
-                self.info = info
-                # 重新设置项目路径
-                self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                                   f"data\{info['customer']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
-                                                   f"{self}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
-                                                       ':', '_'))
-                self.keyword=info['keywords']
-                # 设置关键词
-                self.modifi_keywords()
+            resp = self._crawl2(time_sleep)
 
-                # 再次设置时间
-                end_time1 = datetime.datetime.now().strftime('%Y-%m-%d %H') + ":00:00"
-                one_hour_ago1 = datetime.datetime.now() - datetime.timedelta(hours=1)
-                start_time1 = one_hour_ago1.strftime('%Y-%m-%d %H') + ":00:00"
-                # 开始时间
-                start_time1 = datetime.datetime.strptime(start_time1, "%Y-%m-%d %H:%M:%S")
-                # 结束时间
-                end_time1 = datetime.datetime.strptime(end_time1, "%Y-%m-%d %H:%M:%S")
-
-                self.interval = [start_time1, end_time1]
-                self.last_end_time = self.interval[0]
-                self.next_end_time = self.interval[1]
-                # 抓取数据
-                resp = self._crawl2(time_sleep)
-
-                if resp == "restart_browser":
-                    logger.info("重启浏览器")
-                    self.spider_driver.quit()
-                    self.spider_driver = WebDriverHelper.init_webdriver(is_headless=config.HEAD_LESS)
-                    self.wait = WebDriverWait(self.spider_driver, config.WAIT_TIME)
-                    self.start(resp)
-                elif resp is True:
-                    os.remove(self.process_file_path)
-                    # pyautogui.alert("抓取完成...")
-                    os.system(f'explorer /select,{self.data_file_path}')
-        except Exception as e:
-            # logger.warning(e)
-            print(e)
+            if resp == "restart_browser":
+                logger.info("重启浏览器")
+                self.spider_driver.quit()
+                self.spider_driver = WebDriverHelper.init_webdriver(is_headless=config.HEAD_LESS)
+                self.wait = WebDriverWait(self.spider_driver, config.WAIT_TIME)
+                self.start(resp)
+            elif resp is True:
+                os.remove(self.process_file_path)
+                # pyautogui.alert("抓取完成...")
+                os.system(f'explorer /select,{self.data_file_path}')
+        # except Exception as e:
+        #     # logger.warning(e)
+        #     print(e)
 
         # finally:
         #     if self.spider_driver.service.is_connectable():
@@ -818,23 +828,27 @@ def work_it_2():
     one_hour_ago = datetime.datetime.now() - datetime.timedelta(hours=1)
 
     start_time = one_hour_ago.strftime('%Y-%m-%d %H') + ":00:00"
-    # 开始时间
+    # 开始时间 一小时之前
     start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-    # 结束时间
+    # 结束时间 现在的时间
     end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
     # 获取项目信息
     infos = config.row_list
 
+    today=datetime.datetime.now().strftime('%Y-%m-%d')
+    time1=(datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%Y-%m-%d')
+    ssql_helper.get_month_data(time1,today)
     yqt_spider = YQTSpider(infos[0],start_time=start_time, end_time=end_time)
 
     # yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2,infos=infos)
 
-    project_list=ssql_helper.get_industry_name()
+    project_list=ssql_helper.get_industry_keywords()
     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2,infos=project_list)
 
     #
 def apscheduler():
-    trigger1 = CronTrigger(hour='9-18', minute='37', second=10, jitter=5)
+    trigger1 = CronTrigger(hour='9-18', minute='36', second=10, jitter=5)
+
     sched = BlockingScheduler()
     sched.add_job(work_it_2, trigger1, id='my_job_id')
     sched.start()
