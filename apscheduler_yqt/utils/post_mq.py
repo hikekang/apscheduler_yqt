@@ -26,15 +26,11 @@ class SampleListener(object):
 
 # 推送到队列queue
 def send_to_queue(queue_name,msg):
-    conn = stomp.Connection(host_and_ports=[('223.223.180.10',61613)])
-    # conn = stomp.Connection(host_and_ports=[('127.0.0.1',61613)])
-    # conn = stomp.Connection(host_and_ports=[('192.168.0.146',61613)])
-    # conn.set_listener('', PrintingListener())
-    conn.set_listener('', PrintingListener())
-    conn.connect('admin', 'admin')
-    conn.send(queue_name, msg,headers={'persistent':'true'})
-    # conn.subscribe('/queue/a2',111111)
-    conn.disconnect()
+    conn1 = stomp.Connection(host_and_ports=[('223.223.180.10', 61613)],auto_content_length=False)
+    conn1.set_listener('', PrintingListener())
+    conn1.connect('admin', 'admin')
+    conn1.send(queue_name, msg,headers={'persistent':'true'})
+    conn1.disconnect()
 
 
 # 推送到主题
@@ -69,7 +65,6 @@ def receive_from_topic():
         time.sleep(3)  # secs
 
     conn.disconnect()
-#  Transport Connection to: tcp://192.168.0.146:49708 failed: java.net.SocketException: Software caused connection abort: recv failed
 def my_test_mq():
     conn = stomp.Connection([('223.223.180.10', 8161)])
     conn.set_listener('', PrintingListener())
@@ -78,9 +73,7 @@ def my_test_mq():
     conn.disconnect()
     # 消息丢失
 if __name__ == '__main__':
-    data = {
-        'id': "111111",'industry_id': "222222"
-    }
-    # send_to_queue('aaprocess2323232',str(data))
-    for i in range(50):
-        send_to_queue('a6',str(data))
+    data = {"id":12,"industryId":9999}
+    for i in range(100):
+        send_to_queue('aaa',str(data))
+        send_to_queue('reptile.stay.process_2.1',str(data))
