@@ -19,8 +19,7 @@ from utils.webdriverhelper import MyWebDriver
 from utils.my_pyautogui import pyautogui
 from utils.webdriverhelper import WebDriverHelper
 from yuqingtong import config
-import requests
-from openpyxl import load_workbook
+from utils.ssql_helper import track_data_number_sql
 from utils import ssql_helper
 import re
 class YQTSpider(object):
@@ -476,7 +475,7 @@ class YQTSpider(object):
             logger.info("更改100条数据/每页前，页面加载有问题")
             return False
 
-        self.spider_driver.scroll_to_bottom()
+        self.spider_driver.scroll_to_bottom(10000)
         time.sleep(1)
         self.spider_driver.find_element_by_css_selector('div[ng-show="selectType == 1"]').click()
         time.sleep(1)
@@ -679,23 +678,9 @@ class YQTSpider(object):
             if self.next_end_time >= self.interval[1]:
                 logger.info("解析到终止时间，抓取完成")
                 logger.info("全部抓取完毕上传数据")
-                # post_url="http://localhost:8086/localproject/industry/industryBigDataExcelByEasyExcel"
-                # post_url2="http://localhost:8086/localproject/industry/industryBigDataExcelByEasyExcel_2.1"
-                # files={'file':open(self.data_file_path,'rb')}
-                # proxies = {"http": None, "https": None}
-                # post_info=requests.post(post_url,files=files,proxies=proxies).text
-                # files={'file':open(self.data_file_path,'rb')}
-                # post_info2=requests.post(post_url2,files=files,proxies=proxies).text
-                #
-                # post_info = eval(post_info)
-                # post_info2 = eval(post_info2)
                 logger.info("开始记录")
                 #舆情通数量
                 yqt_count=self._count_number
-                # #xlsx数据量
-                # wb=load_workbook(self.data_file_path)
-                # xlsx_num=wb[wb.sheetnames[0]].max_row
-                # 记录文件路径
                 record_file_path=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                              f"record\{self.info['customer']}",f"{self}_记录.xlsx")
                 sql_number=ssql_helper.find_info_count(self.interval[0],self.interval[1],self.info['industry_name'])
@@ -839,9 +824,7 @@ def work_it_2():
     # 获取项目信息
     infos = config.row_list
 
-    today=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    time1=(datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%Y-%m-%d')
-    ssql_helper.get_month_data(time1,today)
+
     yqt_spider = YQTSpider(infos[-1],start_time=start_time, end_time=end_time)
 
     # yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2,infos=infos)
@@ -851,15 +834,19 @@ def work_it_2():
 
     #
 def apscheduler():
-    trigger1 = CronTrigger(hour='9-18', minute='36', second=10, jitter=5)
+    trigger1 = CronTrigger(hour='9-18', minute='49', second=10, jitter=5)
 
     sched = BlockingScheduler()
     sched.add_job(work_it_2, trigger1, id='my_job_id')
+    sched.add_job(track_data_number_sql(), trigger1, id='my_job_id')
     sched.start()
 
 if __name__ == '__main__':
-    # apscheduler()
-    t1=time.time()
-    xlsx_work()
-    print(time.time()-t1)
+    today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    time1 = (datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%Y-%m-%d')
+    ssql_helper.get_month_data(time1, today)
+    apscheduler()
+    # t1=time.time()
+    # xlsx_work()
+    # print(time.time()-t1)
     # work_it_2()
