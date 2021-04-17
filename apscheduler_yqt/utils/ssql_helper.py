@@ -14,6 +14,8 @@ from utils import baidu_emition
 import redis
 import time
 import re
+import stomp
+from utils.getdatabyselenium import get_data_it
 pool=redis.ConnectionPool(host='localhost',port=6379,decode_responses=True)
 r=redis.Redis(connection_pool=pool)
 config={
@@ -79,10 +81,10 @@ def find_info_count(start_time,end_time,industry_name):
 
 # B库中查询项目名称以及行业名称 对应的关键词
 def get_industry_keywords():
-    sql_B="select * from TS_Customers where IsEnable=1"
-    cursor_B.execute(sql_B)
+    sql_QBBB="select * from TS_Customers where IsEnable=1"
+    cursor_QBBB.execute(sql_QBBB)
     # get enable project
-    data=cursor_B.fetchall()
+    data=cursor_QBBB.fetchall()
     new_data=[]
     for d in iter(data):
         # 处理乱码
@@ -100,10 +102,13 @@ def get_industry_keywords():
                 # 单字段去重
                 # sql_A="select distinct Word from TS_Keywords where C_ID={}".format(dd).encode('GBK')
                 # sql_A="select Word,Simultaneouswords,Excludewords from TS_Keywords where C_ID={} group by Word".format(dd)
-                sql_A="select Word,SimultaneousWord,Excludeword from TS_A.dbo.TS_Keywords where C_ID={} group by Word,SimultaneousWord,Excludeword".format(dd)
+                print(dd)
+                sql_QBBA="select Word,SimultaneousWord,Excludeword from QBB_A.dbo.TS_Keywords where C_ID={} group by Word,SimultaneousWord,Excludeword".format(dd)
+
                 # sql_A="select Word,SimultaneousWord,Excludeword from TS_A.dbo.TS_Keywords where C_ID='1149212304344420353' group by Word,SimultaneousWord,Excludeword"
-                cursor_A.execute(sql_A)
-                data_A=cursor_A.fetchall()
+
+                cursor_QBBA.execute(sql_QBBA)
+                data_A=cursor_QBBA.fetchall()
                 for da in data_A:
                     for i,d_a in enumerate(da):
                         if d_a and i==0:
@@ -210,11 +215,76 @@ def track_data_number_sql():
     sql_Base="update TS_DataMerge_Base set Transpond_Num=%d,Comment_Num=%d,Forward_Good_Num=%d where SN='%s' "%(data[0],data[1],data[2],url['sn'])
     print(cursor_QBBB.execute(sql_Base))
 
-track_data_number_sql()
-# import time
-# t1=time.time()
-# get_month_data('2021-03-14','2021-04-13 10:00:00')
-# t2=time.time()
-# print(t2-t1)
+def track_data_number_sql2(sn,data):
 
-# print(get_industry_keywords())
+    create_date=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    #     转发、评论、点赞
+    sql_record="insert into TS_track_record(sn,forward_num,comment_num,good_num,create_date) values('%s','%d','%d','%d','%s')"%(sn,data[0],data[1],data[2],create_date)
+    print(cursor_QBBB.execute(sql_record))
+    sql_Base="update TS_DataMerge_Base set Transpond_Num=%d,Comment_Num=%d,Forward_Good_Num=%d where SN='%s' "%(data[0],data[1],data[2],sn)
+    print(cursor_QBBB.execute(sql_Base))
+
+# track_data_number_sql()
+
+
+
+# ----------------------------数据追踪消息队列------------------------------------------------
+def connect_and_subscribe(conn):
+
+    # conn.subscribe(destination='task.msg.tracker', id=1, ack='auto')
+    conn.subscribe(destination='task.msg.tracker_2.1', id=1, ack='auto')
+
+class MyListener(stomp.ConnectionListener):
+    def __init__(self, conn):
+        self.conn = conn
+
+    def on_error(self, frame):
+        print('received an error "%s"' % frame.body)
+
+    def on_message(self, frame):
+        print('received a message "%s"' % frame.body)
+        # pattern = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+        pattern = re.compile(r'http://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+        url = re.findall(pattern, frame.body)
+        print(url)
+        if url and "weibo.com" in url:
+            # 爬取评论转发点赞数量
+            data=get_data_it(url[0])
+            sn=frame.body.split('"')[3]
+            track_data_number_sql2(sn,data)
+            for x in range(5):
+                print(x)
+                time.sleep(1)
+            print('processed message')
+
+    def on_disconnected(self):
+        print('disconnected')
+        connect_and_subscribe(self.conn)
+
+# conn = stomp.Connection([('223.223.180.10', 61613)])
+# conn.connect('admin', 'admin', wait=True)
+# conn.set_listener('', MyListener(conn))
+# connect_and_subscribe(conn)
+
+def re_connect_subscribe(conn):
+    """
+    重新登记注册
+    :return:
+    """
+    conn.disconnect()
+    time.sleep(3)
+    connect_and_subscribe(conn)
+# time.sleep(60)
+# i=0
+# while 1:
+#     i += 1
+#     time.sleep(10)
+#     # print(i)
+#     if i == 6 * 3:
+#         # 3分钟之后重新注册一次,防止时间过长，连接断开
+#         re_connect_subscribe(conn)
+#         i = 0
+
+#———————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+
+print(get_industry_keywords())
