@@ -54,7 +54,6 @@ class SpiderHelper(object):
 
             for data in data_list:
                 writer.writerow(data)
-
     @staticmethod
     def save_xlsx(data_list, out_file):
         head_xlsx = ['时间', '标题', '描述', '链接', '转发内容', '发布人', 'attitude', 'images', 'reposts_count', 'comments_count',
