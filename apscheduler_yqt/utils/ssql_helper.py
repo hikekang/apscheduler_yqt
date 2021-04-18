@@ -121,7 +121,7 @@ def get_industry_keywords():
             else:
                 new_d['industry_name']=(d[2].encode('latin1').decode('gbk'))
         new_data.append(new_d)
-    print(new_data)
+    print(new_data[1:])
     return new_data
 
 # 上传数据
@@ -146,7 +146,7 @@ def post_data(data_list,industry_name):
                    "(%d,%d,'%s','%s','%s','%s','%s','%s','%s','%s',%f)"%(table_name,id,industry_id,data['标题'],data['描述'],data['转发内容'],data['链接'],data['发布人'],data['时间'],data['is_original'],data['area'],positive_prob)
         # 插入A库
         cursor_A.execute(sql_ts_a)
-        data={
+        datas={
             "id":id,
             "industryId":industry_id
         }
@@ -163,9 +163,14 @@ def post_data(data_list,industry_name):
 
         params={
             'queues':'reptile.stay.process_2.1',
-            'message':data
+            'message':datas
         }
-        requests.get('http://localhost:8090/jms/send',params=params)
+        print(params)
+        url='http://localhost:8090/jms/send?queues=%s&message={"id":%s,"industryId":%s}'%('reptile.stay.process_2.1',id,industry_id)
+        # requests.get('http://localhost:8090/jms/send',params=params)
+        print(url)
+        proxies={'http':None,'https':None}
+        requests.get(url)
     print("数据上传成功")
 
 def testsql():
