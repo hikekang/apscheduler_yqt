@@ -16,6 +16,8 @@ import time
 import re
 import stomp
 from utils.getdatabyselenium import get_data_it
+import requests
+
 pool=redis.ConnectionPool(host='localhost',port=6379,decode_responses=True)
 r=redis.Redis(connection_pool=pool)
 config={
@@ -96,16 +98,13 @@ def get_industry_keywords():
             'excludewords':'',#排除词
             'simultaneouswords':'',#同现词
         }
+
         for i,dd in enumerate(d):
             if i==0:
                 new_d['id']=dd
                 # 单字段去重
-                # sql_A="select distinct Word from TS_Keywords where C_ID={}".format(dd).encode('GBK')
-                # sql_A="select Word,Simultaneouswords,Excludewords from TS_Keywords where C_ID={} group by Word".format(dd)
-                print(dd)
-                sql_QBBA="select Word,SimultaneousWord,Excludeword from QBB_A.dbo.TS_Keywords where C_ID={} group by Word,SimultaneousWord,Excludeword".format(dd)
-
-                # sql_A="select Word,SimultaneousWord,Excludeword from TS_A.dbo.TS_Keywords where C_ID='1149212304344420353' group by Word,SimultaneousWord,Excludeword"
+                sql_QBBA="select Word,SimultaneousWord,Excludeword from QBB_A.dbo.TS_Keywords where C_ID={} " \
+                         "group by Word,SimultaneousWord,Excludeword".format(dd)
 
                 cursor_QBBA.execute(sql_QBBA)
                 data_A=cursor_QBBA.fetchall()
@@ -122,6 +121,7 @@ def get_industry_keywords():
             else:
                 new_d['industry_name']=(d[2].encode('latin1').decode('gbk'))
         new_data.append(new_d)
+    print(new_data)
     return new_data
 
 # 上传数据
@@ -159,7 +159,13 @@ def post_data(data_list,industry_name):
         # 插入QBB_A库
         cursor_QBBA.execute(sql_qbb_a)
         # 拉取信息到B库
-        post_mq.send_to_queue('reptile.stay.process_2.1',str(data))
+        # post_mq.send_to_queue('reptile.stay.process_2.1',str(data))
+
+        params={
+            'queues':'reptile.stay.process_2.1',
+            'message':data
+        }
+        requests.get('http://localhost:8090/jms/send',params=params)
     print("数据上传成功")
 
 def testsql():
@@ -287,4 +293,4 @@ def re_connect_subscribe(conn):
 
 #———————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 
-print(get_industry_keywords())
+get_industry_keywords()
