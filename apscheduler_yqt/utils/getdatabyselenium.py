@@ -31,9 +31,10 @@ def atoi2(s):
     return num
 
 #检查元素是否存在
-def is_element_present(browser):
+def is_element_present(browser,xpath):
     try:
-        element = browser.find_element_by_xpath("//a[contains(@node-type,'close')]")
+        # element = browser.find_element_by_xpath("//a[contains(@node-type,'close')]")
+        element = browser.find_element_by_xpath(xpath)
     except NoSuchElementException as e:
         return False
     return True
@@ -44,22 +45,24 @@ def get_data_it(url):
     driver.get(url)
     # 向浏览器添加保存的cookies
     time.sleep(2)
-    driver.implicitly_wait(5)
-    if is_element_present(driver):
-        WebDriverWait(driver,10).until(EC.presence_of_element_located((By.XPATH,"//a[contains(@node-type,'close')]")))
-        driver.find_element_by_xpath("//a[contains(@node-type,'close')]").click()
+    if(is_element_present(driver),"//div[@id='Pl_Official_WeiboDetail__73']"):
+        driver.implicitly_wait(5)
+        if is_element_present(driver,"//a[contains(@node-type,'close')]"):
+            WebDriverWait(driver,10).until(EC.presence_of_element_located((By.XPATH,"//a[contains(@node-type,'close')]")))
+            driver.find_element_by_xpath("//a[contains(@node-type,'close')]").click()
 
-    zhuanfa=driver.find_element_by_xpath('//*[@id="Pl_Official_WeiboDetail__73"]/div/div/div/div[2]/div/ul/li[2]/a/span/span/span/em[2]').text
-    pinglun=driver.find_element_by_xpath('//*[@id="Pl_Official_WeiboDetail__73"]/div/div/div/div[2]/div/ul/li[3]/a/span/span/span/em[2]').text
-    dianzhan=driver.find_element_by_xpath('//*[@id="Pl_Official_WeiboDetail__73"]/div/div/div/div[2]/div/ul/li[4]/a/span/span/span/em[2]').text
-    if zhuanfa == "转发":
-        zhuanfa = '0'
-    if pinglun=="评论":
-        pinglun='0'
-    if dianzhan == "点赞":
-        dianzhan = '0'
-    return atoi2(zhuanfa),atoi2(pinglun),atoi2(dianzhan)
-
+        zhuanfa=driver.find_element_by_xpath('//div[@class="WB_handle"]/ul/li[2]/a/span/span/span/em[2]').text
+        pinglun=driver.find_element_by_xpath('//div[@class="WB_handle"]/ul/li[3]/a/span/span/span/em[2]').text
+        dianzhan=driver.find_element_by_xpath('//div[@class="WB_handle"]/ul/li[4]/a/span/span/span/em[2]').text
+        if zhuanfa == "转发":
+            zhuanfa = '0'
+        if pinglun=="评论":
+            pinglun='0'
+        if dianzhan == "赞":
+            dianzhan = '0'
+        return atoi2(zhuanfa),atoi2(pinglun),atoi2(dianzhan)
+    else:
+        return '0','0','0'
 # url_list=get_teack_datas()
 # for url in url_list:
 #     print(type(get_data_it(url)))
