@@ -7,6 +7,7 @@
 """
 from aip import AipNlp
 import re
+import time
 APP_ID="18295264"
 API_KEY="ooX8tfe05iQ8Cb1tjxY5xGx7"
 SECRET_KEY="6EOG69bnEu6HsCQv0yOBO4okdrGwh3qm"
@@ -14,7 +15,12 @@ SECRET_KEY="6EOG69bnEu6HsCQv0yOBO4okdrGwh3qm"
 def emotion(text):
     client=AipNlp(APP_ID,API_KEY,SECRET_KEY)
     data=client.sentimentClassify(re_emojis(text))
-    return data['items'][0]['positive_prob']
+    print(data)
+    if 'error_msg' in data.keys():
+        time.sleep(2)
+        return emotion(text)
+    else:
+        return data['items'][0]['positive_prob']
 
 def re_emojis(text):
     emoji_pattern = re.compile("["
