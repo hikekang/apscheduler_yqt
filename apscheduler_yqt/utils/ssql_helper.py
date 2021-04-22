@@ -52,10 +52,12 @@ tables = {
         "房地产": "dbo.TS_industry_news_estate",
         "服务业": "dbo.TS_industry_news_service",
         "公关传统": "dbo.TS_industry_news_PR",
+        "化妆品":"dbo.TS_industry_news_cosmetic",
         "IT业": "dbo.TS_industry_news_IT",
         "教育": "dbo.TS_industry_news_education",
         "金融业": "dbo.TS_industry_news_financial",
         "机械制造": "dbo.TS_industry_news_machine",
+        "快消品":"dbo.TS_industry_news_FMCG",
         "流通贸易": "dbo.TS_industry_news_circulation",
         "旅游业": "dbo.TS_industry_news_tourism",
         "汽车业": "dbo.TS_industry_news_automotive",
@@ -64,7 +66,6 @@ tables = {
         "医疗保健": "dbo.TS_industry_news_medical",
         "其它": "dbo.TS_industry_news_other",
     }
-
 def find_info_count(start_time,end_time,industry_name):
     connect=pymssql.connect(server='223.223.180.9',user='tsuser1',password='tsuser1@123aA',database='TS_A',port='39999')
     cursor=connect.cursor()
@@ -81,7 +82,7 @@ def find_info_count(start_time,end_time,industry_name):
     print(count)
     return count
 
-# B库中查询项目名称以及行业名称 对应的关键词
+# B库中查询客户名称以及行业名称 对应的关键词
 def get_industry_keywords():
     sql_QBBB="select * from TS_Customers where IsEnable=1"
     cursor_QBBB.execute(sql_QBBB)
@@ -91,7 +92,7 @@ def get_industry_keywords():
     for d in iter(data):
         # 处理乱码
         new_d={
-            'id':'',#行业id
+            'id':'',#客户id
             'customer':'',#项目
             'industry_name':'',#行业名称
             'keywords':'',#关键词
@@ -121,7 +122,6 @@ def get_industry_keywords():
             else:
                 new_d['industry_name']=(d[2].encode('latin1').decode('gbk'))
         new_data.append(new_d)
-    print(new_data[1:])
     return new_data
 
 # 上传数据
@@ -139,11 +139,11 @@ def post_data(data_list,industry_name):
         worker = IdWorker(1, 2, 0)
         # 生成雪花id
         id=worker.get_id()
-        positive_prob=baidu_emition.emotion(data['转发内容'][0:1000])
-        time.sleep(0.1)
-        sql_ts_a ="insert into %s (id,industry_id,title,summary,content,url,author,publish_time,emotion_status) values (%d,%d,'%s','%s','%s','%s','%s','%s',%f)"%(table_name,id,industry_id,data['标题'],data['描述'],data['转发内容'],data['链接'],data['发布人'],data['时间'],positive_prob)
+        # positive_prob=baidu_emition.emotion(data['转发内容'][0:1000])
+        # time.sleep(0.3)
+        sql_ts_a ="insert into %s (id,industry_id,title,summary,content,url,author,publish_time,emotion_status) values (%d,%d,'%s','%s','%s','%s','%s','%s',%f)"%(table_name,id,industry_id,data['标题'],data['描述'],data['转发内容'],data['链接'],data['发布人'],data['时间'],data['positive_prob_number'])
         sql_qbb_a ="insert into %s (id,industry_id,title,summary,content,url,author,publish_time,is_original,location,emotion_status) values " \
-                   "(%d,%d,'%s','%s','%s','%s','%s','%s','%s','%s',%f)"%(table_name,id,industry_id,data['标题'],data['描述'],data['转发内容'],data['链接'],data['发布人'],data['时间'],data['is_original'],data['area'],positive_prob)
+                   "(%d,%d,'%s','%s','%s','%s','%s','%s','%s','%s',%f)"%(table_name,id,industry_id,data['标题'],data['描述'],data['转发内容'],data['链接'],data['发布人'],data['时间'],data['is_original'],data['area'],data['positive_prob_number'])
         # 插入A库
         cursor_A.execute(sql_ts_a)
         datas={
@@ -165,12 +165,13 @@ def post_data(data_list,industry_name):
             'queues':'reptile.stay.process_2.1',
             'message':datas
         }
-        print(params)
+        # print(params)
         url='http://localhost:8090/jms/send?queues=%s&message={"id":%s,"industryId":%s}'%('reptile.stay.process_2.1',id,industry_id)
         # requests.get('http://localhost:8090/jms/send',params=params)
-        print(url)
+        # print(url)
         proxies={'http':None,'https':None}
-        requests.get(url)
+        # proxies = {"http": None, "https": None}
+        requests.get(url,proxies=proxies)
     print("数据上传成功")
 
 def testsql():
@@ -199,6 +200,7 @@ def filter_by_url(datalist,industry_name):
         if r.sismember(industry_id,data['链接'])==False:
             new_data_list.append(data)
     return new_data_list
+
 def get_teack_datas():
     sql_of_extend="select SN from TS_DataMerge_Extend where is_Track=1"
     cursor_QBBB.execute(sql_of_extend)
@@ -240,10 +242,7 @@ def track_data_number_sql2(sn,data):
 
 
 # ----------------------------数据追踪消息队列------------------------------------------------
-def connect_and_subscribe(conn):
 
-    # conn.subscribe(destination='task.msg.tracker', id=1, ack='auto')
-    conn.subscribe(destination='task.msg.tracker_2.1', id=1, ack='auto')
 
 class MyListener(stomp.ConnectionListener):
     def __init__(self, conn):
@@ -255,10 +254,10 @@ class MyListener(stomp.ConnectionListener):
     def on_message(self, frame):
         print('received a message "%s"' % frame.body)
         # pattern = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
-        pattern = re.compile(r'http://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+        pattern = re.compile(r'http://weibo.com(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
         url = re.findall(pattern, frame.body)
         print(url)
-        if url and "weibo.com" in url:
+        if url:
             # 爬取评论转发点赞数量
             data=get_data_it(url[0])
             sn=frame.body.split('"')[3]
@@ -267,16 +266,17 @@ class MyListener(stomp.ConnectionListener):
                 print(x)
                 time.sleep(1)
             print('processed message')
-
+            print(url)
     def on_disconnected(self):
         print('disconnected')
         connect_and_subscribe(self.conn)
 
-# conn = stomp.Connection([('223.223.180.10', 61613)])
-# conn.connect('admin', 'admin', wait=True)
-# conn.set_listener('', MyListener(conn))
-# connect_and_subscribe(conn)
+def connect_and_subscribe(conn):
+    conn.connect('admin', 'admin', wait=True)
+    conn.subscribe(destination='task.msg.tracker_2.1', id=1, ack='auto')
 
+
+# post_track_data()
 def re_connect_subscribe(conn):
     """
     重新登记注册
@@ -285,17 +285,26 @@ def re_connect_subscribe(conn):
     conn.disconnect()
     time.sleep(3)
     connect_and_subscribe(conn)
-# time.sleep(60)
-# i=0
-# while 1:
-#     i += 1
-#     time.sleep(10)
-#     # print(i)
-#     if i == 6 * 3:
-#         # 3分钟之后重新注册一次,防止时间过长，连接断开
-#         re_connect_subscribe(conn)
-#         i = 0
+
 
 #———————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 
-get_industry_keywords()
+# print(get_industry_keywords()[2:])
+
+conn = stomp.Connection(host_and_ports=[('223.223.180.10', 61613)])
+# conn.connect('admin', 'admin', wait=True)
+conn.set_listener('', MyListener(conn))
+connect_and_subscribe(conn)
+i=0
+while 1:
+    i += 1
+    time.sleep(10)
+    # print(i)
+    if i == 6 * 3:
+        # 3分钟之后重新注册一次,防止时间过长，连接断开
+        re_connect_subscribe(conn)
+        i = 0
+# while 1:
+#     connect_and_subscribe(conn)
+#     time.sleep(10)
+#     string indices must be integers

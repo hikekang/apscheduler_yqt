@@ -59,7 +59,6 @@ class YQTSpider(object):
     def __str__(self):
         return "舆情通"
 
-
     def _login(self, count=1):
         """
         登录
@@ -130,6 +129,7 @@ class YQTSpider(object):
             return self._login(count=count + 1)
     # 解析页面进行数据抓取和保存
     def _parse(self, page_source):
+        # 解析源码
         doc = pq(page_source)
 
         items = doc.find('tbody tr.ng-scope').items()
@@ -140,7 +140,6 @@ class YQTSpider(object):
             td_origins = item.find('td:nth-child(4)')
             td_time = item.find('td:last-child')
 
-            # print(td_time)
 
             def parse_time(td_time):
                 from datetime import datetime
@@ -209,9 +208,9 @@ class YQTSpider(object):
                     data['链接']=td_title.find('.news-item-tools.font-size-0 div:nth-child(2)>div>ul>li:nth-child(3) a').attr("href")
                     # 评论的内容
                     biaoti=td_title.find('div.item-title.news-item-title.dot.ng-binding').text().replace('\n', '').replace("'","")
-                    data['标题']=biaoti
+                    data['标题']=repost_content.replace("'","")[0:20]
                     data['发布人']=td_title.find('a[ng-if="icc.commentAuthor != null"]').text()
-                    data['描述']=biaoti
+                    data['描述']=repost_content.replace("'","")
                 elif sort=='原创':
                     data['转发内容']=data['描述']
             else:
@@ -248,6 +247,14 @@ class YQTSpider(object):
             # print(data)
             publish_man=re.sub(':|：','',data['发布人'])
             data['发布人']=publish_man
+            positive_prob = td_title.find('div.sensitive-status-wrapper.p-r>div:first-child>span:first-child').text()
+            positive_dict = {
+                "敏感": 0.1,
+                "非敏感": 0.9,
+                "中性": 0.5
+            }
+            # print(td_time)
+            data['positive_prob_number'] = positive_dict[positive_prob]
             # 查看近一个月中是否存在，滤重
             data_list.append(data)
         return data_list
@@ -313,6 +320,7 @@ class YQTSpider(object):
         page_source = driver.page_source
         return self._parse(page_source)
 
+    #设置筛选条件
     def _set_conditions(self, start_time, end_time):
         """
         设置筛选条件
@@ -337,10 +345,10 @@ class YQTSpider(object):
         driver.find_element_by_css_selector('span[ng-click="confirmTime(1)"]').click()
         time.sleep(0.2)
         # -----------点击全部------------------
-        driver.find_element_by_css_selector('#informationContentType0').click()
-        time.sleep(0.2)
-        driver.find_element_by_css_selector('#select0').click()
-        time.sleep(0.2)
+        # driver.find_element_by_css_selector('#informationContentType0').click()
+        # time.sleep(0.2)
+        # driver.find_element_by_css_selector('#select0').click()
+        # time.sleep(0.2)
         # ------------------------------------
         driver.find_element_by_css_selector("#searchListButton").click()
         # time.sleep(2)
@@ -364,10 +372,6 @@ class YQTSpider(object):
             # self._set_conditions(start_time, end_time)
             # self.modifi_keywords()
 
-            """
-            重新获取时间设置时间
-            
-            """
             # 设置时间
             self._set_conditions(self.last_end_time, self.next_end_time)
 
@@ -609,20 +613,17 @@ class YQTSpider(object):
             self.post_number+=len(data_list)
             # SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path,sheet_name=self.info['sheet_name'])
             # logger.info(f"保存完毕")
-
-
-
             if self.next_page_num >= max_page_num:
                 logger.info("抓取到最大页，停止")
                 data_count = int(self.spider_driver.find_element_by_css_selector(
                     'span[ng-bind="originStat.total"]').text)
-
                 break
             self.next_page_num += 1
             logger.info(f"点击下一页.....")
             self._save_process()
             try:
-                self.spider_driver.find_element_by_xpath('//i[@class="fa-page-arrow-right ng-scope"]').click()
+                time.sleep(1)
+                self.spider_driver.find_element_by_xpath('//i[@class="fa-page-arrow-right ng-scope"and contains(@ng-click,"gotoPage2(page + 1);")]').click()
             except NoSuchElementException:
                 logger.info("没有找到下一页的按钮")
                 break
@@ -712,7 +713,7 @@ class YQTSpider(object):
         action = ActionChains(driver)
         time.sleep(1)
         action.move_to_element(li).perform()
-        time.sleep(1)
+        time.sleep(3)
         span.click()
         time.sleep(0.3)
         driver.find_element_by_xpath('//li[@class="add-plan-trigger"]/a').click()
@@ -790,10 +791,10 @@ def xlsx_work():
     time_list = config.get_time_list()
     today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     time1 = (datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%Y-%m-%d')
-    ssql_helper.get_month_data(time1, today)
+    # ssql_helper.get_month_data(time1, today)
     # print(time_list)
     infos = config.row_list
-    yqt_spider = YQTSpider(infos[-1])
+    yqt_spider = YQTSpider(infos[0])
     project_list = ssql_helper.get_industry_keywords()
     for tim in time_list:
         yqt_spider.start(start_time=tim['start_time'], end_time=tim['end_time'], time_sleep=tim['time_delay'],infos=project_list)
@@ -838,15 +839,17 @@ def apscheduler():
 
     sched = BlockingScheduler()
     sched.add_job(work_it_2, trigger1, id='my_job_id')
-    sched.add_job(track_data_number_sql(), trigger1, id='my_job_id')
+    # sched.add_job(track_data_number_sql(), trigger1, id='my_job_id')
     sched.start()
 
 if __name__ == '__main__':
-    today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    time1 = (datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%Y-%m-%d')
-    ssql_helper.get_month_data(time1, today)
-    apscheduler()
+    # today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    # time1 = (datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%Y-%m-%d')
+    # ssql_helper.get_month_data(time1, today)
+    # apscheduler()
     # t1=time.time()
-    # xlsx_work()
+    xlsx_work()
     # print(time.time()-t1)
     # work_it_2()
+    # work_it_2()
+    # os.system('java -jar jms-1.0.0.jar')
