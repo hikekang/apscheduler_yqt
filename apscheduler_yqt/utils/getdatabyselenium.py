@@ -45,7 +45,7 @@ def get_data_it(url):
     driver.get(url)
     # 向浏览器添加保存的cookies
     time.sleep(2)
-    if(is_element_present(driver),"//div[@id='Pl_Official_WeiboDetail__73']"):
+    if(is_element_present(driver,"//div[@id='Pl_Official_WeiboDetail__73'])")):
         driver.implicitly_wait(5)
         if is_element_present(driver,"//a[contains(@node-type,'close')]"):
             WebDriverWait(driver,10).until(EC.presence_of_element_located((By.XPATH,"//a[contains(@node-type,'close')]")))
