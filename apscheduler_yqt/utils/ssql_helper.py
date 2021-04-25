@@ -9,8 +9,6 @@ from datetime import datetime
 from utils.snowflake import IdWorker
 import pymssql
 from utils import getdatabyselenium
-from utils import post_mq
-from utils import baidu_emition
 import redis
 import time
 import re
@@ -27,7 +25,7 @@ config={
     'database':'TS_A',
     'port':'39999'
 }
-connect=pymssql.connect(server='223.223.180.9',user='tsuser1',password='tsuser1@123aA',database='TS_A',port='39999')
+connect=pymssql.connect(server='223.223.180.9',user='tsuser1',password='tsuser1@123aA',database='TS_A',port='39999',autocommit=True)
 cursor=connect.cursor()
 connect_A=pymssql.connect(server='223.223.180.9',user='tsuser1',password='tsuser1@123aA',database='TS_A',
                           port='39999',charset='utf8',autocommit=True)
@@ -37,10 +35,16 @@ connect_QBBA=pymssql.connect(server='223.223.180.9',user='tsuser1',password='tsu
                              port='39999',charset='utf8',autocommit=True)
 connect_QBBB=pymssql.connect(server='223.223.180.9',user='tsuser1',password='tsuser1@123aA',database='QBB_B',
                              port='39999',charset='utf8',autocommit=True)
+# 内网数据库
+connect_net_QBB_A=pymssql.connect(server='192.168.0.77',user='sa',password='33221100@aA',database='QBB_A',port='1433',autocommit=True)
+connect_net_TS_A=pymssql.connect(server='192.168.0.77',user='sa',password='33221100@aA',database='TS_A',port='1433',autocommit=True)
+
 cursor_A=connect_A.cursor()
 cursor_B=connect_B.cursor()
 cursor_QBBA=connect_QBBA.cursor()
 cursor_QBBB=connect_QBBB.cursor()
+cursor_net_QBB_A=connect_net_QBB_A.cursor()
+cursor_net_TS_A=connect_net_TS_A.cursor()
 
 '''
 优速 流通贸易
@@ -66,6 +70,8 @@ tables = {
         "医疗保健": "dbo.TS_industry_news_medical",
         "其它": "dbo.TS_industry_news_other",
     }
+
+#查询数据量
 def find_info_count(start_time,end_time,industry_name):
     connect=pymssql.connect(server='223.223.180.9',user='tsuser1',password='tsuser1@123aA',database='TS_A',port='39999')
     cursor=connect.cursor()
@@ -82,7 +88,7 @@ def find_info_count(start_time,end_time,industry_name):
     print(count)
     return count
 
-# B库中查询客户名称以及行业名称 对应的关键词
+# B库中查询客户名称以及行业名称 对应的关键词  使用服务器的数据库
 def get_industry_keywords():
     sql_QBBB="select * from TS_Customers where IsEnable=1"
     cursor_QBBB.execute(sql_QBBB)
@@ -124,7 +130,7 @@ def get_industry_keywords():
         new_data.append(new_d)
     return new_data
 
-# 上传数据
+# 单条数据上传数据
 def post_data(data_list,industry_name):
     table_name = tables[industry_name]
     sql_industry_id="select id from TS_Industry where name='"+industry_name+"'"
@@ -174,6 +180,65 @@ def post_data(data_list,industry_name):
         requests.get(url,proxies=proxies)
     print("数据上传成功")
 
+def upload_many_data(data_list,industry_name):
+    table_name = tables[industry_name]
+    # 查询hangyeid
+    sql_industry_id = "select id from TS_Industry where name='" + industry_name + "'"
+
+    cursor_B.execute(sql_industry_id)
+
+    industry_id = cursor_B.fetchone()[0]
+
+    tuple_data_list_ts_a = []
+    tuple_data_list_qbb_a = []
+    post_data_list = []
+    worker = IdWorker(1, 2, 0)
+    for data in data_list:
+        # 生成雪花id
+
+        id = worker.get_id()
+        post_data = {
+            "id": id,
+            "industryId": industry_id
+        }
+        post_data_list.append(post_data)
+        # 更新redis
+        r.sadd(industry_id, data['链接'])
+
+        tuple_data_ts_a = (
+        id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
+        data['positive_prob_number'])
+        tuple_data_qbb_a = (
+        id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
+        data['is_original'], data['area'], data['positive_prob_number'])
+
+        tuple_data_list_ts_a.append(tuple_data_ts_a)
+        tuple_data_list_qbb_a.append(tuple_data_qbb_a)
+
+    sql_ts_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s)"
+    # 插入A库
+    sql_qbb_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,is_original,location,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+    cursor_A.executemany(sql_ts_a, tuple_data_list_ts_a)
+    cursor_net_TS_A.executemany(sql_ts_a, tuple_data_list_ts_a)
+    cursor_QBBA.executemany(sql_qbb_a, tuple_data_list_qbb_a)
+    cursor_net_QBB_A.executemany(sql_qbb_a, tuple_data_list_qbb_a)
+
+    # 消息队列
+    data_2_1 = {
+        'queues': 'reptile.stay.process_2.1',
+        'message': str(post_data_list)
+    }
+    data_2 = {
+        'queues': 'reptile.stay.process',
+        'message': str(post_data_list)
+    }
+
+    proxies = {'http': None, 'https': None}
+    url = 'http://localhost:8090/jms/send_array'
+    requests.get(url=url, proxies=proxies, params=data_2_1)
+    requests.get(url=url, proxies=proxies, params=data_2)
+    print("数据上传成功")
+
 def testsql():
     sql_ts_a = "insert into '%s' (id,industry_id,title,summary,content,url,author,publish_time) values (''%s'','%s','%s','%s','%s','%s','%s','%s')" %('hike','hike','hike','hike','hike','hike','hike','hike','hike',)
     print(sql_ts_a)
@@ -196,6 +261,7 @@ def filter_by_url(datalist,industry_name):
     cursor_B.execute(sql_industry_id)
     industry_id = cursor_B.fetchone()[0]
     new_data_list=[]
+    # redis滤重
     for data in datalist:
         if r.sismember(industry_id,data['链接'])==False:
             new_data_list.append(data)
