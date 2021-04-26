@@ -183,7 +183,9 @@ def get_industry_keywords():
 
 
 def merger_industry_data(list_msg):
-
+    """
+    同一个行业的项目关键词进行合并
+    """
     set_mark = {i['industry_name'] for i in list_msg}
     # 设置动态命名模板
     list_name_template = 'list_data_'
@@ -216,8 +218,11 @@ def merger_industry_data(list_msg):
     return n_e_d
 
 
-# 单条数据上传数据
+
 def post_data(data_list, industry_name):
+    """
+    单数据插入
+    """
     table_name = tables[industry_name]
     sql_industry_id = "select id from TS_Industry where name='" + industry_name + "'"
     # print(sql_industry_id)
@@ -273,6 +278,9 @@ def post_data(data_list, industry_name):
 
 
 def upload_many_data(data_list, industry_name):
+    """
+    多数据插入
+    """
     table_name = tables[industry_name]
     # 查询hangyeid
     sql_industry_id = "select id from TS_Industry where name='" + industry_name + "'"
@@ -337,10 +345,16 @@ def testsql():
     'hike', 'hike', 'hike', 'hike', 'hike', 'hike', 'hike', 'hike', 'hike',)
     print(sql_ts_a)
     # 插入A库
+    # sql_record = "insert into record_log_table (industry,crawl_time,start_time,end_time,yqt_num,crawl_num,upload_num,customer) values ('%s','%s','%s','%s','%s','%s','%s','%s')" % ('1', '2021-4-26 00:00:00', '2021-4-26 00:00:00', '2021-4-26 00:00:00', '1', '1', '1', '1')
+    sql_record = "insert into record_log_table values ('%s','%s','%s','%s','%s','%s','%s','%s')" % ('1', '2021-4-26 00:00:00', '2021-4-26 00:00:00', '2021-4-26 00:00:00', '1', '1', '1', '1')
+    cursor_A.execute(sql_record)
 
 
-# 将所有行业的数据加载到内存中
+
 def get_month_data(time1, time2):
+    """
+    # 将所有行业的数据加载到内存中
+    """
     r.flushall()
     for tb in tables.values():
         sql = "select industry_id,url from %s where publish_time between '%s' and '%s'" % (tb, time1, time2)
@@ -353,6 +367,9 @@ def get_month_data(time1, time2):
 
 # 根据url进行二次滤重
 def filter_by_url(datalist, industry_name):
+    """
+
+    """
     sql_industry_id = "select id from TS_Industry where name='" + industry_name + "'"
     cursor_B.execute(sql_industry_id)
     industry_id = cursor_B.fetchone()[0]
@@ -362,6 +379,14 @@ def filter_by_url(datalist, industry_name):
         if r.sismember(industry_id, data['链接']) == False:
             new_data_list.append(data)
     return new_data_list
+def record_log(data):
+    """
+    数据记录
+    """
+    sql_record = "insert into record_log_table values (%s,%s,%s,%s,%s,%s,%s,%s)"
+    # data=('3', '2021-4-26 00:00:00','2021-4-26 00:00:00', '2021-4-26 00:00:00', '4', '5', '6', '1')
+    cursor_A.execute(sql_record,data)
+    # pass
 
 
 def get_teack_datas():
@@ -386,6 +411,9 @@ def get_teack_datas():
 
 
 def track_data_number_sql():
+    """
+    数据库中获取链接进行追踪
+    """
     for url in get_teack_datas():
         data = getdatabyselenium.get_data_it(url['url'])
         # data=getdatabyselenium.get_data_it(url['url'])
@@ -434,7 +462,7 @@ class MyListener(stomp.ConnectionListener):
         print('received a message "%s"' % frame.body)
         pattern = re.compile(r'http://weibo.com(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
         url = re.findall(pattern, frame.body)
-        print("处理之后的链接：" + url)
+        print("处理之后的链接：" + url[0])
         if url:
             # 爬取评论转发点赞数量
             data = get_data_it(url[0])
@@ -444,7 +472,7 @@ class MyListener(stomp.ConnectionListener):
                 print(x)
                 time.sleep(1)
             print('processed message')
-            print("监听的url：" + url)
+            print("监听的url：" + url[0])
 
     def on_disconnected(self):
         print('disconnected')
@@ -490,18 +518,11 @@ if __name__ == '__main__':
     # except Exception as e:
     #     print(e)
     #     conn.disconnect()
-    # print(get_industry_keywords())
-    industry_words=merger_industry_data(get_industry_keywords())
-    for d in industry_words:
-        print(d)
-    # print(industry_words)
-    # for industry_word in industry_words:
-    #     # print(industry_word)
-    #     words=''
-    #     for word in industry_word:
-    #         words+=word['keywords']
-    #     print(words)
+    # for d in get_industry_keywords():
+    #     print(d)
 
-    # words = get_industry_keywords()
-    # print(words)
+    # record_log()
+
+    for d in merger_industry_data(get_industry_keywords()):
+        print(d)
 
