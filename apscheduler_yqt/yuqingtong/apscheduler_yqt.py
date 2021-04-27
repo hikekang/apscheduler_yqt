@@ -26,7 +26,7 @@ from utils.webdriverhelper import MyWebDriver
 from utils.my_pyautogui import pyautogui
 from utils.webdriverhelper import WebDriverHelper
 from yuqingtong import config
-from utils.ssql_helper import track_data_number_sql
+from utils.ssql_helper import track_data_number_sql, record_log
 from utils import ssql_helper
 import re
 
@@ -141,7 +141,7 @@ class YQTSpider(object):
     # 解析页面进行数据抓取和保存
     def _parse(self, page_source):
         doc = pq(page_source)
-
+        keywords_id=doc.find('span.site-menu-title.ml15.tippy:first-child').attr('id').split('_')[-1]
         items = doc.find('tbody tr.ng-scope').items()
 
         data_list = []
@@ -193,7 +193,9 @@ class YQTSpider(object):
                     '链接': td_title.find('.news-item-tools.font-size-0 div:nth-child(2)>div>ul>li:nth-child(4) a').attr(
                         "href"),
                     '转发内容': repost_content.replace("'", ""),
-                    '发布人': td_title.find('a[ng-bind="icc.author"]').text(),
+                    '发布人': td_title.find('a[ng-click="getDetail(icc,currentKeyword);"]').text(),
+                    'ic_id':td_title.find('a[ng-click="getDetail(icc,currentKeyword);"]').attr('value'),
+                    'keywords_id':keywords_id,
                     'attitude': td_title.find(
                         'div[ng-show="view.resultPresent != 3"] div.sensitive-status-content:not(.ng-hide)>span:first-child').text(),
                     'images': ",".join([img.attr('src') for img in item.find('.actizPicShow img').items()]),
@@ -237,6 +239,8 @@ class YQTSpider(object):
                     '转发内容': repost_content.replace("'", ""),
                     # '发布人': td_title.find('div[class="profile-title inline-block"]>a>span:first-child').text(),
                     '发布人': td_title.find('div[class="profile-title inline-block"]>a>span[ng-if*="icc.author"]').text(),
+                    'ic_id': td_title.find('a[ng-click="getDetail(icc,currentKeyword);"]').attr('value'),
+                    'keywords_id': keywords_id,
                     'attitude': td_title.find(
                         'div[ng-show="view.resultPresent != 3"] div.sensitive-status-content:not(.ng-hide)>span:first-child').text(),
                     'images': ",".join([img.attr('src') for img in item.find('.actizPicShow img').items()]),
@@ -699,6 +703,9 @@ class YQTSpider(object):
                              self.last_end_time, self.next_end_time]
                 SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number,
                                               data_list=data_list)
+                record_dict = (self.info['industry_name'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
+                self.next_end_time, yqt_count, self.post_number, self.info['customer'])
+                record_log(record_dict)
                 # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
                 return True
             else:
@@ -726,7 +733,7 @@ class YQTSpider(object):
         action = ActionChains(driver)
         time.sleep(1)
         action.move_to_element(li).perform()
-        time.sleep(1)
+        time.sleep(3)
         span.click()
         time.sleep(0.3)
         driver.find_element_by_xpath('//li[@class="add-plan-trigger"]/a').click()
@@ -742,7 +749,7 @@ class YQTSpider(object):
 
     def start(self, start_time, end_time, time_sleep, infos):
         # try:
-        # 1.登录
+            # 1.登录
         if not self._login():
             raise Exception("登录环节出现问题")
         self.interval = [start_time, end_time]
@@ -792,7 +799,7 @@ class YQTSpider(object):
         # except Exception as e:
         #     # logger.warning(e)
         #     print(e)
-
+        #
         # finally:
         #     if self.spider_driver.service.is_connectable():
         #         self.spider_driver.quit()
@@ -807,7 +814,7 @@ def xlsx_work():
     # print(time_list)
     infos = config.row_list
     yqt_spider = YQTSpider(infos[0])
-    project_list = ssql_helper.get_industry_keywords()
+    project_list = ssql_helper.get_industry_keywords()[1:]
     for tim in time_list:
         yqt_spider.start(start_time=tim['start_time'], end_time=tim['end_time'], time_sleep=tim['time_delay'],
                          infos=project_list)
@@ -841,22 +848,23 @@ def work_it_2():
     # 获取项目信息
     infos = config.row_list
 
-    yqt_spider = YQTSpider(infos[-1], start_time=start_time, end_time=end_time)
+    yqt_spider = YQTSpider(infos[0], start_time=start_time, end_time=end_time)
 
     # yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2,infos=infos)
     # 从数据库中获取使用项目信息
-    project_list = ssql_helper.get_industry_keywords()
+    # project_list = ssql_helper.get_industry_keywords()
+    project_list=ssql_helper.merger_industry_data(ssql_helper.get_industry_keywords())
     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, infos=project_list)
 
     #
 
 
 def apscheduler():
-    trigger1 = CronTrigger(hour='9-18', minute='49', second=10, jitter=5)
+    trigger1 = CronTrigger(hour='0-23', minute='*/10', second=10, jitter=5)
 
     sched = BlockingScheduler()
     sched.add_job(work_it_2, trigger1, id='my_job_id')
-    sched.add_job(track_data_number_sql(), trigger1, id='my_job_id')
+    # sched.add_job(track_data_number_sql(), trigger1, id='my_job_id')
     sched.start()
 
 
@@ -864,8 +872,12 @@ if __name__ == '__main__':
     # today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     # time1 = (datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%Y-%m-%d')
     # ssql_helper.get_month_data(time1, today)
-    apscheduler()
+    # apscheduler()
+
+    # 补抓数据前一天 固定时间点进行抓取
+    # 词语去重
+
     # t1=time.time()
     # xlsx_work()
     # print(time.time()-t1)
-    # work_it_2()
+    work_it_2()
