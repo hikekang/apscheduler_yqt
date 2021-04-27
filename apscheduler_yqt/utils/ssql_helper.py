@@ -238,13 +238,11 @@ def post_data(data_list, industry_name):
         id = worker.get_id()
         # positive_prob=baidu_emition.emotion(data['转发内容'][0:1000])
         # time.sleep(0.3)
-        sql_ts_a = "insert into %s (id,industry_id,title,summary,content,url,author,publish_time,emotion_status) values (%d,%d,'%s','%s','%s','%s','%s','%s',%f)" % (
-        table_name, id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
-        data['positive_prob_number'])
+        sql_ts_a = "insert into %s (id,industry_id,title,summary,content,url,author,publish_time,emotion_status,ic_id,keywords_id) values (%d,%d,'%s','%s','%s','%s','%s','%s',%f,%s,%s)" % (
+        table_name, id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],data['positive_prob_number'],data['ic_id'],data['keywords_id'])
         sql_qbb_a = "insert into %s (id,industry_id,title,summary,content,url,author,publish_time,is_original,location,emotion_status) values " \
-                    "(%d,%d,'%s','%s','%s','%s','%s','%s','%s','%s',%f)" % (
-                    table_name, id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'],
-                    data['时间'], data['is_original'], data['area'], data['positive_prob_number'])
+                    "(%d,%d,'%s','%s','%s','%s','%s','%s','%s','%s',%f,%s,%s)" % (table_name, id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'],
+                    data['时间'], data['is_original'], data['area'], data['positive_prob_number'],data['ic_id'],data['keywords_id'])
         # 插入A库
         cursor_A.execute(sql_ts_a)
         datas = {
@@ -307,17 +305,17 @@ def upload_many_data(data_list, industry_name):
 
         tuple_data_ts_a = (
             id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
-            data['positive_prob_number'])
+            data['positive_prob_number'],data['ic_id'],data['keywords_id'])
         tuple_data_qbb_a = (
             id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
-            data['is_original'], data['area'], data['positive_prob_number'])
+            data['is_original'], data['area'], data['positive_prob_number'],data['ic_id'],data['keywords_id'])
 
         tuple_data_list_ts_a.append(tuple_data_ts_a)
         tuple_data_list_qbb_a.append(tuple_data_qbb_a)
 
-    sql_ts_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s)"
+    sql_ts_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,emotion_status,ic_id,keywords_id) values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
     # 插入A库
-    sql_qbb_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,is_original,location,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+    sql_qbb_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,is_original,location,emotion_status,ic_id,keywords_id) values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
     cursor_A.executemany(sql_ts_a, tuple_data_list_ts_a)
     cursor_net_TS_A.executemany(sql_ts_a, tuple_data_list_ts_a)
     cursor_QBBA.executemany(sql_qbb_a, tuple_data_list_qbb_a)
@@ -451,9 +449,9 @@ class MyListener(stomp.ConnectionListener):
     """
     自己的监听队列，操作数据库
     """
-
-    def __init__(self, conn):
+    def __init__(self,conn):
         self.conn = conn
+        self.msg_list=[]
 
     def on_error(self, frame):
         print('received an error "%s"' % frame.body)
@@ -462,22 +460,25 @@ class MyListener(stomp.ConnectionListener):
         print('received a message "%s"' % frame.body)
         pattern = re.compile(r'http://weibo.com(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
         url = re.findall(pattern, frame.body)
-        print("处理之后的链接：" + url[0])
         if url:
-            # 爬取评论转发点赞数量
-            data = get_data_it(url[0])
-            sn = frame.body.split('"')[3]
-            track_data_number_sql2(sn, data)
-            for x in range(5):
-                print(x)
-                time.sleep(1)
-            print('processed message')
-            print("监听的url：" + url[0])
-
+            self.msg_list.append(frame.body)
+            print("处理之后的链接：" + url[0])
+            # # 爬取评论转发点赞数量
+            # data = get_data_it(url[0])
+            # sn = frame.body.split('"')[3]
+            # track_data_number_sql2(sn, data)
+            # for x in range(5):
+            #     print(x)
+            #     time.sleep(1)
+            # print('processed message')
+            # print("监听的url：" + url[0])
+        print(self.msg_list)
     def on_disconnected(self):
         print('disconnected')
         connect_and_subscribe(self.conn)
-
+    def get_msg_list(self):
+        print(self.msg_list)
+        return self.msg_list
 
 def connect_and_subscribe(conn):
     """
@@ -496,33 +497,57 @@ def re_connect_subscribe(conn):
     time.sleep(3)
     connect_and_subscribe(conn)
 
+def get_url_from_stomp(frame_body_list):
+    try:
+        if frame_body_list:
+            print("开始抓数据")
+            for frame_body in frame_body_list:
+                pattern = re.compile(r'http://weibo.com(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+                url = re.findall(pattern, frame_body)
+                data = get_data_it(url[0])
+                sn = frame_body.split('"')[3]
+                track_data_number_sql2(sn, data)
+                for x in range(3):
+                    print(x)
+                    time.sleep(1)
+            return True
+    except Exception as e:
+        print(e)
+        return False
+
+
+def track_data_work():
+    conn = stomp.Connection(host_and_ports=[('223.223.180.10', 61613)],heartbeats=(4000, 4000))
+    # conn.connect('admin', 'admin', wait=True)
+    lst = MyListener(conn)
+    # lst = MyListener()
+    conn.set_listener('track_data', lst)
+    connect_and_subscribe(conn)
+    conn.unsubscribe(destination='task.msg.tracker_2.1', id=1, ack='auto')
+    time.sleep(2)
+    frame_body_list=lst.get_msg_list()
+    print(frame_body_list)
+    # conn.disconnect()
+    # conn.disconnect()
+    hike_flag=get_url_from_stomp(frame_body_list)
+    if hike_flag:
+        return  track_data_work()
+    else:
+        conn.disconnect()
 
 # ———————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 
 
 if __name__ == '__main__':
-    # try:
-    #     conn = stomp.Connection(host_and_ports=[('223.223.180.10', 61613)])
-    #     # conn.connect('admin', 'admin', wait=True)
-    #     conn.set_listener('', MyListener(conn))
-    #     connect_and_subscribe(conn)
-    #     i=0
-    #     while 1:
-    #         i += 1
-    #         time.sleep(10)
-    #         # print(i)
-    #         if i == 6 * 3:
-    #             # 3分钟之后重新注册一次,防止时间过长，连接断开
-    #             re_connect_subscribe(conn)
-    #             i = 0
-    # except Exception as e:
-    #     print(e)
-    #     conn.disconnect()
+    # while 1:
+    track_data_work()
+
+
     # for d in get_industry_keywords():
     #     print(d)
 
     # record_log()
 
-    for d in merger_industry_data(get_industry_keywords()):
-        print(d)
+    # for d in merger_industry_data(get_industry_keywords()):
+    #     print(d)
 
