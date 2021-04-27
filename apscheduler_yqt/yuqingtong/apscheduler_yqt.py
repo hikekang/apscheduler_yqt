@@ -9,7 +9,6 @@
 import time
 import datetime
 import os
-
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 from pyquery import PyQuery as pq
@@ -19,14 +18,13 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.action_chains import ActionChains
-
 from utils.mylogger import logger
 from utils.spider_helper import SpiderHelper
+from utils.ssql_helper import get_industry_keywords
 from utils.webdriverhelper import MyWebDriver
 from utils.my_pyautogui import pyautogui
 from utils.webdriverhelper import WebDriverHelper
 from yuqingtong import config
-from utils.ssql_helper import track_data_number_sql, record_log
 from utils import ssql_helper
 import re
 
@@ -141,7 +139,7 @@ class YQTSpider(object):
     # 解析页面进行数据抓取和保存
     def _parse(self, page_source):
         doc = pq(page_source)
-        keywords_id=doc.find('span.site-menu-title.ml15.tippy:first-child').attr('id').split('_')[-1]
+        keywords_id = doc.find('span.site-menu-title.ml15.tippy:first-child').attr('id').split('_')[-1]
         items = doc.find('tbody tr.ng-scope').items()
 
         data_list = []
@@ -238,9 +236,9 @@ class YQTSpider(object):
                         "href"),
                     '转发内容': repost_content.replace("'", ""),
                     # '发布人': td_title.find('div[class="profile-title inline-block"]>a>span:first-child').text(),
-                    '发布人': td_title.find('div[class="profile-title inline-block"]>a>span[ng-if*="icc.author"]').text(),
-                    'ic_id': td_title.find('a[ng-click="getDetail(icc,currentKeyword);"]').attr('value'),
-                    'keywords_id': keywords_id,
+                    '发布人': td_title.find('a[ng-click="getDetail(icc,currentKeyword);"]').text(),
+                    'ic_id':td_title.find('a[ng-click="getDetail(icc,currentKeyword);"]').attr('value'),
+                    'keywords_id':keywords_id,
                     'attitude': td_title.find(
                         'div[ng-show="view.resultPresent != 3"] div.sensitive-status-content:not(.ng-hide)>span:first-child').text(),
                     'images': ",".join([img.attr('src') for img in item.find('.actizPicShow img').items()]),
@@ -265,14 +263,26 @@ class YQTSpider(object):
             # print(data)
             publish_man = re.sub(':|：', '', data['发布人'])
             data['发布人'] = publish_man
+            positive_prob = td_title.find('div.sensitive-status-wrapper.p-r>div.sensitive-status-content:not(.ng-hide)>span:first-child').text()
+            positive_dict = {
+                "敏感": 0.1,
+                "非敏感": 0.9,
+                "中性": 0.5
+            }
+            # print(td_time)
+            data['positive_prob_number'] = positive_dict[positive_prob.split()[0]]
+            # print(data['positive_prob_number'])
+            # print(positive_prob)
             # 查看近一个月中是否存在，滤重
             data_list.append(data)
         return data_list
 
     # 数据处理
     def clear_data(self, data_list):
-        new_data_list = self.quchong(data_list, "链接")
         logger.info("数据处理")
+        t1=time.time()
+        new_data_list = self.quchong(data_list, "链接")
+
         # 第二次滤重
         new_data_list = ssql_helper.filter_by_url(new_data_list, self.info['industry_name'])
         sec_list = []
@@ -309,6 +319,9 @@ class YQTSpider(object):
             else:
                 data['is_original'] = 2
             sec_list.append(data)
+        t2=time.time()
+        print("花费时间:",t2-t1)
+        print('数据处理完毕')
         return sec_list
 
     # 第一次根据爬取链接去重
@@ -338,7 +351,6 @@ class YQTSpider(object):
         :return: True or Flase
         """
         driver = self.spider_driver
-        print(start_time)
         start_time_str = start_time.strftime(config.DATETIME_FORMAT)
         end_time_str = end_time.strftime(config.DATETIME_FORMAT)
         driver.find_element_by_css_selector('div.inline-block.custom-time-period').click()
@@ -354,10 +366,10 @@ class YQTSpider(object):
         driver.find_element_by_css_selector('span[ng-click="confirmTime(1)"]').click()
         time.sleep(0.2)
         # -----------点击全部------------------
-        driver.find_element_by_css_selector('#informationContentType0').click()
-        time.sleep(0.2)
-        driver.find_element_by_css_selector('#select0').click()
-        time.sleep(0.2)
+        # driver.find_element_by_css_selector('#informationContentType0').click()
+        # time.sleep(0.2)
+        # driver.find_element_by_css_selector('#select0').click()
+        # time.sleep(0.2)
         # ------------------------------------
         driver.find_element_by_css_selector("#searchListButton").click()
         # time.sleep(2)
@@ -620,7 +632,7 @@ class YQTSpider(object):
 
             # 插入到数据库，返回一个成功插入的值
             # 上传数据
-            ssql_helper.post_data(data_list, self.info['industry_name'])
+            ssql_helper.upload_many_data(data_list, self.info['industry_name'])
 
             logger.info(f"解析到{len(data_list)}条数据")
             self.post_number += len(data_list)
@@ -649,8 +661,8 @@ class YQTSpider(object):
     def _crawl2(self, time_sleep):
         # 记录任务时间区
         logger.info(
-            f'任务时间区间：{self.interval[0].strftime(config.DATETIME_FORMAT)} --- '
-            f'{self.interval[1].strftime(config.DATETIME_FORMAT)}')
+            f'任务时间区间：{self.interval[0]} --- '
+            f'{self.interval[1]}')
 
         # 改成每页100条
         self._switch_data_count_perpage()
@@ -705,7 +717,7 @@ class YQTSpider(object):
                                               data_list=data_list)
                 record_dict = (self.info['industry_name'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
                 self.next_end_time, yqt_count, self.post_number, self.info['customer'])
-                record_log(record_dict)
+                ssql_helper.record_log(record_dict)
                 # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
                 return True
             else:
@@ -747,21 +759,22 @@ class YQTSpider(object):
         driver.find_element_by_id("saveHighSetKeyword").click()
         time.sleep(1)
 
-    def start(self, start_time, end_time, time_sleep, infos):
-        # try:
+    def start(self, start_time, end_time, time_sleep, info):
+        try:
             # 1.登录
-        if not self._login():
-            raise Exception("登录环节出现问题")
-        self.interval = [start_time, end_time]
-        self.last_end_time = self.interval[0]
-        self.next_end_time = self.interval[1]
-        # 抓取数据
-        print("获取关键词")
-        self.infos = infos
-        # 循环进行项目采取数据
-        for info in infos:
+            if not self._login():
+                raise Exception("登录环节出现问题")
+            self.interval = [start_time, end_time]
+            self.last_end_time = self.interval[0]
+            self.next_end_time = self.interval[1]
+            # 抓取数据
+            print("获取关键词")
+
+            # 循环进行项目采取数据
+
             self.info = info
             # 重新设置项目路径
+
             self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                                f"data\{info['customer']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
                                                f"{self}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
@@ -771,13 +784,10 @@ class YQTSpider(object):
             self.modifi_keywords()
 
             # -------------再次设置时间（定时抓取）----------------
-            end_time1 = datetime.datetime.now().strftime('%Y-%m-%d %H') + ":00:00"
-            one_hour_ago1 = datetime.datetime.now() - datetime.timedelta(hours=1)
-            start_time1 = one_hour_ago1.strftime('%Y-%m-%d %H') + ":00:00"
-            # 开始时间
-            start_time1 = datetime.datetime.strptime(start_time1, "%Y-%m-%d %H:%M:%S")
-            # 结束时间
-            end_time1 = datetime.datetime.strptime(end_time1, "%Y-%m-%d %H:%M:%S")
+            end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            start_time = (datetime.datetime.now() - datetime.timedelta(minutes=3)).strftime("%Y-%m-%d %H:%M:%S")
+            start_time1 = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+            end_time1 = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
 
             self.interval = [start_time1, end_time1]
             self.last_end_time = self.interval[0]
@@ -796,13 +806,11 @@ class YQTSpider(object):
             elif resp is True:
                 os.remove(self.process_file_path)
                 # pyautogui.alert("抓取完成...")
-        # except Exception as e:
-        #     # logger.warning(e)
-        #     print(e)
-        #
-        # finally:
-        #     if self.spider_driver.service.is_connectable():
-        #         self.spider_driver.quit()
+        except Exception as e:
+            logger.warning(e)
+        finally:
+            if self.spider_driver.service.is_connectable():
+                self.spider_driver.quit()
 
 
 # 修改xlsx文件进行自动抓取
@@ -814,7 +822,8 @@ def xlsx_work():
     # print(time_list)
     infos = config.row_list
     yqt_spider = YQTSpider(infos[0])
-    project_list = ssql_helper.get_industry_keywords()[1:]
+    data=get_industry_keywords()
+    project_list = ssql_helper.merger_industry_data(data)[1]
     for tim in time_list:
         yqt_spider.start(start_time=tim['start_time'], end_time=tim['end_time'], time_sleep=tim['time_delay'],
                          infos=project_list)
@@ -837,47 +846,41 @@ def work_it():
 
 
 def work_it_2():
-    end_time = datetime.datetime.now().strftime('%Y-%m-%d %H') + ":00:00"
-    one_hour_ago = datetime.datetime.now() - datetime.timedelta(hours=1)
-
-    start_time = one_hour_ago.strftime('%Y-%m-%d %H') + ":00:00"
-    # 开始时间 一小时之前
+    end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    start_time = (datetime.datetime.now() - datetime.timedelta(minutes=3)).strftime("%Y-%m-%d %H:%M:%S")
     start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-    # 结束时间 现在的时间
     end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
     # 获取项目信息
     infos = config.row_list
 
-    yqt_spider = YQTSpider(infos[0], start_time=start_time, end_time=end_time)
+    yqt_spider = YQTSpider(infos[-1], start_time=start_time, end_time=end_time)
 
     # yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2,infos=infos)
     # 从数据库中获取使用项目信息
-    # project_list = ssql_helper.get_industry_keywords()
-    project_list=ssql_helper.merger_industry_data(ssql_helper.get_industry_keywords())
-    yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, infos=project_list)
+    project_list = ssql_helper.get_industry_keywords()[4]
+    p_data = []
+    project_list_1 = ssql_helper.get_industry_keywords()
+    project_list = ssql_helper.merger_industry_data(project_list_1)
+    for project_data in project_list:
+        if project_data['industry_name'] == 'IT业':
+            p_data.append(project_data)
+    print(p_data)
+    yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=p_data[0])
 
     #
 
 
 def apscheduler():
-    trigger1 = CronTrigger(hour='0-23', minute='*/10', second=10, jitter=5)
-
+    trigger1 = CronTrigger(hour='0-23', minute='01',second=00, jitter=5)
     sched = BlockingScheduler()
-    sched.add_job(work_it_2, trigger1, id='my_job_id')
-    # sched.add_job(track_data_number_sql(), trigger1, id='my_job_id')
+    sched.add_job(work_it_2, trigger1,max_instances=10,id='my_job_id')
     sched.start()
 
 
 if __name__ == '__main__':
-    # today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    # time1 = (datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%Y-%m-%d')
+    today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    time1 = (datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%Y-%m-%d')
     # ssql_helper.get_month_data(time1, today)
     # apscheduler()
-
-    # 补抓数据前一天 固定时间点进行抓取
-    # 词语去重
-
-    # t1=time.time()
     # xlsx_work()
-    # print(time.time()-t1)
     work_it_2()
