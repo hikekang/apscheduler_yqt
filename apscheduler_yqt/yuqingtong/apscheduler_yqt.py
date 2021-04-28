@@ -318,7 +318,23 @@ class YQTSpider(object):
                     data['is_original'] = 2
             else:
                 data['is_original'] = 2
-            sec_list.append(data)
+            keywords_list = self.keywords.split('|')
+            simultaneousWords=self.SimultaneousWord.split('|')
+            excludewords=self.excludewords.split('|')
+            for keywords in keywords_list:
+                if(keywords in data['标题'] or keywords in data['转发内容']):
+                        pass
+            for s in simultaneousWords:
+                if (s in data['标题'] or s in data['转发内容']):
+                    pass
+            for ex in excludewords:
+                if(ex in data['标题'] or ex in data['转发内容']):
+                    flag=1
+                    continue
+            if flag==1:
+                 continue
+            else:
+                sec_list.append(data)
         t2=time.time()
         print("花费时间:",t2-t1)
         print('数据处理完毕')
@@ -780,12 +796,14 @@ class YQTSpider(object):
                                                f"{self}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
                                                    ':', '_'))
             self.keyword = info['keywords']
+            self.SimultaneousWord=info['simultaneouswords']
+            self.excludewords=info['excludewords']
             # 设置关键词
             self.modifi_keywords()
 
             # -------------再次设置时间（定时抓取）----------------
             end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            start_time = (datetime.datetime.now() - datetime.timedelta(minutes=3)).strftime("%Y-%m-%d %H:%M:%S")
+            start_time = (datetime.datetime.now() - datetime.timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M:%S")
             start_time1 = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
             end_time1 = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
 
@@ -847,7 +865,7 @@ def work_it():
 
 def work_it_2():
     end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    start_time = (datetime.datetime.now() - datetime.timedelta(minutes=3)).strftime("%Y-%m-%d %H:%M:%S")
+    start_time = (datetime.datetime.now() - datetime.timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M:%S")
     start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
     end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
     # 获取项目信息
@@ -867,13 +885,42 @@ def work_it_2():
     print(p_data)
     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=p_data[0])
 
+def work_it_one_day():
+    end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    start_time = (datetime.datetime.now() - datetime.timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M:%S")
+    start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+    end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+    # 获取项目信息
+    infos = config.row_list
+
+    yqt_spider = YQTSpider(infos[-1], start_time=start_time, end_time=end_time)
+
+    # yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2,infos=infos)
+    # 从数据库中获取使用项目信息
+    # project_list = ssql_helper.get_industry_keywords()[4]
+
+    p_data = []
+    project_list_1 = ssql_helper.get_industry_keywords()
+    project_list = ssql_helper.merger_industry_data(project_list_1)
+    for project_data in project_list:
+        if project_data['industry_name'] == 'IT业':
+            p_data.append(project_data)
+    print(p_data)
+    yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=p_data[0])
+
     #
 
 
 def apscheduler():
     trigger1 = CronTrigger(hour='0-23', minute='01',second=00, jitter=5)
+    trigger2 = CronTrigger(hour='0', minute='01',second=00, jitter=5)
+    trigger3 = CronTrigger(hour='0-23', minute='*/3',second=00, jitter=5)
+    trigger4 = CronTrigger(hour='0-23', minute='*/3',second=00, jitter=5)
     sched = BlockingScheduler()
     sched.add_job(work_it_2, trigger1,max_instances=10,id='my_job_id')
+    sched.add_job(work_it_one_day, trigger2,max_instances=10,id='my_job_id_ever')
+    sched.add_job(ssql_helper.track_data_task, trigger3,max_instances=10,id='my_job_track')
+    sched.add_job(ssql_helper.single_thread, trigger4,max_instances=10,id='my_job_second')
     sched.start()
 
 
