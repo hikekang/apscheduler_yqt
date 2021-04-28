@@ -5,7 +5,12 @@
    Author :       hike
    time：          2021/4/1 14:44
 """
+import json
+import threading
 from datetime import datetime
+
+from fake_useragent import UserAgent
+
 from utils.snowflake import IdWorker
 import pymssql
 from utils import getdatabyselenium
@@ -15,6 +20,7 @@ import re
 import stomp
 from utils.getdatabyselenium import get_data_it
 import requests
+from utils import extract_content
 
 pool = redis.ConnectionPool(host='localhost', port=6379, decode_responses=True)
 r = redis.Redis(connection_pool=pool)
@@ -278,6 +284,7 @@ def post_data(data_list, industry_name):
 def upload_many_data(data_list, industry_name):
     """
     多数据插入
+
     """
     table_name = tables[industry_name]
     # 查询hangyeid
@@ -288,6 +295,7 @@ def upload_many_data(data_list, industry_name):
     industry_id = cursor_B.fetchone()[0]
 
     tuple_data_list_ts_a = []
+    tuple_data_list_ts_a_second_data = []
     tuple_data_list_qbb_a = []
     post_data_list = []
     worker = IdWorker(1, 2, 0)
@@ -305,18 +313,29 @@ def upload_many_data(data_list, industry_name):
 
         tuple_data_ts_a = (
             id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
-            data['positive_prob_number'],data['ic_id'],data['keywords_id'])
+            data['positive_prob_number'])
+
+
+
         tuple_data_qbb_a = (
             id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
-            data['is_original'], data['area'], data['positive_prob_number'],data['ic_id'],data['keywords_id'])
+            data['is_original'], data['area'], data['positive_prob_number'])
 
         tuple_data_list_ts_a.append(tuple_data_ts_a)
+
         tuple_data_list_qbb_a.append(tuple_data_qbb_a)
 
-    sql_ts_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,emotion_status,ic_id,keywords_id) values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+        tuple_data_ts_a_second_data = (id, industry_id, data['ic_id'], data['keywords_id'], data['链接'])
+        tuple_data_list_ts_a_second_data.append(tuple_data_ts_a_second_data)
+
+    sql_ts_a_second_data="insert into TS_Second_Data (id,industry_id,ic_id,keywords_id,url) values (%d,%d,%s,%s,%s)"
+    sql_ts_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s)"
     # 插入A库
-    sql_qbb_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,is_original,location,emotion_status,ic_id,keywords_id) values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+    sql_qbb_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,is_original,location,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
     cursor_A.executemany(sql_ts_a, tuple_data_list_ts_a)
+    # 二级数据表
+    cursor_A.executemany(sql_ts_a_second_data, tuple_data_list_ts_a_second_data)
+
     cursor_net_TS_A.executemany(sql_ts_a, tuple_data_list_ts_a)
     cursor_QBBA.executemany(sql_qbb_a, tuple_data_list_qbb_a)
     cursor_net_QBB_A.executemany(sql_qbb_a, tuple_data_list_qbb_a)
@@ -339,6 +358,10 @@ def upload_many_data(data_list, industry_name):
 
 
 def testsql():
+    """
+     测试sql语句
+
+    """
     sql_ts_a = "insert into '%s' (id,industry_id,title,summary,content,url,author,publish_time) values (''%s'','%s','%s','%s','%s','%s','%s','%s')" % (
     'hike', 'hike', 'hike', 'hike', 'hike', 'hike', 'hike', 'hike', 'hike',)
     print(sql_ts_a)
@@ -407,26 +430,101 @@ def get_teack_datas():
             url_list.append(url)
     return url_list
 
-
-def track_data_number_sql():
+def get_track_datas_qbbb():
     """
+    数据库qbbb,track_task中获取数据
+    """
+    sql="select * from TS_track_task where is_done=0"
+    cursor_QBBB.execute(sql)
+    datas=cursor_QBBB.fetchall()
+    return datas
+
+def second_data_url_sql():
+    """
+    二层数据抓取 url查询
+    """
+    sql="select * from TS_Second_Data where crawl_flag=0"
+    cursor_A.execute(sql)
+    data=cursor_A.fetchall()
+    return data
+
+def crawl_data(data):
+    """
+    抓取二层数据并进行更新数据库
+    """
+    url = 'http://yuqing.sina.com/newEdition/getDetail.action'
+    headers = {
+        'User-Agent': UserAgent().random,
+        'Cookie': 'Hm_lvt_d535b0ca2985df3bb95f745cd80ea59e=1619337563,1619416119,1619494308,1619574875; Hm_lpvt_d535b0ca2985df3bb95f745cd80ea59e=1619574875; Hm_lvt_c29f5cd9e2c7e8844969c899f7ac90d3=1619337563,1619416119,1619494308,1619574875; Hm_lpvt_c29f5cd9e2c7e8844969c899f7ac90d3=1619574875; www=userSId_yqt365_hbslxx_239715_41922; JSESSIONID=B833FDDC979244F27AEB1BCFC833237E'
+    }
+    params = {
+        'icc.id': data[2],
+        'kw.keywordId':data[3]
+    }
+    r=requests.post(url,params=params,headers=headers,proxies = {'http': None, 'https': None})
+    time.sleep(0.3)
+    print(r.text)
+    data_content = json.loads(r.text)
+    print(data_content)
+    # 获取数据
+    content=extract_content.extract_content(str('<html><body>'+data_content['icc']['content']))
+    # print(content+"\n")
+    # B库更新
+    sql_Base = "update TS_DataMerge_Base set Body='%s'where url='%s' "% (content,data[5])
+    print(sql_Base)
+    cursor_QBBB.execute(sql_Base)
+
+    sql_second_data="update TS_Second_Data set crawl_flag=1 where url='%s'"%data[5]
+    cursor_A.execute(sql_second_data)
+
+def multi_thread():
+    """
+    多线程数据爬取
+    """
+    threads=[]
+    for data in iter(second_data_url_sql()):
+        threads.append(
+            threading.Thread(target=crawl_data,args=(list(data),))
+        )
+    for thread in threads:
+        thread.start()
+
+    for thread in threads:
+        thread.join()
+
+def single_thread():
+    for data in iter(second_data_url_sql()):
+        crawl_data(data)
+
+
+def track_data_task():
+    """
+    直接扫描表
     数据库中获取链接进行追踪
     """
-    for url in get_teack_datas():
-        data = getdatabyselenium.get_data_it(url['url'])
+    for data in get_track_datas_qbbb():
+        num = getdatabyselenium.get_data_it(data[1])
         # data=getdatabyselenium.get_data_it(url['url'])
         create_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    #     转发、评论、点赞
-    sql_record = "insert into TS_track_record(sn,forward_num,comment_num,good_num,create_date) values('%s','%d','%d','%d','%s')" % (
-    url['sn'], data[0], data[1], data[2], create_date)
-    print(cursor_QBBB.execute(sql_record))
-    sql_Base = "update TS_DataMerge_Base set Transpond_Num=%d,Comment_Num=%d,Forward_Good_Num=%d where SN='%s' " % (
-    data[0], data[1], data[2], url['sn'])
-    print(cursor_QBBB.execute(sql_Base))
+        #     转发、评论、点赞
+        # 追踪记录
+        sql_record = "insert into TS_track_record(sn,forward_num,comment_num,good_num,create_date) values('%s','%d','%d','%d','%s')" % (
+        data[2], num[0], num[1], num[2], create_date)
+        cursor_QBBB.execute(sql_record)
+        # 更新值
+        sql_Base = "update TS_DataMerge_Base set Transpond_Num=%d,Comment_Num=%d,Forward_Good_Num=%d where SN='%s' " % (
+        num[0], num[1], num[2], data[2])
+        cursor_QBBB.execute(sql_Base)
+        # print('更新库')
+         #     修改数据追踪表
+        sql_track_task="update TS_track_task set is_done=1 where sn='%s' "%data[2]
+        cursor_QBBB.execute(sql_track_task)
+        # print('追踪完毕')
 
 
 def track_data_number_sql2(sn, data):
     """
+    stomp版本
     将得到的数据插入数据库
     """
     create_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -540,8 +638,10 @@ def track_data_work():
 
 if __name__ == '__main__':
     # while 1:
-    track_data_work()
+    # track_data_work()
+    # multi_thread()
 
+    single_thread()
 
     # for d in get_industry_keywords():
     #     print(d)
@@ -551,3 +651,10 @@ if __name__ == '__main__':
     # for d in merger_industry_data(get_industry_keywords()):
     #     print(d)
 
+    # for data in get_track_datas():
+    #     print(data)
+    # track_data_task()
+
+    # for data in second_data_url_sql():
+    #     print(data)
+    #     print(data[5])
