@@ -42,6 +42,10 @@ connect_QBBA = pymssql.connect(server='223.223.180.9', user='tsuser1', password=
                                port='39999', charset='utf8', autocommit=True)
 connect_QBBB = pymssql.connect(server='223.223.180.9', user='tsuser1', password='tsuser1@123aA', database='QBB_B',
                                port='39999', charset='utf8', autocommit=True)
+
+# connect_QBBB_odbc=pyodbc.connect(DRIVER='SQL Server Native Client 11.0',SERVER='223.223.180.9',DATABASE='QBB_B',UID='tsuser1',PWD='tsuser1@123aA',port='39999')
+
+
 # 内网数据库
 connect_net_QBB_A = pymssql.connect(server='192.168.0.77', user='sa', password='33221100@aA', database='QBB_A',
                                     port='1433', autocommit=True)
@@ -118,7 +122,7 @@ def get_industry_keywords():
             'excludewords': '',  # 排除词
             'simultaneouswords': '',  # 同现词
         }
-
+        # principals
         for i, dd in enumerate(d):
             if i == 0:
                 new_d['id'] = dd
@@ -399,12 +403,14 @@ def filter_by_url(datalist, industry_name):
     for data in datalist:
         if r.sismember(industry_id, data['链接']) == False:
             new_data_list.append(data)
+    print("rediss 滤重之后的数量")
+    print(len(new_data_list))
     return new_data_list
 def record_log(data):
     """
     数据记录
     """
-    sql_record = "insert into record_log_table values (%s,%s,%s,%s,%s,%s,%s,%s)"
+    sql_record = "insert into record_log_table values (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
     # data=('3', '2021-4-26 00:00:00','2021-4-26 00:00:00', '2021-4-26 00:00:00', '4', '5', '6', '1')
     cursor_A.execute(sql_record,data)
     # pass
@@ -455,7 +461,7 @@ def crawl_data(data):
     url = 'http://yuqing.sina.com/newEdition/getDetail.action'
     headers = {
         'User-Agent': UserAgent().random,
-        'Cookie': 'Hm_lvt_d535b0ca2985df3bb95f745cd80ea59e=1619337563,1619416119,1619494308,1619574875; Hm_lpvt_d535b0ca2985df3bb95f745cd80ea59e=1619574875; Hm_lvt_c29f5cd9e2c7e8844969c899f7ac90d3=1619337563,1619416119,1619494308,1619574875; Hm_lpvt_c29f5cd9e2c7e8844969c899f7ac90d3=1619574875; www=userSId_yqt365_hbslxx_239715_41922; JSESSIONID=B833FDDC979244F27AEB1BCFC833237E'
+        'Cookie': 'Hm_lvt_d535b0ca2985df3bb95f745cd80ea59e=1619337563,1619416119,1619494308,1619574875; Hm_lpvt_d535b0ca2985df3bb95f745cd80ea59e=1619574875; Hm_lvt_c29f5cd9e2c7e8844969c899f7ac90d3=1619337563,1619416119,1619494308,1619574875; Hm_lpvt_c29f5cd9e2c7e8844969c899f7ac90d3=1619574875; www=userSId_yqt365_hbslxx_239715_72496; JSESSIONID=53D37416EB6EA584070A2EAFCE70E515'
     }
     params = {
         'icc.id': data[2],
@@ -641,11 +647,11 @@ if __name__ == '__main__':
     # track_data_work()
     # multi_thread()
 
-    single_thread()
+    # single_thread()
 
-    # for d in get_industry_keywords():
-    #     print(d)
-
+    for d in get_industry_keywords():
+        print(d)
+    # track_data_task()
     # record_log()
 
     # for d in merger_industry_data(get_industry_keywords()):
