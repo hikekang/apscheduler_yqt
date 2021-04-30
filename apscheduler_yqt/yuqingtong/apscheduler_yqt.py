@@ -263,6 +263,8 @@ class YQTSpider(object):
             # print(data)
             publish_man = re.sub(':|：', '', data['发布人'])
             data['发布人'] = publish_man
+            if(len(data['发布人'])>10):
+                data['发布人']=''
             positive_prob = td_title.find('div.sensitive-status-wrapper.p-r>div.sensitive-status-content:not(.ng-hide)>span:first-child').text()
             positive_dict = {
                 "敏感": 0.1,
@@ -285,15 +287,24 @@ class YQTSpider(object):
 
         # 第二次滤重
         new_data_list = ssql_helper.filter_by_url(new_data_list, self.info['industry_name'])
+        self.redis_len+=len(new_data_list)
         sec_list = []
         for data in new_data_list:
             # 1.标题或url为空的舍去
-            if data["标题"] == "" or data["链接"] == "":
+            if data["标题"] == "" and data["链接"] == "":
                 # new_data_list.remove(data)
+                print("标题或者链接为空")
+                print(data)
                 continue
+            if data["标题"]=="":
+                if len(data["转发内容"]) >= 20:
+                    data["标题"] = data["转发内容"][0:20]
+                else:
+                    data["标题"] = data["转发内容"]
             #     2.转发微博并且转发内容为空的使舍去
             elif data["标题"] == "转发微博" and data["转发内容"] == "":
                 # new_data_list.remove(data)
+                print("标题为转发微博，转发内容为空")
                 continue
             #     3.转发类型的微博，取前内容的前20个字符作为标题
             elif data["标题"] == "转发微博":
@@ -318,36 +329,43 @@ class YQTSpider(object):
                     data['is_original'] = 2
             else:
                 data['is_original'] = 2
-            keywords_list = self.keywords.split('|')
-            simultaneousWords=self.SimultaneousWord.split('|')
-            excludewords=self.excludewords.split('|')
-            for keywords in keywords_list:
-                if(keywords in data['标题'] or keywords in data['转发内容']):
-                        pass
-            for s in simultaneousWords:
-                if (s in data['标题'] or s in data['转发内容']):
-                    pass
-            for ex in excludewords:
-                if(ex in data['标题'] or ex in data['转发内容']):
-                    flag=1
-                    continue
-            if flag==1:
-                 continue
-            else:
-                sec_list.append(data)
+            # print(self.keyword)
+            # keywords_list = self.keyword.split('|')
+            # simultaneousWords=self.SimultaneousWord.split('|')
+            # excludewords=self.excludewords.split('|')
+            # for keywords in keywords_list:
+            #     if(keywords in data['标题'] or keywords in data['转发内容']):
+            #             pass
+            # for s in simultaneousWords:
+            #     if (s in data['标题'] or s in data['转发内容']):
+            #         pass
+            # for ex in excludewords:
+            #     if(ex in data['标题'] or ex in data['转发内容']):
+            #         flag=1
+            #         continue
+            # if flag==1:
+            #      continue
+            # else:
+            sec_list.append(data)
         t2=time.time()
         print("花费时间:",t2-t1)
         print('数据处理完毕')
+        print("数据处理完毕之后的数量")
         return sec_list
 
     # 第一次根据爬取链接去重
     def quchong(self, dir_list, key):
+        print("第一次链接去重")
+        print(len(dir_list))
         new_dirlist = []
         values = []
         for d in dir_list:
             if d[key] not in values:
                 new_dirlist.append(d)
                 values.append(d[key])
+
+        print("第一次滤重之后的数量")
+        self.first_len+=len(new_dirlist)
         return new_dirlist
 
     def parse_data(self):
@@ -731,8 +749,10 @@ class YQTSpider(object):
                              self.last_end_time, self.next_end_time]
                 SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number,
                                               data_list=data_list)
+                # record_dict = (self.info['industry_name'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
+                # self.next_end_time, yqt_count, self.post_number, self.info['customer'])
                 record_dict = (self.info['industry_name'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
-                self.next_end_time, yqt_count, self.post_number, self.info['customer'])
+                self.next_end_time, yqt_count, self.post_number, self.info['customer'],self.first_len,self.redis_len)
                 ssql_helper.record_log(record_dict)
                 # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
                 return True
@@ -771,36 +791,40 @@ class YQTSpider(object):
         time.sleep(0.3)
         keywords.send_keys(self.keyword)
         time.sleep(0.3)
+
         # 保存
         driver.find_element_by_id("saveHighSetKeyword").click()
         time.sleep(1)
 
-    def start(self, start_time, end_time, time_sleep, info):
-        try:
-            # 1.登录
-            if not self._login():
-                raise Exception("登录环节出现问题")
-            self.interval = [start_time, end_time]
-            self.last_end_time = self.interval[0]
-            self.next_end_time = self.interval[1]
-            # 抓取数据
-            print("获取关键词")
+    def start(self, start_time, end_time, time_sleep, info,is_one_day):
+        # try:
+        # 1.登录
+        if not self._login():
+            raise Exception("登录环节出现问题")
+        self.interval = [start_time, end_time]
+        self.last_end_time = self.interval[0]
+        self.next_end_time = self.interval[1]
+        # 抓取数据
+        print("获取关键词")
+        # print(self.spider_driver.get_cookies())
+        # for request in self.spider_driver.requests:
+        #     print(request.headers)
 
-            # 循环进行项目采取数据
+        # 循环进行项目采取数据
 
-            self.info = info
-            # 重新设置项目路径
+        self.info = info
+        # 重新设置项目路径
 
-            self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                               f"data\{info['customer']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
-                                               f"{self}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
-                                                   ':', '_'))
-            self.keyword = info['keywords']
-            self.SimultaneousWord=info['simultaneouswords']
-            self.excludewords=info['excludewords']
-            # 设置关键词
-            self.modifi_keywords()
-
+        self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                           f"data\{info['customer']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
+                                           f"{self}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
+                                               ':', '_'))
+        self.keyword = info['keywords']
+        self.SimultaneousWord=info['simultaneouswords']
+        self.excludewords=info['excludewords']
+        # 设置关键词
+        self.modifi_keywords()
+        if is_one_day==False:
             # -------------再次设置时间（定时抓取）----------------
             end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             start_time = (datetime.datetime.now() - datetime.timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M:%S")
@@ -812,23 +836,23 @@ class YQTSpider(object):
             self.next_end_time = self.interval[1]
             # -----------定时抓取时间设置完毕----------------------
 
-            # 抓取数据
-            resp = self._crawl2(time_sleep)
+        # 抓取数据
+        resp = self._crawl2(time_sleep)
 
-            if resp == "restart_browser":
-                logger.info("重启浏览器")
-                self.spider_driver.quit()
-                self.spider_driver = WebDriverHelper.init_webdriver(is_headless=config.HEAD_LESS)
-                self.wait = WebDriverWait(self.spider_driver, config.WAIT_TIME)
-                self.start(resp)
-            elif resp is True:
-                os.remove(self.process_file_path)
-                # pyautogui.alert("抓取完成...")
-        except Exception as e:
-            logger.warning(e)
-        finally:
-            if self.spider_driver.service.is_connectable():
-                self.spider_driver.quit()
+        if resp == "restart_browser":
+            logger.info("重启浏览器")
+            self.spider_driver.quit()
+            self.spider_driver = WebDriverHelper.init_webdriver(is_headless=config.HEAD_LESS)
+            self.wait = WebDriverWait(self.spider_driver, config.WAIT_TIME)
+            self.start(resp)
+        elif resp is True:
+            os.remove(self.process_file_path)
+            # pyautogui.alert("抓取完成...")
+        # except Exception as e:
+        #     logger.warning(e)
+        # finally:
+        #     if self.spider_driver.service.is_connectable():
+        #         self.spider_driver.quit()
 
 
 # 修改xlsx文件进行自动抓取
@@ -864,8 +888,9 @@ def work_it():
 
 
 def work_it_2():
-    end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    start_time = (datetime.datetime.now() - datetime.timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M:%S")
+    end_time = datetime.datetime.now().strftime('%Y-%m-%d ') + "00:00:00"
+    # end_time = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d ") + "00:00:00"
+    start_time = (datetime.datetime.now() - datetime.timedelta(hours=3)).strftime("%Y-%m-%d ") + "00:00:00"
     start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
     end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
     # 获取项目信息
@@ -883,17 +908,17 @@ def work_it_2():
         if project_data['industry_name'] == 'IT业':
             p_data.append(project_data)
     print(p_data)
-    yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=p_data[0])
+    yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=p_data[0],is_one_day=False)
 
 def work_it_one_day():
-    end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    start_time = (datetime.datetime.now() - datetime.timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M:%S")
+    end_time = (datetime.datetime.now() - datetime.timedelta(days=2)).strftime("%Y-%m-%d ") + "00:00:00"
+    start_time = (datetime.datetime.now() - datetime.timedelta(days=3)).strftime("%Y-%m-%d ")+"00:00:00"
     start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
     end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
     # 获取项目信息
     infos = config.row_list
 
-    yqt_spider = YQTSpider(infos[-1], start_time=start_time, end_time=end_time)
+    yqt_spider = YQTSpider(infos[0], start_time=start_time, end_time=end_time)
 
     # yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2,infos=infos)
     # 从数据库中获取使用项目信息
@@ -903,10 +928,11 @@ def work_it_one_day():
     project_list_1 = ssql_helper.get_industry_keywords()
     project_list = ssql_helper.merger_industry_data(project_list_1)
     for project_data in project_list:
-        if project_data['industry_name'] == 'IT业':
+        if project_data['industry_name'] == '流通贸易':
             p_data.append(project_data)
+    print("data")
     print(p_data)
-    yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=p_data[0])
+    yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=p_data[0],is_one_day=True)
 
     #
 
@@ -931,3 +957,4 @@ if __name__ == '__main__':
     # apscheduler()
     # xlsx_work()
     work_it_2()
+    # work_it_one_day()
