@@ -38,6 +38,9 @@ class YQTSpider(object):
             self.spider_driver = spider_driver  # type:MyWebDriver
         self.wait = WebDriverWait(self.spider_driver, config.WAIT_TIME)
         self.info = info
+        self.devide_keywords=False
+        self.first_len=0
+        self.redis_len=0
         # 需要替换
         self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                            f"data\{info['project_name']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
@@ -52,7 +55,6 @@ class YQTSpider(object):
         # 本次终止时间
         self.next_end_time = None  # type:datetime.datetime
 
-        self.keywords = None
         # self.last_end_time = self.end_time
         default_start_time = datetime.datetime.combine(
             (datetime.datetime.now() + datetime.timedelta(days=-99)).date(),
@@ -231,10 +233,10 @@ class YQTSpider(object):
                 data = {
                     '时间': parse_time(td_time),
                     '标题': title.replace("'", ""),
-                    '描述': content[0].replace("'", ""),
+                    '描述': content[0].replace("'", "").replace("\n",""),
                     '链接': td_title.find('.news-item-tools.font-size-0 div:nth-child(2)>div>ul>li:nth-child(4) a').attr(
                         "href"),
-                    '转发内容': repost_content.replace("'", ""),
+                    '转发内容': repost_content.replace("'", "").replace("\n",""),
                     # '发布人': td_title.find('div[class="profile-title inline-block"]>a>span:first-child').text(),
                     '发布人': td_title.find('a[ng-click="getDetail(icc,currentKeyword);"]').text(),
                     'ic_id':td_title.find('a[ng-click="getDetail(icc,currentKeyword);"]').attr('value'),
@@ -261,10 +263,19 @@ class YQTSpider(object):
 
                 }
             # print(data)
-            publish_man = re.sub(':|：', '', data['发布人'])
-            data['发布人'] = publish_man
-            if(len(data['发布人'])>10):
-                data['发布人']=''
+            #     publish_man = re.sub(':|：', '', data['发布人'])
+            #     data['发布人'] = publish_man
+            #     if(len(data['发布人'])>10):
+            #         data['发布人']=''
+            #
+                if '：' in data['发布人'] or ":" in data['发布人']:
+                    publish_man = re.sub(':|：', '', data['发布人'])
+                    data['发布人'] = publish_man
+                else:
+                    if(len( data['发布人'])>10):
+                        data['发布人'] = ''
+                if (len(data['发布人']) > 15):
+                    data['发布人'] = ''
             positive_prob = td_title.find('div.sensitive-status-wrapper.p-r>div.sensitive-status-content:not(.ng-hide)>span:first-child').text()
             positive_dict = {
                 "敏感": 0.1,
@@ -437,31 +448,41 @@ class YQTSpider(object):
             if not self._is_page_loaded():
                 logger.info("设置时间时页面加载出现问题")
                 return False
-            if not self._is_data_count_outside():  # 没有超过5000条，不用调整
-                logger.info(f"小于{config.MAX_DATA_COUNT}条,符合条件")
+                if not self._is_data_count_outside():  # 没有超过5000条，不用调整
+                    logger.info(f"小于{config.MAX_DATA_COUNT}条,符合条件")
                 break
             logger.info(f"页面数据大于{config.MAX_DATA_COUNT}条，调整时间区段")
+            # 超出5000条进行分词抓取
+            # return False
+            self.devide_keywords=True
+            break
 
-            # 时间设置
-            timedelta = self.next_end_time - self.last_end_time
-            if timedelta.days <= 1:
-                timedelta_hours = timedelta.total_seconds() / 60 / 60
-                if timedelta_hours <= 1:
-                    logger.info("时间区间小于一小时，无法调整")
-                    break
-                logger.info("时间区间小于一天，继续细化调整")
-                # 下次开始时间
-                self.next_end_time = self.last_end_time + datetime.timedelta(hours=timedelta_hours / 2)
-            else:
-                # return None
-                self.next_end_time = datetime.datetime.combine(self.last_end_time.date(),
-                                                               datetime.datetime.min.time()) + \
-                                     datetime.timedelta(days=round(timedelta.days / 2))
+
+            # ---------------------------------------------------------------------------------------------------------
+            # 超出5000条进行时间设置
+
+            # 停止时间划分
+            # timedelta = self.next_end_time - self.last_end_time
+            # if timedelta.days <= 1:
+            #     timedelta_hours = timedelta.total_seconds() / 60 / 60
+            #     if timedelta_hours <= 1:
+            #         logger.info("时间区间小于一小时，无法调整")
+            #         break
+            #     logger.info("时间区间小于一天，继续细化调整")
+            #     # 下次开始时间
+            #     self.next_end_time = self.last_end_time + datetime.timedelta(hours=timedelta_hours / 2)
+            # else:
+            #     # return None
+            #     self.next_end_time = datetime.datetime.combine(self.last_end_time.date(),
+            #                                                    datetime.datetime.min.time()) + \
+            #                          datetime.timedelta(days=round(timedelta.days / 2))
+
+            # # ---------------------------------------------------------------------------------------------------------
             # if timedelta.days % 2 == 0:  # 偶数
             #     end_time = start_time.date() + datetime.timedelta(days=timedelta.days / 2)
             # else:
             #     end_time = start_time.date() + datetime.timedelta(days=(timedelta.days + 1) / 2)
-
+            # ---------------------------------------------------------------------------------------------------------
         logger.info(
             f"当前时间区间:{self.last_end_time.strftime(config.DATETIME_FORMAT)}  --"
             f" {self.next_end_time.strftime(config.DATETIME_FORMAT)}")
@@ -478,6 +499,7 @@ class YQTSpider(object):
     def _is_data_count_outside(self):
         """
         数据量是否超出5000
+        超出返回True
         :return:
         """
         try:
@@ -528,6 +550,7 @@ class YQTSpider(object):
             print('再次判断')
             return self._is_page_loaded(count=count + 1)
 
+    # 100条
     def _switch_data_count_perpage(self):
         """
         点击每页100条按钮
@@ -550,44 +573,44 @@ class YQTSpider(object):
         logger.info("更改100条数据/每页")
         return True
 
-    def _get_input_time_range(self):
-        """
-        获取输入的时间区间
-        :return:
-        """
-        while 1:
-            input_start_time = pyautogui.prompt('请输入起始日期\n格式：2020-01-01', "起始时间",
-                                                default=self.interval[0].strftime('%Y-%m-%d'))
-            # input_start_time = config.info['start_time'].strftime('%Y-%m-%d')
-            try:
-                start_time = datetime.datetime.strptime(input_start_time, "%Y-%m-%d")
-                break
-            except ValueError as e:
-                logger.warning(e)
-                pyautogui.alert(f"检查日期是否有误：{input_start_time}")
-            except TypeError:
-                return
-        while 1:
-            input_end_time = pyautogui.prompt(f'起始时间：{input_start_time}\n请输入终止日期\n格式：2020-12-01', "终止时间",
-                                              default=self.interval[1].strftime('%Y-%m-%d'))
-            # input_end_time = config.info['end_time'].strftime('%Y-%m-%d')
-            try:
-                end_time = datetime.datetime.strptime(input_end_time, "%Y-%m-%d") + datetime.timedelta(
-                    days=1)
-                if end_time <= start_time:
-                    pyautogui.alert(f"终止时间[{input_end_time}]小于起始时间[{input_start_time}]")
-                    continue
-
-                if (end_time - start_time).days > 100:
-                    pyautogui.alert(f"时间跨度不能超过100天，请重新输入")
-                    return self._get_input_time_range()
-                break
-            except ValueError as e:
-                logger.warning(e)
-                pyautogui.alert(f"检查日期是否有误：{input_start_time}")
-            except TypeError:
-                return
-        return start_time, end_time
+    # def _get_input_time_range(self):
+    #     """
+    #     获取输入的时间区间
+    #     :return:
+    #     """
+    #     while 1:
+    #         input_start_time = pyautogui.prompt('请输入起始日期\n格式：2020-01-01', "起始时间",
+    #                                             default=self.interval[0].strftime('%Y-%m-%d'))
+    #         # input_start_time = config.info['start_time'].strftime('%Y-%m-%d')
+    #         try:
+    #             start_time = datetime.datetime.strptime(input_start_time, "%Y-%m-%d")
+    #             break
+    #         except ValueError as e:
+    #             logger.warning(e)
+    #             pyautogui.alert(f"检查日期是否有误：{input_start_time}")
+    #         except TypeError:
+    #             return
+    #     while 1:
+    #         input_end_time = pyautogui.prompt(f'起始时间：{input_start_time}\n请输入终止日期\n格式：2020-12-01', "终止时间",
+    #                                           default=self.interval[1].strftime('%Y-%m-%d'))
+    #         # input_end_time = config.info['end_time'].strftime('%Y-%m-%d')
+    #         try:
+    #             end_time = datetime.datetime.strptime(input_end_time, "%Y-%m-%d") + datetime.timedelta(
+    #                 days=1)
+    #             if end_time <= start_time:
+    #                 pyautogui.alert(f"终止时间[{input_end_time}]小于起始时间[{input_start_time}]")
+    #                 continue
+    # 
+    #             if (end_time - start_time).days > 100:
+    #                 pyautogui.alert(f"时间跨度不能超过100天，请重新输入")
+    #                 return self._get_input_time_range()
+    #             break
+    #         except ValueError as e:
+    #             logger.warning(e)
+    #             pyautogui.alert(f"检查日期是否有误：{input_start_time}")
+    #         except TypeError:
+    #             return
+    #     return start_time, end_time
 
     def _reload(self):
         """
@@ -673,7 +696,8 @@ class YQTSpider(object):
             # SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path,sheet_name=self.info['sheet_name'])
             # logger.info(f"保存完毕")
 
-            if self.next_page_num >= max_page_num:
+            # 想要抓取的最大页数，可以修改
+            if self.next_page_num >= 30:
                 logger.info("抓取到最大页，停止")
                 data_count = int(self.spider_driver.find_element_by_css_selector(
                     'span[ng-bind="originStat.total"]').text)
@@ -704,7 +728,6 @@ class YQTSpider(object):
         is_reload = False
         set_conditions_reload_count = 0
         turn_page_reload_count = 0
-
         while 1:
             # 设置时间区间
             if not self._go_page_num_by_conditions(is_reload):
@@ -717,48 +740,64 @@ class YQTSpider(object):
             set_conditions_reload_count = 0
             max_page_num = self._maxpage
             print(f"最大页数：{max_page_num}")
-
+            
             # 翻页并抓取数据
-            resp = self._turn_page(max_page_num, time_sleep)
+            ret=self.keyword.split("|")
+            keywords=[]
+            for i in range(0,len(ret),3):
+                key = ''
+                for j in ret[i:i + 3]:
+                    key += j + '|'
+                keywords.append(key)
+            # 多关键词抓取
+            for keyword in keywords:
+                input_keywords=self.spider_driver.find_element_by_xpath('//input[@ng-model="view.secondKeyword"]')
+                input_keywords.clear()
+                input_keywords.send_keys(keyword)
+                time.sleep(1)
+                self.spider_driver.find_element_by_xpath('//a[@ng-click="searchListButton();"]').click()
+                if self._is_page_loaded():
+                    max_page_num = self._maxpage
+                    resp = self._turn_page(max_page_num, time_sleep)
+                    if resp == "restart_browser":
+                        return resp
+                    elif not resp:
+                        self._turn_page(max_page_num, time_sleep)
+                        if turn_page_reload_count >= 3:
+                            logger.warning("翻页时，连续出现问题3次，退出")
+                            return False
+                        turn_page_reload_count += 1
+                        is_reload = True
+                        continue
+                    turn_page_reload_count = 0
+                    # 翻页结束
 
-            if resp == "restart_browser":
-                return resp
-            elif not resp:
-                self._turn_page(max_page_num, time_sleep)
-                if turn_page_reload_count >= 3:
-                    logger.warning("翻页时，连续出现问题3次，退出")
-                    return False
-                turn_page_reload_count += 1
-                is_reload = True
-                continue
-            turn_page_reload_count = 0
-            # 翻页结束
+                    # 设置下次抓取条件
+                    self.next_page_num = 1
+                    if self.next_end_time >= self.interval[1]:
+                        logger.info("解析到终止时间，抓取完成")
+                        logger.info("全部抓取完毕上传数据")
+                        logger.info("开始记录")
+                        # 舆情通数量
+                        yqt_count = self._count_number
+                        record_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                                        f"record\{self.info['customer']}", f"{self}_记录.xlsx")
+                        sql_number = ssql_helper.find_info_count(self.interval[0], self.interval[1], self.info['industry_name'])
+                        data_list = [self.info['customer'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                     self.last_end_time, self.next_end_time]
+                        SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number,
+                                                      data_list=data_list)
+                        # record_dict = (self.info['industry_name'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
+                        # self.next_end_time, yqt_count, self.post_number, self.info['customer'])
+                        record_dict = (self.info['industry_name'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
+                        self.next_end_time, yqt_count, self.post_number, self.info['customer'],self.first_len,self.redis_len)
+                        ssql_helper.record_log(record_dict)
+                        # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
 
-            # 设置下次抓取条件
-            self.next_page_num = 1
-            if self.next_end_time >= self.interval[1]:
-                logger.info("解析到终止时间，抓取完成")
-                logger.info("全部抓取完毕上传数据")
-                logger.info("开始记录")
-                # 舆情通数量
-                yqt_count = self._count_number
-                record_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                                f"record\{self.info['customer']}", f"{self}_记录.xlsx")
-                sql_number = ssql_helper.find_info_count(self.interval[0], self.interval[1], self.info['industry_name'])
-                data_list = [self.info['customer'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                             self.last_end_time, self.next_end_time]
-                SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number,
-                                              data_list=data_list)
-                # record_dict = (self.info['industry_name'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
-                # self.next_end_time, yqt_count, self.post_number, self.info['customer'])
-                record_dict = (self.info['industry_name'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
-                self.next_end_time, yqt_count, self.post_number, self.info['customer'],self.first_len,self.redis_len)
-                ssql_helper.record_log(record_dict)
-                # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
-                return True
-            else:
-                self.last_end_time = self.next_end_time  # 上次终止时间就是下次起始时间
-                self.next_end_time = self.interval[1]
+                    else:
+                        self.last_end_time = self.next_end_time  # 上次终止时间就是下次起始时间
+                        self.next_end_time = self.interval[1]
+        return True
 
     def _load_condition_process_file(self):
         if os.path.exists(self.process_file_path):
@@ -827,7 +866,7 @@ class YQTSpider(object):
         if is_one_day==False:
             # -------------再次设置时间（定时抓取）----------------
             end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            start_time = (datetime.datetime.now() - datetime.timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M:%S")
+            start_time = (datetime.datetime.now() - datetime.timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S")
             start_time1 = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
             end_time1 = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
 
@@ -905,7 +944,7 @@ def work_it_2():
     project_list_1 = ssql_helper.get_industry_keywords()
     project_list = ssql_helper.merger_industry_data(project_list_1)
     for project_data in project_list:
-        if project_data['industry_name'] == 'IT业':
+        if project_data['industry_name'] == '汽车业':
             p_data.append(project_data)
     print(p_data)
     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=p_data[0],is_one_day=False)
