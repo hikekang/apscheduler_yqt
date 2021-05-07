@@ -274,8 +274,8 @@ class YQTSpider(object):
                 else:
                     if(len( data['发布人'])>10):
                         data['发布人'] = ''
-                if (len(data['发布人']) > 15):
-                    data['发布人'] = ''
+            if (len(data['发布人']) > 15):
+                data['发布人'] = ''
             positive_prob = td_title.find('div.sensitive-status-wrapper.p-r>div.sensitive-status-content:not(.ng-hide)>span:first-child').text()
             positive_dict = {
                 "敏感": 0.1,
@@ -572,46 +572,6 @@ class YQTSpider(object):
             return False
         logger.info("更改100条数据/每页")
         return True
-
-    # def _get_input_time_range(self):
-    #     """
-    #     获取输入的时间区间
-    #     :return:
-    #     """
-    #     while 1:
-    #         input_start_time = pyautogui.prompt('请输入起始日期\n格式：2020-01-01', "起始时间",
-    #                                             default=self.interval[0].strftime('%Y-%m-%d'))
-    #         # input_start_time = config.info['start_time'].strftime('%Y-%m-%d')
-    #         try:
-    #             start_time = datetime.datetime.strptime(input_start_time, "%Y-%m-%d")
-    #             break
-    #         except ValueError as e:
-    #             logger.warning(e)
-    #             pyautogui.alert(f"检查日期是否有误：{input_start_time}")
-    #         except TypeError:
-    #             return
-    #     while 1:
-    #         input_end_time = pyautogui.prompt(f'起始时间：{input_start_time}\n请输入终止日期\n格式：2020-12-01', "终止时间",
-    #                                           default=self.interval[1].strftime('%Y-%m-%d'))
-    #         # input_end_time = config.info['end_time'].strftime('%Y-%m-%d')
-    #         try:
-    #             end_time = datetime.datetime.strptime(input_end_time, "%Y-%m-%d") + datetime.timedelta(
-    #                 days=1)
-    #             if end_time <= start_time:
-    #                 pyautogui.alert(f"终止时间[{input_end_time}]小于起始时间[{input_start_time}]")
-    #                 continue
-    # 
-    #             if (end_time - start_time).days > 100:
-    #                 pyautogui.alert(f"时间跨度不能超过100天，请重新输入")
-    #                 return self._get_input_time_range()
-    #             break
-    #         except ValueError as e:
-    #             logger.warning(e)
-    #             pyautogui.alert(f"检查日期是否有误：{input_start_time}")
-    #         except TypeError:
-    #             return
-    #     return start_time, end_time
-
     def _reload(self):
         """
         刷新页面
@@ -689,7 +649,8 @@ class YQTSpider(object):
 
             # 插入到数据库，返回一个成功插入的值
             # 上传数据
-            ssql_helper.upload_many_data(data_list, self.info['industry_name'])
+            if data_list:
+                ssql_helper.upload_many_data(data_list, self.info['industry_name'])
 
             logger.info(f"解析到{len(data_list)}条数据")
             self.post_number += len(data_list)
@@ -741,7 +702,7 @@ class YQTSpider(object):
             max_page_num = self._maxpage
             print(f"最大页数：{max_page_num}")
             
-            # 翻页并抓取数据
+
             ret=self.keyword.split("|")
             keywords=[]
             for i in range(0,len(ret),3):
@@ -750,13 +711,56 @@ class YQTSpider(object):
                     key += j + '|'
                 keywords.append(key)
             # 多关键词抓取
-            # if self._count_number>5000
-            for keyword in keywords:
-                input_keywords=self.spider_driver.find_element_by_xpath('//input[@ng-model="view.secondKeyword"]')
-                input_keywords.clear()
-                input_keywords.send_keys(keyword)
-                time.sleep(1)
-                self.spider_driver.find_element_by_xpath('//a[@ng-click="searchListButton();"]').click()
+            if self._count_number>5000:
+                for keyword in keywords:
+                    input_keywords=self.spider_driver.find_element_by_xpath('//input[@ng-model="view.secondKeyword"]')
+                    input_keywords.clear()
+                    input_keywords.send_keys(keyword)
+                    time.sleep(1)
+                    self.spider_driver.find_element_by_xpath('//a[@ng-click="searchListButton();"]').click()
+                    if self._is_page_loaded():
+                        max_page_num = self._maxpage
+                        # 翻页并抓取数据
+                        resp = self._turn_page(max_page_num, time_sleep)
+                        if resp == "restart_browser":
+                            return resp
+                        elif not resp:
+                            self._turn_page(max_page_num, time_sleep)
+                            if turn_page_reload_count >= 3:
+                                logger.warning("翻页时，连续出现问题3次，退出")
+                                return False
+                            turn_page_reload_count += 1
+                            is_reload = True
+                            continue
+                        turn_page_reload_count = 0
+                        # 翻页结束
+
+                        # 设置下次抓取条件
+                        self.next_page_num = 1
+                        if self.next_end_time >= self.interval[1]:
+                            logger.info("解析到终止时间，抓取完成")
+                            logger.info("全部抓取完毕上传数据")
+                            logger.info("开始记录")
+                            # 舆情通数量
+                            yqt_count = self._count_number
+                            record_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                                            f"record\{self.info['customer']}", f"{self}_记录.xlsx")
+                            sql_number = ssql_helper.find_info_count(self.interval[0], self.interval[1], self.info['industry_name'])
+                            data_list = [self.info['customer'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                         self.last_end_time, self.next_end_time]
+                            SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number,
+                                                          data_list=data_list)
+                            # record_dict = (self.info['industry_name'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
+                            # self.next_end_time, yqt_count, self.post_number, self.info['customer'])
+                            record_dict = (self.info['industry_name'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
+                            self.next_end_time, yqt_count, self.post_number, self.info['customer'],self.first_len,self.redis_len)
+                            ssql_helper.record_log(record_dict)
+                            # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
+                            return True
+                        else:
+                            self.last_end_time = self.next_end_time  # 上次终止时间就是下次起始时间
+                            self.next_end_time = self.interval[1]
+            else:
                 if self._is_page_loaded():
                     max_page_num = self._maxpage
                     resp = self._turn_page(max_page_num, time_sleep)
@@ -783,22 +787,25 @@ class YQTSpider(object):
                         yqt_count = self._count_number
                         record_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                                         f"record\{self.info['customer']}", f"{self}_记录.xlsx")
-                        sql_number = ssql_helper.find_info_count(self.interval[0], self.interval[1], self.info['industry_name'])
+                        sql_number = ssql_helper.find_info_count(self.interval[0], self.interval[1],
+                                                                 self.info['industry_name'])
                         data_list = [self.info['customer'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                                      self.last_end_time, self.next_end_time]
                         SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number,
                                                       data_list=data_list)
                         # record_dict = (self.info['industry_name'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
                         # self.next_end_time, yqt_count, self.post_number, self.info['customer'])
-                        record_dict = (self.info['industry_name'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
-                        self.next_end_time, yqt_count, self.post_number, self.info['customer'],self.first_len,self.redis_len)
+                        record_dict = (
+                        self.info['industry_name'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        self.last_end_time,
+                        self.next_end_time, yqt_count, self.post_number, self.info['customer'], self.first_len,
+                        self.redis_len)
                         ssql_helper.record_log(record_dict)
                         # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
-
+                        return True
                     else:
                         self.last_end_time = self.next_end_time  # 上次终止时间就是下次起始时间
                         self.next_end_time = self.interval[1]
-        return True
 
     def _load_condition_process_file(self):
         if os.path.exists(self.process_file_path):
@@ -814,7 +821,6 @@ class YQTSpider(object):
         根据关键词进行修改
         """
         driver = self.spider_driver
-        # li = driver.find_element_by_xpath('//li[@class="site-menu-item is-shown open"]')
         print("点击")
         li = driver.find_element_by_xpath('//li[contains(@id,"kw_li_")]')
         span = li.find_element_by_xpath('//span[@class="fa-tree-plan-tools-bar"]')
@@ -846,12 +852,6 @@ class YQTSpider(object):
         self.next_end_time = self.interval[1]
         # 抓取数据
         print("获取关键词")
-        # print(self.spider_driver.get_cookies())
-        # for request in self.spider_driver.requests:
-        #     print(request.headers)
-
-        # 循环进行项目采取数据
-
         self.info = info
         # 重新设置项目路径
 
@@ -867,7 +867,7 @@ class YQTSpider(object):
         if is_one_day==False:
             # -------------再次设置时间（定时抓取）----------------
             end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            start_time = (datetime.datetime.now() - datetime.timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S")
+            start_time = (datetime.datetime.now() - datetime.timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S")
             start_time1 = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
             end_time1 = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
 
@@ -940,9 +940,6 @@ def work_it_2():
 
     yqt_spider = YQTSpider(infos[-1], start_time=start_time, end_time=end_time)
 
-    # yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2,infos=infos)
-    # 从数据库中获取使用项目信息
-    project_list = ssql_helper.get_industry_keywords()[4]
     p_data = []
     project_list_1 = ssql_helper.get_industry_keywords()
     project_list = ssql_helper.merger_industry_data(project_list_1)
@@ -954,12 +951,14 @@ def work_it_2():
     chrome_service.stop()
 
 def work_it_one_day():
-    end_time = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d ") + "00:00:00"
-    start_time = (datetime.datetime.now() - datetime.timedelta(days=2)).strftime("%Y-%m-%d ")+"00:00:00"
+    end_time = (datetime.datetime.now()).strftime("%Y-%m-%d ") + "00:00:00"
+    start_time = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d ")+"00:00:00"
     start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
     end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
     # 获取项目信息
     infos = config.row_list
+    chrome_service = Service('D:\Anacadon\envs\python36\chromedriver.exe')
+    chrome_service.start()
 
     yqt_spider = YQTSpider(infos[0], start_time=start_time, end_time=end_time)
 
@@ -971,15 +970,12 @@ def work_it_one_day():
     project_list_1 = ssql_helper.get_industry_keywords()
     project_list = ssql_helper.merger_industry_data(project_list_1)
     for project_data in project_list:
-        # if project_data['industry_name'] == '流通贸易':
-        if project_data['industry_name'] == '快消品':
+        if project_data['industry_name'] == '流通贸易':
+        # if project_data['industry_name'] == '快消品':
             p_data.append(project_data)
-    print("data")
     print(p_data)
     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=p_data[0],is_one_day=True)
-
-    #
-
+    chrome_service.stop()
 
 def apscheduler():
     trigger1 = CronTrigger(hour='0-23', minute='01',second=00, jitter=5)
@@ -1018,7 +1014,4 @@ if __name__ == '__main__':
     p2=Process(target=work_it_one_day,name='定时抓取')
     p1.start()
     p2.start()
-    #
-    # import os
-    # print(os.path.abspath(__file__))
 
