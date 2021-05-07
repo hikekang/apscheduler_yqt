@@ -31,9 +31,6 @@ config = {
     'database': 'TS_A',
     'port': '39999'
 }
-connect = pymssql.connect(server='223.223.180.9', user='tsuser1', password='tsuser1@123aA', database='TS_A',
-                          port='39999', autocommit=True)
-cursor = connect.cursor()
 connect_A = pymssql.connect(server='223.223.180.9', user='tsuser1', password='tsuser1@123aA', database='TS_A',
                             port='39999', charset='utf8', autocommit=True)
 connect_B = pymssql.connect(server='223.223.180.9', user='tsuser1', password='tsuser1@123aA', database='TS_B2.0',
@@ -336,8 +333,10 @@ def upload_many_data(data_list, industry_name):
     sql_ts_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s)"
     # 插入A库
     sql_qbb_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,is_original,location,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+    print(tuple_data_list_ts_a)
     cursor_A.executemany(sql_ts_a, tuple_data_list_ts_a)
     # 二级数据表
+    print(tuple_data_list_ts_a_second_data)
     cursor_A.executemany(sql_ts_a_second_data, tuple_data_list_ts_a_second_data)
 
     cursor_net_TS_A.executemany(sql_ts_a, tuple_data_list_ts_a)
@@ -360,6 +359,24 @@ def upload_many_data(data_list, industry_name):
     requests.get(url=url, proxies=proxies, params=data_2)
     print("数据上传成功")
 
+def close_all_db():
+    cursor_A.close()
+    cursor_B.close()
+    cursor_QBBA.close()
+    cursor_QBBB.close()
+    cursor_net_TS_A.close()
+    cursor_net_QBB_A.close()
+
+    connect_A.close()
+    connect_B.close()
+    cursor_QBBA.close()
+    connect_QBBB.close()
+    connect_net_QBB_A.close()
+
+
+
+
+    pass
 
 def testsql():
     """
@@ -413,6 +430,19 @@ def record_log(data):
     sql_record = "insert into record_log_table values (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
     # data=('3', '2021-4-26 00:00:00','2021-4-26 00:00:00', '2021-4-26 00:00:00', '4', '5', '6', '1')
     cursor_A.execute(sql_record,data)
+    # print(type(data[2]))
+    today=data[2].date()
+    # print(today)
+    sql_industry_num="""
+    if not exists (select * from record_log_industry  where industry = '{0}' and record_time='{1}')
+            INSERT INTO record_log_industry (industry,record_time,yqt_num,upload_num,first_data_num,redis_num) VALUES ('{0}','{1}',{2},{3},{4},{5})
+        else
+            UPDATE record_log_industry SET yqt_num=yqt_num+{2},upload_num=upload_num+{3},first_data_num=first_data_num+{4},redis_num=redis_num+{5}
+                            
+           WHERE industry = '{0}' and record_time='{1}'
+    """.format(data[0],today,data[4],data[5],data[7],data[8])
+    print(sql_industry_num)
+    cursor_A.execute(sql_industry_num)
     # pass
 
 
@@ -640,7 +670,11 @@ def track_data_work():
         conn.disconnect()
 
 # ———————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-
+def record_total_num():
+    for d in merger_industry_data(get_industry_keywords()):
+        sql="select * from record_log_table where industry={0} and start_time between{1} and {2}".format(d['industry_name'])
+    cursor_A.execute()
+    pass
 
 if __name__ == '__main__':
     # while 1:
@@ -649,13 +683,13 @@ if __name__ == '__main__':
 
     # single_thread()
 
-    for d in get_industry_keywords():
-        print(d)
+    # for d in get_industry_keywords():
+    #     print(d)
     # track_data_task()
     # record_log()
 
-    # for d in merger_industry_data(get_industry_keywords()):
-    #     print(d)
+    for d in merger_industry_data(get_industry_keywords()):
+        print(d)
 
     # for data in get_track_datas():
     #     print(data)
