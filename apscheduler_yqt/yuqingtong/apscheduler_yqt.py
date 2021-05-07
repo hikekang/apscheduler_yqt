@@ -27,7 +27,8 @@ from utils.webdriverhelper import WebDriverHelper
 from yuqingtong import config
 from utils import ssql_helper
 import re
-
+from selenium.webdriver.chrome.service import Service
+from multiprocessing import Process
 
 class YQTSpider(object):
 
@@ -60,7 +61,6 @@ class YQTSpider(object):
             (datetime.datetime.now() + datetime.timedelta(days=-99)).date(),
             datetime.datetime.min.time())
         default_end_time = datetime.datetime.combine(datetime.datetime.now().date(), datetime.datetime.min.time())
-        print(default_end_time)
         self.interval = [default_start_time, default_end_time]
         self.next_page_num = 1
 
@@ -361,7 +361,7 @@ class YQTSpider(object):
         t2=time.time()
         print("花费时间:",t2-t1)
         print('数据处理完毕')
-        print("数据处理完毕之后的数量")
+        print("数据处理完毕之后的数量",len(sec_list))
         return sec_list
 
     # 第一次根据爬取链接去重
@@ -375,7 +375,7 @@ class YQTSpider(object):
                 new_dirlist.append(d)
                 values.append(d[key])
 
-        print("第一次滤重之后的数量")
+        print("第一次滤重之后的数量:",self.first_len)
         self.first_len+=len(new_dirlist)
         return new_dirlist
 
@@ -697,7 +697,7 @@ class YQTSpider(object):
             # logger.info(f"保存完毕")
 
             # 想要抓取的最大页数，可以修改
-            if self.next_page_num >= 30:
+            if self.next_page_num >= 50:
                 logger.info("抓取到最大页，停止")
                 data_count = int(self.spider_driver.find_element_by_css_selector(
                     'span[ng-bind="originStat.total"]').text)
@@ -750,6 +750,7 @@ class YQTSpider(object):
                     key += j + '|'
                 keywords.append(key)
             # 多关键词抓取
+            # if self._count_number>5000
             for keyword in keywords:
                 input_keywords=self.spider_driver.find_element_by_xpath('//input[@ng-model="view.secondKeyword"]')
                 input_keywords.clear()
@@ -883,7 +884,7 @@ class YQTSpider(object):
             self.spider_driver.quit()
             self.spider_driver = WebDriverHelper.init_webdriver(is_headless=config.HEAD_LESS)
             self.wait = WebDriverWait(self.spider_driver, config.WAIT_TIME)
-            self.start(resp)
+            self.start(resp,self.info,self.last_end_time,self.next_end_time)
         elif resp is True:
             os.remove(self.process_file_path)
             # pyautogui.alert("抓取完成...")
@@ -934,6 +935,8 @@ def work_it_2():
     end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
     # 获取项目信息
     infos = config.row_list
+    chrome_service = Service('D:\Anacadon\envs\python36\chromedriver.exe')
+    chrome_service.start()
 
     yqt_spider = YQTSpider(infos[-1], start_time=start_time, end_time=end_time)
 
@@ -948,10 +951,11 @@ def work_it_2():
             p_data.append(project_data)
     print(p_data)
     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=p_data[0],is_one_day=False)
+    chrome_service.stop()
 
 def work_it_one_day():
-    end_time = (datetime.datetime.now() - datetime.timedelta(days=2)).strftime("%Y-%m-%d ") + "00:00:00"
-    start_time = (datetime.datetime.now() - datetime.timedelta(days=3)).strftime("%Y-%m-%d ")+"00:00:00"
+    end_time = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d ") + "00:00:00"
+    start_time = (datetime.datetime.now() - datetime.timedelta(days=2)).strftime("%Y-%m-%d ")+"00:00:00"
     start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
     end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
     # 获取项目信息
@@ -967,7 +971,8 @@ def work_it_one_day():
     project_list_1 = ssql_helper.get_industry_keywords()
     project_list = ssql_helper.merger_industry_data(project_list_1)
     for project_data in project_list:
-        if project_data['industry_name'] == '流通贸易':
+        # if project_data['industry_name'] == '流通贸易':
+        if project_data['industry_name'] == '快消品':
             p_data.append(project_data)
     print("data")
     print(p_data)
@@ -987,13 +992,33 @@ def apscheduler():
     sched.add_job(ssql_helper.track_data_task, trigger3,max_instances=10,id='my_job_track')
     sched.add_job(ssql_helper.single_thread, trigger4,max_instances=10,id='my_job_second')
     sched.start()
-
+def java_task():
+    # 获取当前工作目录路径  三种方法
+    ab = os.getcwd()
+    # print(ab)
+    # print(os.path.abspath(""))
+    # import sys
+    # print(sys.argv[0])
+    path_java = os.path.join(ab, "jms-1.1.1.jar")
+    command = r'java -jar ' + path_java
+    os.system(command)
+    print("执行成功")
 
 if __name__ == '__main__':
-    today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    time1 = (datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%Y-%m-%d')
+    # today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    # time1 = (datetime.datetime.now() - datetime.timedelta(days=5)).strftime('%Y-%m-%d')
     # ssql_helper.get_month_data(time1, today)
     # apscheduler()
     # xlsx_work()
-    work_it_2()
+    # work_it_2()
     # work_it_one_day()
+
+
+    p1=Process(target=java_task,name='java程序')
+    p2=Process(target=work_it_one_day,name='定时抓取')
+    p1.start()
+    p2.start()
+    #
+    # import os
+    # print(os.path.abspath(__file__))
+
