@@ -7,7 +7,7 @@
 """
 import json
 import threading
-from datetime import datetime
+import datetime
 
 from fake_useragent import UserAgent
 
@@ -285,7 +285,6 @@ def post_data(data_list, industry_name):
 def upload_many_data(data_list, industry_name):
     """
     多数据插入
-
     """
     table_name = tables[industry_name]
     # 查询hangyeid
@@ -426,6 +425,8 @@ def filter_by_url(datalist, industry_name):
 def record_log(data):
     """
     数据记录
+    本次抓取数据的记录
+    行业数据自动增加的记录
     """
     sql_record = "insert into record_log_table values (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
     # data=('3', '2021-4-26 00:00:00','2021-4-26 00:00:00', '2021-4-26 00:00:00', '4', '5', '6', '1')
@@ -441,9 +442,34 @@ def record_log(data):
                             
            WHERE industry = '{0}' and record_time='{1}'
     """.format(data[0],today,data[4],data[5],data[7],data[8])
-    print(sql_industry_num)
+
+    sql_industry_num = """
+        if not exists (select * from record_log_industry  where industry = '{0}' and record_time='{1}')
+                INSERT INTO record_log_industry (industry,record_time,upload_num) VALUES ('{0}','{1}',{2})
+            else
+                UPDATE record_log_industry SET upload_num=upload_num+{2}
+
+               WHERE industry = '{0}' and record_time='{1}'
+        """.format(data[0], today, data[5])
+    # print(sql_industry_num)
     cursor_A.execute(sql_industry_num)
     # pass
+def customer_log():
+    """
+    统计项目数据量
+    B库
+    """
+    for customer in get_industry_keywords():
+        date_now=datetime.datetime.now().strftime('%Y-%m-%d 00:00:00')
+        date_yesterday=(datetime.datetime.now()-datetime.timedelta(days=1)).strftime("%Y-%m-%d 00:00:00")
+        sql_qbbb="select count(*) from TS_DataMerge_Base where C_Id='{0}' and PublishDate_Std between '{2}' and '{1}'".format(customer['id'],date_now,date_yesterday)
+        print(sql_qbbb)
+        # qbbb 库查询的数量
+        cursor_QBBB.execute(sql_qbbb)
+        today_customer_num=cursor_QBBB.fetchone()[0]
+        sql_tsa_customer="insert into record_log_customer (customer,record_time,upload_num) values(%s,%s,%s)"
+        data=(customer['customer'],date_yesterday,today_customer_num)
+        cursor_A.execute(sql_tsa_customer,data)
 
 
 def get_teack_datas():
@@ -688,8 +714,8 @@ if __name__ == '__main__':
     # track_data_task()
     # record_log()
 
-    for d in merger_industry_data(get_industry_keywords()):
-        print(d)
+    # for d in merger_industry_data(get_industry_keywords()):
+    #     print(d)
 
     # for data in get_track_datas():
     #     print(data)
@@ -698,3 +724,4 @@ if __name__ == '__main__':
     # for data in second_data_url_sql():
     #     print(data)
     #     print(data[5])
+    customer_log()
