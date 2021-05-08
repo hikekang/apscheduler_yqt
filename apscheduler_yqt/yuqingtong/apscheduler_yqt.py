@@ -29,6 +29,7 @@ from utils import ssql_helper
 import re
 from selenium.webdriver.chrome.service import Service
 from multiprocessing import Process
+from utils.email_helper import my_Email
 
 class YQTSpider(object):
 
@@ -843,56 +844,58 @@ class YQTSpider(object):
         time.sleep(1)
 
     def start(self, start_time, end_time, time_sleep, info,is_one_day):
-        # try:
-        # 1.登录
-        if not self._login():
-            raise Exception("登录环节出现问题")
-        self.interval = [start_time, end_time]
-        self.last_end_time = self.interval[0]
-        self.next_end_time = self.interval[1]
-        # 抓取数据
-        print("获取关键词")
-        self.info = info
-        # 重新设置项目路径
-
-        self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                           f"data\{info['customer']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
-                                           f"{self}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
-                                               ':', '_'))
-        self.keyword = info['keywords']
-        self.SimultaneousWord=info['simultaneouswords']
-        self.excludewords=info['excludewords']
-        # 设置关键词
-        self.modifi_keywords()
-        if is_one_day==False:
-            # -------------再次设置时间（定时抓取）----------------
-            end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            start_time = (datetime.datetime.now() - datetime.timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S")
-            start_time1 = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-            end_time1 = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
-
-            self.interval = [start_time1, end_time1]
+        try:
+            # 1.登录
+            if not self._login():
+                raise Exception("登录环节出现问题")
+            self.interval = [start_time, end_time]
             self.last_end_time = self.interval[0]
             self.next_end_time = self.interval[1]
-            # -----------定时抓取时间设置完毕----------------------
+            # 抓取数据
+            print("获取关键词")
+            self.info = info
+            # 重新设置项目路径
 
-        # 抓取数据
-        resp = self._crawl2(time_sleep)
+            self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                               f"data\{info['customer']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
+                                               f"{self}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
+                                                   ':', '_'))
+            self.keyword = info['keywords']
+            self.SimultaneousWord=info['simultaneouswords']
+            self.excludewords=info['excludewords']
+            # 设置关键词
+            self.modifi_keywords()
+            if is_one_day==False:
+                # -------------再次设置时间（定时抓取）----------------
+                end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                start_time = (datetime.datetime.now() - datetime.timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S")
+                start_time1 = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+                end_time1 = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
 
-        if resp == "restart_browser":
-            logger.info("重启浏览器")
-            self.spider_driver.quit()
-            self.spider_driver = WebDriverHelper.init_webdriver(is_headless=config.HEAD_LESS)
-            self.wait = WebDriverWait(self.spider_driver, config.WAIT_TIME)
-            self.start(resp,self.info,self.last_end_time,self.next_end_time)
-        elif resp is True:
-            os.remove(self.process_file_path)
-            # pyautogui.alert("抓取完成...")
-        # except Exception as e:
-        #     logger.warning(e)
-        # finally:
-        #     if self.spider_driver.service.is_connectable():
-        #         self.spider_driver.quit()
+                self.interval = [start_time1, end_time1]
+                self.last_end_time = self.interval[0]
+                self.next_end_time = self.interval[1]
+                # -----------定时抓取时间设置完毕----------------------
+
+            # 抓取数据
+            resp = self._crawl2(time_sleep)
+
+            if resp == "restart_browser":
+                logger.info("重启浏览器")
+                self.spider_driver.quit()
+                self.spider_driver = WebDriverHelper.init_webdriver(is_headless=config.HEAD_LESS)
+                self.wait = WebDriverWait(self.spider_driver, config.WAIT_TIME)
+                self.start(resp,self.info,self.last_end_time,self.next_end_time)
+            elif resp is True:
+                os.remove(self.process_file_path)
+                # pyautogui.alert("抓取完成...")
+        except Exception as e:
+            my_e=my_Email()
+            my_e.send_message(e)
+            logger.warning(e)
+        finally:
+            if self.spider_driver.service.is_connectable():
+                self.spider_driver.quit()
 
 
 # 修改xlsx文件进行自动抓取
@@ -944,7 +947,7 @@ def work_it_2():
     project_list_1 = ssql_helper.get_industry_keywords()
     project_list = ssql_helper.merger_industry_data(project_list_1)
     for project_data in project_list:
-        if project_data['industry_name'] == '汽车业':
+        if project_data['industry_name'] == '流通贸易':
             p_data.append(project_data)
     print(p_data)
     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=p_data[0],is_one_day=False)
@@ -962,16 +965,11 @@ def work_it_one_day():
 
     yqt_spider = YQTSpider(infos[0], start_time=start_time, end_time=end_time)
 
-    # yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2,infos=infos)
-    # 从数据库中获取使用项目信息
-    # project_list = ssql_helper.get_industry_keywords()[4]
-
     p_data = []
     project_list_1 = ssql_helper.get_industry_keywords()
     project_list = ssql_helper.merger_industry_data(project_list_1)
     for project_data in project_list:
         if project_data['industry_name'] == '流通贸易':
-        # if project_data['industry_name'] == '快消品':
             p_data.append(project_data)
     print(p_data)
     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=p_data[0],is_one_day=True)
@@ -985,8 +983,6 @@ def apscheduler():
     sched = BlockingScheduler()
     sched.add_job(work_it_2, trigger1,max_instances=10,id='my_job_id')
     sched.add_job(work_it_one_day, trigger2,max_instances=10,id='my_job_id_ever')
-    sched.add_job(ssql_helper.track_data_task, trigger3,max_instances=10,id='my_job_track')
-    sched.add_job(ssql_helper.single_thread, trigger4,max_instances=10,id='my_job_second')
     sched.start()
 def java_task():
     # 获取当前工作目录路径  三种方法
