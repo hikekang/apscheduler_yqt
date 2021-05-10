@@ -9,6 +9,12 @@
 import time
 import datetime
 import os
+import sys
+# sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+# sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+# ab=os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+# path_utils=os.path.join(ab,'utils')
+# sys.path.append(path_utils)
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 from pyquery import PyQuery as pq
@@ -20,17 +26,20 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.action_chains import ActionChains
 from utils.mylogger import logger
 from utils.spider_helper import SpiderHelper
-from utils.ssql_helper import get_industry_keywords
+# from utils.ssql_helper import get_industry_keywords
+
+from utils.ssql_helper_test import get_industry_keywords
+
 from utils.webdriverhelper import MyWebDriver
 from utils.my_pyautogui import pyautogui
 from utils.webdriverhelper import WebDriverHelper
 from yuqingtong import config
-from utils import ssql_helper
+# from utils import  ssql_helper
+from utils import  ssql_helper_test as ssql_helper
 import re
 from selenium.webdriver.chrome.service import Service
 from multiprocessing import Process
 from utils.email_helper import my_Email
-
 class YQTSpider(object):
 
     def __init__(self, info, spider_driver=None, start_time=None, end_time=None, *args, **kwargs):
@@ -194,8 +203,8 @@ class YQTSpider(object):
                     '链接': td_title.find('.news-item-tools.font-size-0 div:nth-child(2)>div>ul>li:nth-child(4) a').attr(
                         "href"),
                     '转发内容': repost_content.replace("'", ""),
-                    '发布人': td_title.find('a[ng-click="getDetail(icc,currentKeyword);"]').text(),
-                    'ic_id':td_title.find('a[ng-click="getDetail(icc,currentKeyword);"]').attr('value'),
+                    '发布人': td_title.find('a[ng-click="getDetail(icc,cucurrrentKeyword);"]').text(),
+                    'ic_id':td_title.find('a[ng-click="getDetail(icc,rentKeyword);"]').attr('value'),
                     'keywords_id':keywords_id,
                     'attitude': td_title.find(
                         'div[ng-show="view.resultPresent != 3"] div.sensitive-status-content:not(.ng-hide)>span:first-child').text(),
@@ -230,6 +239,8 @@ class YQTSpider(object):
                     data['描述'] = biaoti
                 elif sort == '原创':
                     data['转发内容'] = data['描述']
+                if len(data['标题'])>20:
+                    data['标题']=data['标题'][0:20]
             else:
                 data = {
                     '时间': parse_time(td_time),
@@ -239,7 +250,7 @@ class YQTSpider(object):
                         "href"),
                     '转发内容': repost_content.replace("'", "").replace("\n",""),
                     # '发布人': td_title.find('div[class="profile-title inline-block"]>a>span:first-child').text(),
-                    '发布人': td_title.find('a[ng-click="getDetail(icc,currentKeyword);"]').text(),
+                    '发布人': td_title.find('a[ng-click="getDetail(icc,currentKeyword);"]>span:first-child').text(),
                     'ic_id':td_title.find('a[ng-click="getDetail(icc,currentKeyword);"]').attr('value'),
                     'keywords_id':keywords_id,
                     'attitude': td_title.find(
@@ -263,6 +274,7 @@ class YQTSpider(object):
                     'area': td_origins.find('div[ng-bind="icc.province"]').text(),
 
                 }
+
             # print(data)
             #     publish_man = re.sub(':|：', '', data['发布人'])
             #     data['发布人'] = publish_man
@@ -271,6 +283,7 @@ class YQTSpider(object):
             #
                 if '：' in data['发布人'] or ":" in data['发布人']:
                     publish_man = re.sub(':|：', '', data['发布人'])
+                    # publish_man=data['发布人'].split(":")[0]
                     data['发布人'] = publish_man
                 else:
                     if(len( data['发布人'])>10):
@@ -283,6 +296,7 @@ class YQTSpider(object):
                 "非敏感": 0.9,
                 "中性": 0.5
             }
+            print(data['发布人'])
             # print(td_time)
             data['positive_prob_number'] = positive_dict[positive_prob.split()[0]]
             # print(data['positive_prob_number'])
@@ -830,9 +844,9 @@ class YQTSpider(object):
         action.move_to_element(li).perform()
         time.sleep(3)
         span.click()
-        time.sleep(0.3)
+        time.sleep(2)
         driver.find_element_by_xpath('//li[@class="add-plan-trigger"]/a').click()
-        time.sleep(0.3)
+        time.sleep(1)
         keywords = driver.find_element_by_xpath('//div[@class="edit_textarea mb5 ng-binding"]')
         keywords.clear()
         time.sleep(0.3)
@@ -868,7 +882,7 @@ class YQTSpider(object):
             if is_one_day==False:
                 # -------------再次设置时间（定时抓取）----------------
                 end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                start_time = (datetime.datetime.now() - datetime.timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S")
+                start_time = (datetime.datetime.now() - datetime.timedelta(hours=5)).strftime("%Y-%m-%d %H:%M:%S")
                 start_time1 = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
                 end_time1 = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
 
@@ -933,7 +947,7 @@ def work_it():
 def work_it_2():
     end_time = datetime.datetime.now().strftime('%Y-%m-%d ') + "00:00:00"
     # end_time = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d ") + "00:00:00"
-    start_time = (datetime.datetime.now() - datetime.timedelta(hours=3)).strftime("%Y-%m-%d ") + "00:00:00"
+    start_time = (datetime.datetime.now() - datetime.timedelta(hours=2)).strftime("%Y-%m-%d ") + "00:00:00"
     start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
     end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
     # 获取项目信息
@@ -941,7 +955,7 @@ def work_it_2():
     chrome_service = Service('D:\Anacadon\envs\python36\chromedriver.exe')
     chrome_service.start()
 
-    yqt_spider = YQTSpider(infos[-1], start_time=start_time, end_time=end_time)
+    yqt_spider = YQTSpider(infos[0], start_time=start_time, end_time=end_time)
 
     p_data = []
     project_list_1 = ssql_helper.get_industry_keywords()
@@ -998,7 +1012,7 @@ def java_task():
 
 if __name__ == '__main__':
     # today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    # time1 = (datetime.datetime.now() - datetime.timedelta(days=5)).strftime('%Y-%m-%d')
+    # time1 = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
     # ssql_helper.get_month_data(time1, today)
     # apscheduler()
     # xlsx_work()
@@ -1007,7 +1021,7 @@ if __name__ == '__main__':
 
 
     p1=Process(target=java_task,name='java程序')
-    p2=Process(target=work_it_one_day,name='定时抓取')
+    p2=Process(target=work_it_2,name='定时抓取')
     p1.start()
     p2.start()
 
