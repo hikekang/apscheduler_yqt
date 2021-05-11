@@ -873,17 +873,17 @@ class YQTSpider(object):
             self.excludewords=info['excludewords']
             # 设置关键词
             self.modifi_keywords()
-            if is_one_day==False:
-                # -------------再次设置时间（定时抓取）----------------
-                end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                start_time = (datetime.datetime.now() - datetime.timedelta(hours=5)).strftime("%Y-%m-%d %H:%M:%S")
-                start_time1 = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-                end_time1 = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
-
-                self.interval = [start_time1, end_time1]
-                self.last_end_time = self.interval[0]
-                self.next_end_time = self.interval[1]
-                # -----------定时抓取时间设置完毕----------------------
+            # if is_one_day==False:
+            #     # -------------再次设置时间（定时抓取）----------------
+            #     end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            #     start_time = (datetime.datetime.now() - datetime.timedelta(hours=5)).strftime("%Y-%m-%d %H:%M:%S")
+            #     start_time1 = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+            #     end_time1 = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+            #
+            #     self.interval = [start_time1, end_time1]
+            #     self.last_end_time = self.interval[0]
+            #     self.next_end_time = self.interval[1]
+            #     # -----------定时抓取时间设置完毕----------------------
 
             # 抓取数据并记录
             resp = self._crawl2(time_sleep)
@@ -948,19 +948,37 @@ def work_it(start_time,end_time):
     chrome_service.stop()
 
 def work_it_hour():
-    end_time = datetime.datetime.now().strftime('%Y-%m-%d ') + "00:00:00"
-    # end_time = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d ") + "00:00:00"
-    start_time = (datetime.datetime.now() - datetime.timedelta(hours=2)).strftime("%Y-%m-%d ") + "00:00:00"
-    start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-    end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
-    work_it(start_time,end_time)
+    myconfig = config.redconfig()
 
+    # end_time = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d ") + "00:00:00"
+    time_info=myconfig.getDictBySection('time_info')
+    if list(time_info.keys())[0]=='minutes':
+        minutes=int(time_info['minutes'])
+        start_time = (datetime.datetime.now() - datetime.timedelta(minutes=minutes)).strftime("%Y-%m-%d %H:%M:%S")
+        start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+        end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+        work_it(myconfig,start_time,end_time)
+    elif list(time_info.keys())[0]=='hours':
+        end_time = datetime.datetime.now().strftime('%Y-%m-%d %H')+":00:00"
+        hours = int(time_info['hours'])
+        start_time = (datetime.datetime.now() - datetime.timedelta(hours=hours)).strftime("%Y-%m-%d %H") + ":00:00"
+        start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+        end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+        print(start_time,end_time)
+        work_it(myconfig, start_time, end_time)
+    else:
+        pass
 def work_it_one_day():
-    end_time = (datetime.datetime.now()).strftime("%Y-%m-%d ") + "00:00:00"
-    start_time = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d ")+"00:00:00"
-    start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-    end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
-    work_it(start_time,end_time)
+    myconfig = config.redconfig()
+    time_info = myconfig.getDictBySection('time_info')
+    if list(time_info.keys())[0] == 'days':
+        days = int(time_info['days'])
+        end_time = (datetime.datetime.now()).strftime("%Y-%m-%d ") + "00:00:00"
+        start_time = (datetime.datetime.now() - datetime.timedelta(days=days)).strftime("%Y-%m-%d ")+"00:00:00"
+        start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+        end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+        work_it(start_time,end_time)
 
 def apscheduler():
     trigger1 = CronTrigger(hour='0-23', minute='01',second=00, jitter=5)
