@@ -9,12 +9,20 @@ from openpyxl import Workbook
 class SpiderHelper(object):
 
     @staticmethod
-    def recognise_code(image_base64,info):
+    def recognise_code(image_base64,infos):
         # base64_data = base64.b64encode(img_bytes)
         # img_b64_data = base64_data.decode()
+        # data = {
+        #     "user": info['dama_username'],
+        #     "pass": info['dama_password'],
+        #     "softid": info['softid'],
+        #     "codetype": 1006,
+        #     "file_base64": image_base64
+        # }
+        info=infos.getDictBySection('chaojiyin_info')
         data = {
-            "user": info['dama_username'],
-            "pass": info['dama_password'],
+            "user": info['username'],
+            "pass": info['pwd'],
             "softid": info['softid'],
             "codetype": 1006,
             "file_base64": image_base64
@@ -163,8 +171,8 @@ class SpiderHelper(object):
             data_list.append(post_number)
             data_list.append(sql_num)
             chayi = yq_number - sql_num
-            if chayi / yq_number >= 0.3:
-                print('预警')
+            # if chayi / yq_number >= 0.3:
+            #     print('预警')
             data_list.append(chayi)
             sheet.append(data_list)
             wb.save(out_file)
@@ -177,8 +185,8 @@ class SpiderHelper(object):
             data_list.append(post_number)
             data_list.append(sql_num)
             chayi = post_number - sql_num
-            if chayi / yq_number >= 0.3:
-                print('预警')
+            # if chayi / yq_number >= 0.3:
+            #     print('预警')
             data_list.append(chayi)
             sheet.append(data_list)
             wb.save(out_file)

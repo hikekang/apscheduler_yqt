@@ -53,10 +53,20 @@ class YQTSpider(object):
         self.first_len=0
         self.redis_len=0
         # 需要替换
+            #from xlsx
+        # self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        #                                    f"data\{info['project_name']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
+        #                                    f"{self}_{info['yuqingtong_username']}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
+        #                                        ':', '_'))
+            #from config.ini
+        self.project_name=info.getValueByDict('industry_info','project_name')
+        self.industry_name=info.getValueByDict('industry_info','industry_name')
+
         self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                           f"data\{info['project_name']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
-                                           f"{self}_{info['yuqingtong_username']}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
+                                           f"data\{self.project_name}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
+                                           f"{self}_{self.industry_name}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
                                                ':', '_'))
+        
         self.process_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                               "process.txt")
 
@@ -97,8 +107,10 @@ class YQTSpider(object):
 
         submit_buttion = driver.find_element_by_xpath("//button[contains(@class,'login-form-button')]")
 
-        username.send_keys(self.info['yuqingtong_username'])
-        password.send_keys(self.info['yuqingtong_password'])
+        # username.send_keys(self.info['yuqingtong_username'])
+        username.send_keys(self.info.getValueByDict('yqt_info','username'))
+        # password.send_keys(self.info['yuqingtong_password'])
+        password.send_keys(self.info.getValueByDict('yqt_info','pwd'))
 
         logger.info("获取验证码....")
         while 1:
@@ -296,12 +308,7 @@ class YQTSpider(object):
                 "非敏感": 0.9,
                 "中性": 0.5
             }
-            print(data['发布人'])
-            # print(td_time)
             data['positive_prob_number'] = positive_dict[positive_prob.split()[0]]
-            # print(data['positive_prob_number'])
-            # print(positive_prob)
-            # 查看近一个月中是否存在，滤重
             data_list.append(data)
         return data_list
 
@@ -319,8 +326,6 @@ class YQTSpider(object):
             # 1.标题或url为空的舍去
             if data["标题"] == "" and data["链接"] == "":
                 # new_data_list.remove(data)
-                print("标题或者链接为空")
-                print(data)
                 continue
             if data["标题"]=="":
                 if len(data["转发内容"]) >= 20:
@@ -355,23 +360,6 @@ class YQTSpider(object):
                     data['is_original'] = 2
             else:
                 data['is_original'] = 2
-            # print(self.keyword)
-            # keywords_list = self.keyword.split('|')
-            # simultaneousWords=self.SimultaneousWord.split('|')
-            # excludewords=self.excludewords.split('|')
-            # for keywords in keywords_list:
-            #     if(keywords in data['标题'] or keywords in data['转发内容']):
-            #             pass
-            # for s in simultaneousWords:
-            #     if (s in data['标题'] or s in data['转发内容']):
-            #         pass
-            # for ex in excludewords:
-            #     if(ex in data['标题'] or ex in data['转发内容']):
-            #         flag=1
-            #         continue
-            # if flag==1:
-            #      continue
-            # else:
             sec_list.append(data)
         t2=time.time()
         print("花费时间:",t2-t1)
@@ -769,6 +757,7 @@ class YQTSpider(object):
                             # self.next_end_time, yqt_count, self.post_number, self.info['customer'])
                             record_dict = (self.info['industry_name'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
                             self.next_end_time, yqt_count, self.post_number, self.info['customer'],self.first_len,self.redis_len)
+                            print(record_dict)
                             ssql_helper.record_log(record_dict)
                             # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
                             return True
@@ -806,6 +795,7 @@ class YQTSpider(object):
                                                                  self.info['industry_name'])
                         data_list = [self.info['customer'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                                      self.last_end_time, self.next_end_time]
+                        # 本地文件记录数量
                         SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number,
                                                       data_list=data_list)
                         # record_dict = (self.info['industry_name'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
@@ -815,6 +805,7 @@ class YQTSpider(object):
                         self.last_end_time,
                         self.next_end_time, yqt_count, self.post_number, self.info['customer'], self.first_len,
                         self.redis_len)
+                        # print(record_dict)
                         ssql_helper.record_log(record_dict)
                         # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
                         return True
@@ -871,7 +862,7 @@ class YQTSpider(object):
             # 重新设置项目路径
 
             self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                               f"data\{info['customer']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
+                                               f"data\{self.info['customer']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
                                                f"{self}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
                                                    ':', '_'))
             self.keyword = info['keywords']
@@ -891,7 +882,7 @@ class YQTSpider(object):
                 self.next_end_time = self.interval[1]
                 # -----------定时抓取时间设置完毕----------------------
 
-            # 抓取数据
+            # 抓取数据并记录
             resp = self._crawl2(time_sleep)
 
             if resp == "restart_browser":
@@ -951,17 +942,23 @@ def work_it_2():
     start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
     end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
     # 获取项目信息
+    # from xlsx
     infos = config.row_list
+    #from config.ini
+    myconfig=config.redconfig()
+    
     chrome_service = Service('D:\Anacadon\envs\python36\chromedriver.exe')
     chrome_service.start()
 
-    yqt_spider = YQTSpider(infos[0], start_time=start_time, end_time=end_time)
+    # yqt_spider = YQTSpider(infos[0], start_time=start_time, end_time=end_time)
+    yqt_spider = YQTSpider(myconfig, start_time=start_time, end_time=end_time)
 
     p_data = []
     project_list_1 = ssql_helper.get_industry_keywords()
     project_list = ssql_helper.merger_industry_data(project_list_1)
     for project_data in project_list:
-        if project_data['industry_name'] == '流通贸易':
+        # if project_data['industry_name'] == '流通贸易':
+        if project_data['industry_name'] == yqt_spider.industry_name:
             p_data.append(project_data)
     print(p_data)
     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=p_data[0],is_one_day=False)
@@ -992,20 +989,14 @@ def work_it_one_day():
 def apscheduler():
     trigger1 = CronTrigger(hour='0-23', minute='01',second=00, jitter=5)
     trigger2 = CronTrigger(hour='0', minute='01',second=00, jitter=5)
-    trigger3 = CronTrigger(hour='0-23', minute='*/3',second=00, jitter=5)
-    trigger4 = CronTrigger(hour='0-23', minute='*/3',second=00, jitter=5)
     sched = BlockingScheduler()
     sched.add_job(work_it_2, trigger1,max_instances=10,id='my_job_id')
     sched.add_job(work_it_one_day, trigger2,max_instances=10,id='my_job_id_ever')
     sched.start()
 def java_task():
-    # 获取当前工作目录路径  三种方法
-    ab = os.getcwd()
-    # print(ab)
-    # print(os.path.abspath(""))
-    # import sys
-    # print(sys.argv[0])
+    ab=os.path.dirname(os.path.realpath(__file__))
     path_java = os.path.join(ab, "jms-1.1.1.jar")
+    # print(path_java)
     command = r'java -jar ' + path_java
     os.system(command)
     print("执行成功")

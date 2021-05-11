@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-
+import configparser
+import os
 
 
 from openpyxl import load_workbook
@@ -18,6 +19,7 @@ for row in sheet.iter_rows(min_row=2,max_col=8):
         row_info.append(cell.value)
     info = dict(list(zip(pinyin, row_info)))
     row_list.append(info)
+
 
 # for data in sheet[2:5]:
 #     print(type(data))
@@ -72,3 +74,28 @@ MAX_CRAWL_PAGE_COUNT = 60
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 DATA_DIR = "../data/"
+
+class redconfig():
+    def __init__(self,filepath=None):
+        if filepath:
+            self.config_path=filepath
+        else:
+            self.config_path=os.path.join(os.path.dirname(os.path.realpath(__file__)),'config.ini')
+        # print(self.config_path)
+        self.config=configparser.ConfigParser()
+        self.config.read(self.config_path,encoding='utf-8')
+
+    def getValueByDict(self,key,value):
+        return self.config.get(key,value)
+
+    def getDictBySection(self,section):
+        return dict(self.config.items(section))
+
+
+if __name__ == '__main__':
+    myconfig=redconfig()
+    print(myconfig.getValueByDict('yqt_info','username'))
+    print(myconfig.getDictBySection('yqt_info'))
+
+
+
