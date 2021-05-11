@@ -59,7 +59,7 @@ tables = {
     "医疗保健": "dbo.TS_industry_news_medical",
     "其它": "dbo.TS_industry_news_other",
 }
-
+# 查看本次抓取插入到数据库内的数量
 def find_info_count(start_time, end_time, industry_name):
     table_name = tables[industry_name]
     sql = "select count(*) from {table_name} where publish_time between '{start_time}' and '{end_time}' ".format(
@@ -372,6 +372,8 @@ def filter_by_url(datalist, industry_name):
     print("rediss 滤重之后的数量")
     print(len(new_data_list))
     return new_data_list
+
+
 def record_log(data):
     """
     数据记录
@@ -379,8 +381,35 @@ def record_log(data):
     sql_record = "insert into record_log_table values (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
     # data=('3', '2021-4-26 00:00:00','2021-4-26 00:00:00', '2021-4-26 00:00:00', '4', '5', '6', '1')
     db_a.execute(sql_record,data)
-    # pass
+    today=data[2].date()
+    sql_industry_num = """
+            if not exists (select * from record_log_industry  where industry = '{0}' and record_time='{1}')
+                    INSERT INTO record_log_industry (industry,record_time,upload_num) VALUES ('{0}','{1}',{2})
+                else
+                    UPDATE record_log_industry SET upload_num=upload_num+{2}
 
+                   WHERE industry = '{0}' and record_time='{1}'
+            """.format(data[0], today, data[5])
+
+    # 行业数据表每天增加
+    db_a.execute(sql_industry_num)
+    # pass
+def customer_log():
+    """
+    统计项目数据量
+    B库
+    """
+    for customer in get_industry_keywords():
+        date_now=datetime.datetime.now().strftime('%Y-%m-%d 00:00:00')
+        date_yesterday=(datetime.datetime.now()-datetime.timedelta(days=1)).strftime("%Y-%m-%d 00:00:00")
+
+        sql_qbbb="select count(*) from TS_DataMerge_Base where C_Id='{0}' and PublishDate_Std between '{2}' and '{1}'".format(customer['id'],date_now,date_yesterday)
+        # qbbb 库查询的数量
+        today_customer_num=db_qbbb.execute_query(sql_qbbb)[0][0]
+        # 记录项目的数据量
+        sql_tsa_customer="insert into record_log_customer (customer,record_time,upload_num) values(%s,%s,%s)"
+        data=(customer['customer'],date_yesterday,today_customer_num)
+        db_a.execute(sql_tsa_customer,data)
 
 def get_teack_datas():
     """
