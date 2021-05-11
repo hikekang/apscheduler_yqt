@@ -923,34 +923,14 @@ def xlsx_work():
 
 
 # 自定义时间抓取任务
-def work_it():
-    end_time = datetime.datetime.now().strftime('%Y-%m-%d %H') + ":00:00"
-    one_hour_ago = datetime.datetime.now() - datetime.timedelta(hours=1)
-
-    start_time = one_hour_ago.strftime('%Y-%m-%d %H') + ":00:00"
-    # 开始时间
-    start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-    # 结束时间
-    end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
-    infos = config.row_list
-    for info in infos:
-        yqt_spider = YQTSpider(info, start_time=start_time, end_time=end_time)
-        yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=info)
-
-
-def work_it_2():
-    end_time = datetime.datetime.now().strftime('%Y-%m-%d ') + "00:00:00"
-    # end_time = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d ") + "00:00:00"
-    start_time = (datetime.datetime.now() - datetime.timedelta(hours=2)).strftime("%Y-%m-%d ") + "00:00:00"
-    start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-    end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+def work_it(start_time,end_time):
     # 获取项目信息
     # from xlsx
     infos = config.row_list
-    #from config.ini
-    myconfig=config.redconfig()
-    
-    chrome_service = Service('D:\Anacadon\envs\python36\chromedriver.exe')
+    # from config.ini
+    myconfig = config.redconfig()
+    chromedriver_path = myconfig.getValueByDict('chromerdriver', 'path')
+    chrome_service = Service(chromedriver_path)
     chrome_service.start()
 
     # yqt_spider = YQTSpider(infos[0], start_time=start_time, end_time=end_time)
@@ -964,36 +944,29 @@ def work_it_2():
         if project_data['industry_name'] == yqt_spider.industry_name:
             p_data.append(project_data)
     print(p_data)
-    yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=p_data[0],is_one_day=False)
+    yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=p_data[0], is_one_day=False)
     chrome_service.stop()
+
+def work_it_hour():
+    end_time = datetime.datetime.now().strftime('%Y-%m-%d ') + "00:00:00"
+    # end_time = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d ") + "00:00:00"
+    start_time = (datetime.datetime.now() - datetime.timedelta(hours=2)).strftime("%Y-%m-%d ") + "00:00:00"
+    start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+    end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+    work_it(start_time,end_time)
 
 def work_it_one_day():
     end_time = (datetime.datetime.now()).strftime("%Y-%m-%d ") + "00:00:00"
     start_time = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d ")+"00:00:00"
     start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
     end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
-    # 获取项目信息
-    infos = config.row_list
-    chrome_service = Service('D:\Anacadon\envs\python36\chromedriver.exe')
-    chrome_service.start()
-
-    yqt_spider = YQTSpider(infos[0], start_time=start_time, end_time=end_time)
-
-    p_data = []
-    project_list_1 = ssql_helper.get_industry_keywords()
-    project_list = ssql_helper.merger_industry_data(project_list_1)
-    for project_data in project_list:
-        if project_data['industry_name'] == '流通贸易':
-            p_data.append(project_data)
-    print(p_data)
-    yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=p_data[0],is_one_day=True)
-    chrome_service.stop()
+    work_it(start_time,end_time)
 
 def apscheduler():
     trigger1 = CronTrigger(hour='0-23', minute='01',second=00, jitter=5)
     trigger2 = CronTrigger(hour='0', minute='01',second=00, jitter=5)
     sched = BlockingScheduler()
-    sched.add_job(work_it_2, trigger1,max_instances=10,id='my_job_id')
+    sched.add_job(work_it_hour, trigger1,max_instances=10,id='my_job_id')
     sched.add_job(work_it_one_day, trigger2,max_instances=10,id='my_job_id_ever')
     sched.start()
 def java_task():
@@ -1015,7 +988,7 @@ if __name__ == '__main__':
 
 
     # p1=Process(target=java_task,name='java程序')
-    # p2=Process(target=work_it_2,name='定时抓取')
+    # p2=Process(target=work_it_hour,name='定时抓取')
     # p1.start()
     # p2.start()
-    work_it_2()
+    work_it_hour()
