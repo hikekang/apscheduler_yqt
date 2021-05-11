@@ -215,7 +215,8 @@ class YQTSpider(object):
                     '链接': td_title.find('.news-item-tools.font-size-0 div:nth-child(2)>div>ul>li:nth-child(4) a').attr(
                         "href"),
                     '转发内容': repost_content.replace("'", ""),
-                    '发布人': td_title.find('a[ng-click="getDetail(icc,cucurrrentKeyword);"]').text(),
+                    # '发布人': td_title.find('a[ng-click="getDetail(icc,cucurrrentKeyword);"]').text(),
+                    '发布人': td_title.find('div.profile-title.inline-block>a').text(),
                     'ic_id':td_title.find('a[ng-click="getDetail(icc,rentKeyword);"]').attr('value'),
                     'keywords_id':keywords_id,
                     'attitude': td_title.find(
@@ -319,7 +320,7 @@ class YQTSpider(object):
         new_data_list = self.quchong(data_list, "链接")
 
         # 第二次滤重
-        new_data_list = ssql_helper.filter_by_url(new_data_list, self.info['industry_name'])
+        new_data_list = ssql_helper.filter_by_url(new_data_list, self.industry_name)
         self.redis_len+=len(new_data_list)
         sec_list = []
         for data in new_data_list:
@@ -653,12 +654,13 @@ class YQTSpider(object):
             # 插入到数据库，返回一个成功插入的值
             # 上传数据
             if data_list:
-                ssql_helper.upload_many_data(data_list, self.info['industry_name'])
+                ssql_helper.upload_many_data(data_list, self.industry_name)
 
             logger.info(f"解析到{len(data_list)}条数据")
             self.post_number += len(data_list)
             # SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path,sheet_name=self.info['sheet_name'])
-            # logger.info(f"保存完毕")
+            SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path,sheet_name=self.industry_name)
+            logger.info(f"保存完毕")
 
             # 想要抓取的最大页数，可以修改
             if self.next_page_num >= 50:
@@ -747,17 +749,17 @@ class YQTSpider(object):
                             # 舆情通数量
                             yqt_count = self._count_number
                             record_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                                            f"record\{self.info['customer']}", f"{self}_记录.xlsx")
-                            sql_number = ssql_helper.find_info_count(self.interval[0], self.interval[1], self.info['industry_name'])
-                            data_list = [self.info['customer'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                                            f"record\{self.project_name}", f"{self}_记录.xlsx")
+                            sql_number = ssql_helper.find_info_count(self.interval[0], self.interval[1], self.industry_name)
+                            data_list = [self.project_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                                          self.last_end_time, self.next_end_time]
                             SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number,
                                                           data_list=data_list)
-                            # record_dict = (self.info['industry_name'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
-                            # self.next_end_time, yqt_count, self.post_number, self.info['customer'])
-                            record_dict = (self.info['industry_name'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
-                            self.next_end_time, yqt_count, self.post_number, self.info['customer'],self.first_len,self.redis_len)
-                            print(record_dict)
+                            # record_dict = (self.industry_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
+                            # self.next_end_time, yqt_count, self.post_number, self.project_name)
+                            record_dict = (self.industry_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
+                            self.next_end_time, yqt_count, self.post_number, self.project_name,self.first_len,self.redis_len)
+                            print(record_file_path)
                             ssql_helper.record_log(record_dict)
                             # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
                             return True
@@ -790,20 +792,20 @@ class YQTSpider(object):
                         # 舆情通数量
                         yqt_count = self._count_number
                         record_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                                        f"record\{self.info['customer']}", f"{self}_记录.xlsx")
+                                                        f"record\{self.project_name}", f"{self}_记录.xlsx")
                         sql_number = ssql_helper.find_info_count(self.interval[0], self.interval[1],
-                                                                 self.info['industry_name'])
-                        data_list = [self.info['customer'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                                                 self.industry_name)
+                        data_list = [self.project_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                                      self.last_end_time, self.next_end_time]
                         # 本地文件记录数量
                         SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number,
                                                       data_list=data_list)
-                        # record_dict = (self.info['industry_name'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
-                        # self.next_end_time, yqt_count, self.post_number, self.info['customer'])
+                        # record_dict = (self.industry_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
+                        # self.next_end_time, yqt_count, self.post_number, self.project_name)
                         record_dict = (
-                        self.info['industry_name'], datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        self.industry_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                         self.last_end_time,
-                        self.next_end_time, yqt_count, self.post_number, self.info['customer'], self.first_len,
+                        self.next_end_time, yqt_count, self.post_number, self.project_name, self.first_len,
                         self.redis_len)
                         # print(record_dict)
                         ssql_helper.record_log(record_dict)
@@ -862,9 +864,10 @@ class YQTSpider(object):
             # 重新设置项目路径
 
             self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                               f"data\{self.info['customer']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
+                                               f"data\{self.project_name}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
                                                f"{self}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
                                                    ':', '_'))
+            print(self.data_file_path)
             self.keyword = info['keywords']
             self.SimultaneousWord=info['simultaneouswords']
             self.excludewords=info['excludewords']
@@ -1011,8 +1014,8 @@ if __name__ == '__main__':
     # work_it_one_day()
 
 
-    p1=Process(target=java_task,name='java程序')
-    p2=Process(target=work_it_2,name='定时抓取')
-    p1.start()
-    p2.start()
-
+    # p1=Process(target=java_task,name='java程序')
+    # p2=Process(target=work_it_2,name='定时抓取')
+    # p1.start()
+    # p2.start()
+    work_it_2()
