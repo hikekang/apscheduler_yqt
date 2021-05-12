@@ -5,18 +5,12 @@
    Author :       hike
    time：          2021/5/7 11:03
 """
-import json
-import threading
 from datetime import datetime
-from fake_useragent import UserAgent
 from utils.snowflake import IdWorker
 import redis
-import time
 import re
-import stomp
-from utils.getdatabyselenium import get_num_driver
 import requests
-from utils import extract_content
+from utils.email_helper import my_Email
 from utils.ssql_pool_helper import DataBase,config_A,config_B,config_QBBA,config_QBBB,config_net_TS_A,config_net_QBBA
 from utils.redis_helper import my_redis
 pool = redis.ConnectionPool(host='localhost', port=6379, decode_responses=True)
@@ -75,6 +69,7 @@ def find_info_count(start_time, end_time, industry_name):
 
 # B库中查询客户名称以及行业名称 对应的关键词  使用服务器的数据库
 def get_industry_keywords():
+    # 查询所有启用项目
     sql_qbbb = "select * from TS_Customers where IsEnable=1"
     # get enable project
     data = db_qbbb.execute_query(sql_qbbb)
@@ -102,14 +97,18 @@ def get_industry_keywords():
                     for i, d_a in enumerate(da):
                         if d_a and i == 0:
                             new_d['keywords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
-                        if d_a and i == 1:
-                            new_d['excludewords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
                         if d_a and i == 2:
+                            new_d['excludewords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
+                        if d_a and i == 1:
                             new_d['simultaneouswords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
+
             if i == 1:
                 new_d['customer'] = (d[1].encode('latin1').decode('gbk'))
             else:
                 new_d['industry_name'] = (d[2].encode('latin1').decode('gbk'))
+        new_d['keywords']=new_d['keywords'][:-1]
+        new_d['excludewords']=new_d['excludewords'][:-1]
+        new_d['simultaneouswords']=new_d['simultaneouswords'][:-1]
         new_data.append(new_d)
     new_eight = []
     for word in new_data:
@@ -280,9 +279,6 @@ def upload_many_data(data_list, industry_name):
         tuple_data_ts_a = (
             id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
             data['positive_prob_number'])
-
-
-
         tuple_data_qbb_a = (
             id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
             data['is_original'], data['area'], data['positive_prob_number'])
@@ -337,8 +333,6 @@ def testsql():
     sql_record = "insert into record_log_table values ('%s','%s','%s','%s','%s','%s','%s','%s')" % ('1', '2021-4-26 00:00:00', '2021-4-26 00:00:00', '2021-4-26 00:00:00', '1', '1', '1', '1')
     db_a.execute(sql_record)
 
-
-
 def get_month_data(time1, time2):
     """
     # 将所有行业的数据加载到内存中
@@ -357,16 +351,12 @@ def get_month_data(time1, time2):
 
 # 根据url进行二次滤重
 def filter_by_url(datalist, industry_name):
-    """
-
-    """
 
     sql_industry_id = "select id from TS_Industry where name='" + industry_name + "'"
     industry_id = db_b.execute_query(sql_industry_id)[0][0]
     new_data_list = []
     # redis滤重
     for data in datalist:
-        print(data['链接'])
         if (r.sismember(industry_id, data['链接']) == False):
             new_data_list.append(data)
     print("rediss 滤重之后的数量")
@@ -378,9 +368,16 @@ def record_log(data):
     """
     数据记录
     """
+    # A库 每一次抓取的记录
     sql_record = "insert into record_log_table values (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
     # data=('3', '2021-4-26 00:00:00','2021-4-26 00:00:00', '2021-4-26 00:00:00', '4', '5', '6', '1')
     db_a.execute(sql_record,data)
+    my_e = my_Email()
+    if data[4]!=0 and data[5]!=0:
+        if(data[5]/data[4])<0.7:
+            my_e.send_message('数据量异常', data[6])
+    elif data[4]==0 or data[5]==0:
+        my_e.send_message('数据量异常', data[6])
     today=data[2].date()
     sql_industry_num = """
             if not exists (select * from record_log_industry  where industry = '{0}' and record_time='{1}')
@@ -392,8 +389,11 @@ def record_log(data):
             """.format(data[0], today, data[5])
 
     # 行业数据表每天增加
+    # print(sql_industry_num)
     db_a.execute(sql_industry_num)
+    print("Finash record")
     # pass
+
 def customer_log():
     """
     统计项目数据量
@@ -411,232 +411,11 @@ def customer_log():
         data=(customer['customer'],date_yesterday,today_customer_num)
         db_a.execute(sql_tsa_customer,data)
 
-def get_teack_datas():
-    """
-    数据库中获取追踪的url
-    """
-    sql_of_extend = "select SN from TS_DataMerge_Extend where is_Track=1"
-    datas = db_qbbb.execute_query(sql_of_extend)
-    url_list = []
-    for data in datas:
-        sql_of_base = "select URL from TS_DataMerge_Base where SN='%s'" % (data[0])
-        urls = db_qbbb.execute_query(sql_of_base)
-        if "weibo.com" in urls[0]:
-            url = {
-                'sn': data[0],
-                'url': urls[0]
-            }
-            url_list.append(url)
-    return url_list
-
-def get_track_datas_qbbb():
-    """
-    数据库qbbb,track_task中获取数据
-    """
-    sql="select * from TS_track_task where is_done=0"
-    db_qbbb.execute(sql)
-    datas=db_qbbb.execute_query()
-    return datas
-
-def second_data_url_sql():
-    """
-    二层数据抓取 url查询
-    """
-    sql="select * from TS_Second_Data where crawl_flag=0"
-    data=db_a.execute_query(sql)
-    return data
-
-def crawl_data(data):
-    """
-    抓取二层数据并进行更新数据库
-    """
-    url = 'http://yuqing.sina.com/newEdition/getDetail.action'
-    headers = {
-        'User-Agent': UserAgent().random,
-        'Cookie': 'Hm_lvt_d535b0ca2985df3bb95f745cd80ea59e=1619337563,1619416119,1619494308,1619574875; Hm_lpvt_d535b0ca2985df3bb95f745cd80ea59e=1619574875; Hm_lvt_c29f5cd9e2c7e8844969c899f7ac90d3=1619337563,1619416119,1619494308,1619574875; Hm_lpvt_c29f5cd9e2c7e8844969c899f7ac90d3=1619574875; www=userSId_yqt365_hbslxx_239715_72496; JSESSIONID=53D37416EB6EA584070A2EAFCE70E515'
-    }
-    params = {
-        'icc.id': data[2],
-        'kw.keywordId':data[3]
-    }
-    r=requests.post(url,params=params,headers=headers,proxies = {'http': None, 'https': None})
-    time.sleep(0.3)
-    print(r.text)
-    data_content = json.loads(r.text)
-    print(data_content)
-    # 获取数据
-    content=extract_content.extract_content(str('<html><body>'+data_content['icc']['content']))
-    # print(content+"\n")
-    # B库更新
-    sql_Base = "update TS_DataMerge_Base set Body='%s'where url='%s' "% (content,data[5])
-    print(sql_Base)
-    db_qbbb.execute(sql_Base)
-
-    sql_second_data="update TS_Second_Data set crawl_flag=1 where url='%s'"%data[5]
-    db_a.execute(sql_second_data)
-
-def multi_thread():
-    """
-    多线程数据爬取
-    """
-    threads=[]
-    for data in iter(second_data_url_sql()):
-        threads.append(
-            threading.Thread(target=crawl_data,args=(list(data),))
-        )
-    for thread in threads:
-        thread.start()
-
-    for thread in threads:
-        thread.join()
-
-def single_thread():
-    for data in iter(second_data_url_sql()):
-        crawl_data(data)
 
 
-def track_data_task():
-    """
-    直接扫描表
-    数据库中获取链接进行追踪
-    """
-    driver=get_num_driver()
-    for data in get_track_datas_qbbb():
-
-        num = driver.get_data_it(data[1])
-        create_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        #     转发、评论、点赞
-        # 追踪记录
-        sql_record = "insert into TS_track_record(sn,forward_num,comment_num,good_num,create_date) values('%s','%d','%d','%d','%s')" % (
-        data[2], num[0], num[1], num[2], create_date)
-        db_qbbb.execute(sql_record)
-        # 更新值
-        sql_Base = "update TS_DataMerge_Base set Transpond_Num=%d,Comment_Num=%d,Forward_Good_Num=%d where SN='%s' " % (
-        num[0], num[1], num[2], data[2])
-        db_qbbb.execute(sql_Base)
-        # print('更新库')
-         #     修改数据追踪表
-        sql_track_task="update TS_track_task set is_done=1 where sn='%s' "%data[2]
-        db_qbbb.execute(sql_track_task)
-        # print('追踪完毕')
-    driver.close()
 
 
-def track_data_number_sql2(sn, data):
-    """
-    stomp版本
-    将得到的数据插入数据库
-    """
-    create_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    #     转发、评论、点赞
-    sql_record = "insert into TS_track_record(sn,forward_num,comment_num,good_num,create_date) values('%s','%d','%d','%d','%s')" % (
-    sn, data[0], data[1], data[2], create_date)
-    db_qbbb.execute(sql_record)
-    sql_Base = "update TS_DataMerge_Base set Transpond_Num=%d,Comment_Num=%d,Forward_Good_Num=%d where SN='%s' " % (
-    data[0], data[1], data[2], sn)
-    db_qbbb.execute(sql_Base)
 
-
-# track_data_number_sql()
-
-
-# ----------------------------数据追踪消息队列------------------------------------------------
-
-
-class MyListener(stomp.ConnectionListener):
-    """
-    自己的监听队列，操作数据库
-    """
-    def __init__(self,conn):
-        self.conn = conn
-        self.msg_list=[]
-
-    def on_error(self, frame):
-        print('received an error "%s"' % frame.body)
-
-    def on_message(self, frame):
-        print('received a message "%s"' % frame.body)
-        pattern = re.compile(r'http://weibo.com(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
-        url = re.findall(pattern, frame.body)
-        if url:
-            self.msg_list.append(frame.body)
-            print("处理之后的链接：" + url[0])
-            # # 爬取评论转发点赞数量
-            # data = get_data_it(url[0])
-            # sn = frame.body.split('"')[3]
-            # track_data_number_sql2(sn, data)
-            # for x in range(5):
-            #     print(x)
-            #     time.sleep(1)
-            # print('processed message')
-            # print("监听的url：" + url[0])
-        print(self.msg_list)
-    def on_disconnected(self):
-        print('disconnected')
-        connect_and_subscribe(self.conn)
-    def get_msg_list(self):
-        print(self.msg_list)
-        return self.msg_list
-
-def connect_and_subscribe(conn):
-    """
-    连接和监听
-    """
-    conn.connect('admin', 'admin', wait=True)
-    conn.subscribe(destination='task.msg.tracker_2.1', id=1, ack='auto')
-
-
-def re_connect_subscribe(conn):
-    """
-    重新登记注册
-    :return:
-    """
-    conn.disconnect()
-    time.sleep(3)
-    connect_and_subscribe(conn)
-
-def get_url_from_stomp(frame_body_list):
-    try:
-        if frame_body_list:
-            print("开始抓数据")
-            for frame_body in frame_body_list:
-                pattern = re.compile(r'http://weibo.com(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
-                url = re.findall(pattern, frame_body)
-                driver=get_num_driver()
-                data = driver.get_data_it(url[0])
-                sn = frame_body.split('"')[3]
-                track_data_number_sql2(sn, data)
-                for x in range(3):
-                    print(x)
-                    time.sleep(1)
-            return True
-    except Exception as e:
-        print(e)
-        return False
-    finally:
-        driver.close()
-
-
-def track_data_work():
-    conn = stomp.Connection(host_and_ports=[('223.223.180.10', 61613)],heartbeats=(4000, 4000))
-    # conn.connect('admin', 'admin', wait=True)
-    lst = MyListener(conn)
-    # lst = MyListener()
-    conn.set_listener('track_data', lst)
-    connect_and_subscribe(conn)
-    conn.unsubscribe(destination='task.msg.tracker_2.1', id=1, ack='auto')
-    time.sleep(2)
-    frame_body_list=lst.get_msg_list()
-    print(frame_body_list)
-    # conn.disconnect()
-    # conn.disconnect()
-    hike_flag=get_url_from_stomp(frame_body_list)
-    if hike_flag:
-        return  track_data_work()
-    else:
-        conn.disconnect()
-
-# ———————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 
 
 if __name__ == '__main__':
@@ -651,8 +430,8 @@ if __name__ == '__main__':
     # track_data_task()
     # record_log()
 
-    # for d in merger_industry_data(get_industry_keywords()):
-    #     print(d)
+    for d in merger_industry_data(get_industry_keywords()):
+        print(d)
     # get_industry_keywords()
     # sql_QBBB = "select * from TS_Customers where IsEnable=1"
 
@@ -665,5 +444,5 @@ if __name__ == '__main__':
     # for data in second_data_url_sql():
     #     print(data)
     #     print(data[5])
-    for d in db_net_a.execute_query("select * from TS_test"):
-        print(d)
+    # for d in db_net_a.execute_query("select * from TS_test"):
+    #     print(d)
