@@ -21,12 +21,12 @@ class my_Email():
         # 邮件接受方邮箱地址，注意需要[]包裹，这意味着你可以写多个邮件地址群发
         self.receivers = ['haidong.kang@datagalaxy.cn']
 
-    def send_message(self,content):
+    def send_message(self,content,industry_name):
         # 设置email信息
         # 邮件内容设置
         message = MIMEText(content, 'plain', 'utf-8')
         # 邮件主题
-        message['Subject'] = '测试'
+        message['Subject'] = industry_name
         # 发送方信息
         message['From'] = self.sender
         # 接受方信息
