@@ -59,7 +59,7 @@ class YQTSpider(object):
         #                                    f"{self}_{info['yuqingtong_username']}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
         #                                        ':', '_'))
             #from config.ini
-        self.project_name=info.getValueByDict('industry_info','project_name')
+        self.project_name=info.getValueByDict('industry_info','project_name')  #项目名称
         self.industry_name=info.getValueByDict('industry_info','industry_name')
 
         self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -322,6 +322,7 @@ class YQTSpider(object):
         # 第二次滤重
         new_data_list = ssql_helper.filter_by_url(new_data_list, self.industry_name)
         self.redis_len+=len(new_data_list)
+
         sec_list = []
         for data in new_data_list:
             # 1.标题或url为空的舍去
@@ -757,9 +758,20 @@ class YQTSpider(object):
                                                           data_list=data_list)
                             # record_dict = (self.industry_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
                             # self.next_end_time, yqt_count, self.post_number, self.project_name)
-                            record_dict = (self.industry_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
-                            self.next_end_time, yqt_count, self.post_number, self.project_name,self.first_len,self.redis_len)
-                            print(record_file_path)
+
+                            record_dict = (
+                                self.industry_name,#行业名称
+                                datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),#抓取时间
+                                self.last_end_time,#开始时间
+                                self.next_end_time,#结束时间
+                                yqt_count,#舆情通数量
+                                self.post_number,#上传数量
+                                self.project_name,#项目名称
+                                self.first_len,#第一次过滤之后的数量
+                                self.redis_len#redis过滤之后的数量
+                            )
+
+                            #数据统计记录
                             ssql_helper.record_log(record_dict)
                             # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
                             return True
@@ -840,12 +852,24 @@ class YQTSpider(object):
         time.sleep(2)
         driver.find_element_by_xpath('//li[@class="add-plan-trigger"]/a').click()
         time.sleep(1)
-        keywords = driver.find_element_by_xpath('//div[@class="edit_textarea mb5 ng-binding"]')
+        # keywords = driver.find_element_by_xpath('//div[@class="edit_textarea mb5 ng-binding"]')
+        keywords = driver.find_element_by_xpath('//div[@id="currentKeyword_keyword"]')
         keywords.clear()
         time.sleep(0.3)
-        keywords.send_keys(self.keyword)
+        if self.SimultaneousWord:
+            keyword="({0})+({1})".format(self.keyword,self.SimultaneousWord)
+        else:
+            keyword=self.keyword
+        keywords.send_keys(keyword)
+        print(keyword)
         time.sleep(0.3)
-
+        fitler_keywords=driver.find_element_by_xpath('//div[@id="currentKeyword_filterKeyword_high"]')
+        fitler_keywords.clear()
+        fitler_keywords.clear()
+        fitler_keywords.clear()
+        time.sleep(0.3)
+        fitler_keywords.send_keys(self.excludewords)
+        time.sleep(0.3)
         # 保存
         driver.find_element_by_id("saveHighSetKeyword").click()
         time.sleep(1)
@@ -898,8 +922,7 @@ class YQTSpider(object):
                 os.remove(self.process_file_path)
                 # pyautogui.alert("抓取完成...")
         except Exception as e:
-            my_e=my_Email()
-            my_e.send_message(e)
+
             logger.warning(e)
         finally:
             if self.spider_driver.service.is_connectable():
@@ -923,12 +946,12 @@ def xlsx_work():
 
 
 # 自定义时间抓取任务
-def work_it(start_time,end_time):
+def work_it(myconfig,start_time,end_time):
     # 获取项目信息
     # from xlsx
     infos = config.row_list
     # from config.ini
-    myconfig = config.redconfig()
+    # myconfig = config.redconfig()
     chromedriver_path = myconfig.getValueByDict('chromerdriver', 'path')
     chrome_service = Service(chromedriver_path)
     chrome_service.start()
@@ -979,6 +1002,12 @@ def work_it_one_day():
         start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
         end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
         work_it(start_time,end_time)
+    else:
+        end_time = (datetime.datetime.now()).strftime("%Y-%m-%d ") + "00:00:00"
+        start_time = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d ") + "00:00:00"
+        start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+        end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+        work_it(start_time, end_time)
 
 def apscheduler():
     trigger1 = CronTrigger(hour='0-23', minute='01',second=00, jitter=5)
@@ -996,17 +1025,23 @@ def java_task():
     print("执行成功")
 
 if __name__ == '__main__':
-    # today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    # time1 = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
-    # ssql_helper.get_month_data(time1, today)
-    # apscheduler()
-    # xlsx_work()
-    # work_it_2()
-    # work_it_one_day()
+    try:
+        # today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # time1 = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+        # ssql_helper.get_month_data(time1, today)
+        # apscheduler()
+        # xlsx_work()
+        # work_it_2()
+        # work_it_one_day()
 
 
-    # p1=Process(target=java_task,name='java程序')
-    # p2=Process(target=work_it_hour,name='定时抓取')
-    # p1.start()
-    # p2.start()
-    work_it_hour()
+        p1=Process(target=java_task,name='java程序')
+        p2=Process(target=work_it_hour,name='定时抓取')
+        p1.start()
+        p2.start()
+        # work_it_hour()
+    except Exception as e:
+        my_e = my_Email()
+        my_e.send_message(str(e), "程序预警")
+
+
