@@ -66,6 +66,18 @@ def find_info_count(start_time, end_time, industry_name):
     count=db_a.execute_query(sql)[0][0]
     # print(type(cursor.fetchall()))
     return count
+def find_info_count_B(start_time, end_time, C_Id):
+
+    sql = "select count(*) from TS_DataMerge_Base where C_Id={C_Id} and PublishDate_Std between '{start_time}' and '{end_time}' ".format(
+         C_Id=C_Id,start_time=start_time, end_time=end_time)
+
+    # sql="select count(*) from dbo.TS_industry_news_circulation where create_time>='2021-04-02 10:00:00' and create_time<='2021-04-02 11:00:00'"
+    # sql="select count(*) from dbo.TS_industry_news_circulation where create_time between '2021-04-02 10:00:00' and '2021-04-02 11:00:00' "
+    # print(sql)
+    # sql="select count(*) from dbo.TS_industry_news_circulation where create_time between '2021-03-22' and '2021-04-01' "
+    count=db_qbbb.execute_query(sql)[0][0]
+    # print(type(cursor.fetchall()))
+    return count
 
 # B库中查询客户名称以及行业名称 对应的关键词  使用服务器的数据库
 def get_industry_keywords():
@@ -294,10 +306,10 @@ def upload_many_data(data_list, industry_name):
     sql_ts_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s)"
     # 插入A库
     sql_qbb_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,is_original,location,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
-    print(tuple_data_list_ts_a)
+    # print(tuple_data_list_ts_a)
     db_a.execute_many(sql_ts_a, tuple_data_list_ts_a)
     # 二级数据表
-    print(tuple_data_list_ts_a_second_data)
+    # print(tuple_data_list_ts_a_second_data)
     db_a.execute_many(sql_ts_a_second_data, tuple_data_list_ts_a_second_data)
 
     db_net_a.execute_many(sql_ts_a, tuple_data_list_ts_a)
@@ -369,7 +381,7 @@ def record_log(data):
     数据记录
     """
     # A库 每一次抓取的记录
-    sql_record = "insert into record_log_table values (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+    sql_record = "insert into record_log_table values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
     # data=('3', '2021-4-26 00:00:00','2021-4-26 00:00:00', '2021-4-26 00:00:00', '4', '5', '6', '1')
     db_a.execute(sql_record,data)
     my_e = my_Email()
@@ -430,8 +442,9 @@ if __name__ == '__main__':
     # track_data_task()
     # record_log()
 
-    for d in merger_industry_data(get_industry_keywords()):
-        print(d)
+    # for d in merger_industry_data(get_industry_keywords()):
+    #     print(d)
+    print(find_info_count_B('2021-05-19 13:00:00','2021-05-19 14:00:00',1387697657920643074))
     # get_industry_keywords()
     # sql_QBBB = "select * from TS_Customers where IsEnable=1"
 
