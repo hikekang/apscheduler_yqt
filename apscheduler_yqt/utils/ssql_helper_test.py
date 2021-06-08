@@ -337,7 +337,7 @@ def keywords_of_b(info, data):
         # 处理每一条数据
         # 生成时间
         item['create_date'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        for i in range(3, 0,-1):
+        for i in range(3, 0, -1):
             flag = 0
             # 获取XX子级域名
             domain_level = fi.parse_url_level(item['链接'], i)
@@ -400,15 +400,22 @@ def alone_keyword_(info, data):
         if info['keywords'] != '':
             if info['excludewords'] == '' and info['simultaneouswords'] == '':
                 if contain_keywords(info['keywords'], d['标题'] + d['转发内容'] + d['描述']):
-                    new_data.append(d)
+                    d['sort_num'] += 1
+                    d['parent_id'].append(info['parent_id'])
+                    # new_data.append(d)
             elif info['simultaneouswords'] != '' and info['excludewords'] == '':
                 if contain_keywords(info['keywords'] + "、" + info['simultaneouswords'], d['标题'] + d['转发内容'] + d['描述']):
-                    new_data.append(d)
+                    d['sort_num'] += 1
+                    d['parent_id'].append(info['parent_id'])
+                    # new_data.append(d)
             elif info['simultaneouswords'] != '' and info['excludewords'] != '':
                 if contain_keywords(info['keywords'] + "、" + info['simultaneouswords'], d['标题'] + d['转发内容'] + d['描述']):
                     if contain_keywords(info['excludewords'], d['标题'] + d['转发内容'] + d['描述']) != True:
-                        new_data.append(d)
-    return new_data
+                        d['sort_num'] += 1
+                        d['parent_id'].append(info['parent_id'])
+                        # new_data.append(d)
+    # return new_data
+    return data
 
 
 def insert_base_of_b(info, data_list, industry_name):
@@ -439,6 +446,10 @@ def insert_base_of_b(info, data_list, industry_name):
         'Author_Name': '',
     }
     for item in baseData:
+        # 匹配到的次数
+        item['sort_num'] = 0
+        # 匹配到的parent_id
+        item['parent_id'] = []
         item_dict = dict()
         item_dict.setdefault('SN', item['SN'])
         item_dict.setdefault('C_Id', item['C_Id'])
@@ -480,22 +491,22 @@ def insert_base_of_b(info, data_list, industry_name):
     db_qbbb.execute_many(sql_of_base, new_base_data)
     print("插入B库数据量为", len(new_base_data))
     # 第一级过滤 应当插入
-    first_datamerge_data = []
-    if len(baseData) != 0:
-        sql_of_Tid = "select T_Id from QBB_A.dbo.TS_Keywords where C_Id=%s" % baseData[0]['C_Id']
-        T_id = db_qbba.execute_query(sql_of_Tid)[0][0]
-        for item in baseData:
-            """
-            C_Id:客户id项目id
-            T_Id:Thream id 监测主题id
-            """
-
-            first_datamerge_data.append((item['C_Id'], item['SN'],T_id, 0, 0, 0))
-        sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map (c_id,SN,ms_id," \
-                                             "ms_node_id,classMethod,not_first_sort) " \
-                                             "values (%d,%s,%s,%s,%s,%s)"
-
-        db_qbbb.execute_many(sql_DataMerger_Extend_MSubject_Map, first_datamerge_data)
+    # first_datamerge_data = []
+    # if len(baseData) != 0:
+    #     sql_of_Tid = "select T_Id from QBB_A.dbo.TS_Keywords where C_Id=%s" % baseData[0]['C_Id']
+    #     T_id = db_qbba.execute_query(sql_of_Tid)[0][0]
+    #     for item in baseData:
+    #         """
+    #         C_Id:客户id项目id
+    #         T_Id:Thream id 监测主题id
+    #         """
+    #
+    #         first_datamerge_data.append((item['C_Id'], item['SN'],T_id, 0, 0, 0))
+    #     sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map (c_id,SN,ms_id," \
+    #                                          "ms_node_id,classMethod,not_first_sort) " \
+    #                                          "values (%d,%s,%s,%s,%s,%s)"
+    #
+    #     db_qbbb.execute_many(sql_DataMerger_Extend_MSubject_Map, first_datamerge_data)
     return baseData
 
 
@@ -515,72 +526,35 @@ def classification(T_id, data, info_y):
 
     # sub_data = insert_base_of_b(info_y, data, info_y['industry_name'])
     # 根据核心词、同现词、排除词进行数据过滤
-    def insert_data_func(item):
+    def insert_data_func(item, filter_data):
+        """
 
-        # print(item)
-        # if item['parent_id'] != T_id:
-        sql = "select A.id,C_Id,parent_id,subject_id,classId,ruleContent,homonymWords,exclusionWords from " \
-              "QBB_B.dbo.TS_MonitorSubject as A inner join QBB_B.dbo.TS_MonitorSubject_rules as B " \
-              "on A.id=B.classId where A.subject_id={0} and A.id!={0} and A.id={1}".format(T_id, item['parent_id'])
-        # 查询父级数据进行数据插入
-        item_parent = db_qbbb.execute_query(sql)
-        if len(item_parent) != 0:
-            # 有两个分类以上的插入数据规则
-            # 插入多分类数据
-            print("有父级")
-            info = dict()
-            info['keywords'] = item['ruleContent']
-            info['simultaneouswords'] = item['homonymWords']
-            info['excludewords'] = item['exclusionWords']
-            # 数据过滤i_data
+        :param item:当前监测主题下的某一个分类
+        :param filter_data:需要处理的数据
+        :return:
+        """
+        sql_son = "select A.id,C_Id,parent_id,subject_id,classId,ruleContent,homonymWords,exclusionWords from " \
+                  "QBB_B.dbo.TS_MonitorSubject as A inner join QBB_B.dbo.TS_MonitorSubject_rules as B " \
+                  "on A.id=B.classId where A.subject_id={0} and A.id!={0} and parent_id={1}".format(T_id, item['A_id'])
+        # 查看当前分类下面是否有子分类
+        item_son = db_qbbb.execute_query(sql_son)
 
-            ss_data = alone_keyword_(info, sub_data)
-            # ss_data = alone_keyword_(info, data)
-            # 插入数据
-            # DataMerger_Extend_MSubject_Map
-            insert_data = []
-            print("之后的", len(ss_data))
-            # print(ss_data[0])
-            for d in ss_data:
-                insert_data.append((item['C_Id'], d['SN'], item['subject_id'], item['A_id'], 0, 1))
-                # print(d['时间'])
-                post_data = {
-                    "cid": item['C_Id'],
-                    "sn": d['SN'],
-                    "msId": item['subject_id'],
-                    "title": d['标题'],
-                    "msNodeId": item['A_id'],
-                    "publishDate": d['时间'],
-                }
-                post_mq.send_to_queue("task.msg.similar_2.1", str(post_data))
-            sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map (c_id,SN,ms_id," \
-                                                 "ms_node_id,classMethod,not_first_sort) " \
-                                                 "values (%d,%s,%s,%s,%s,%s)"
-            db_qbbb.execute_many(sql_DataMerger_Extend_MSubject_Map, insert_data)
-            # print("分类——", item['A_id'])
-            i_d_p = dict(zip(listdict, list(item_parent[0])))
+        info = dict()
+        info['keywords'] = item['ruleContent']
+        info['simultaneouswords'] = item['homonymWords']
+        info['excludewords'] = item['exclusionWords']
+        # 当前分类的id
+        info['parent_id'] = item['A_id']
 
-            # update on 2021-06-04 16:44:11
-            return insert_data_func(i_d_p)
-        else:
-            # 单个分类的插入规则
-            info = dict()
-            info['keywords'] = item['ruleContent']
-            info['simultaneouswords'] = item['homonymWords']
-            info['excludewords'] = item['exclusionWords']
-            # 数据过滤
-            ss_data = keywords_of_b(info, sub_data)
-            # 插入数据
-            # DataMerger_Extend_MSubject_Map
-            insert_b_datas = []
-            # 只匹配了一个分类
-            for d in ss_data:
-                insert_b_datas.append(( item['C_Id'], d['SN'], item['subject_id'], item['A_id'], 0, 0))
-            sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map " \
-                                                 "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
-                                                 "values (%d,%s,%s,%s,%s,%s)"
-            print("单个分类", item['A_id'])
-            db_qbbb.execute_many(sql_DataMerger_Extend_MSubject_Map, insert_b_datas)
+        # 是否匹配当前分类
+        data = alone_keyword_(info, filter_data)
+        # 获取当前级别的数据
+        for i_data in item_son:
+            item_son_data = dict(zip(listdict, list(i_data)))
+            item_son_data['ruleContent'] = item_son_data['ruleContent'].encode('latin1').decode('gbk')
+            item_son_data['homonymWords'] = item_son_data['homonymWords'].encode('latin1').decode('gbk')
+            item_son_data['exclusionWords'] = item_son_data['exclusionWords'].encode('latin1').decode('gbk')
+            insert_data_func(item_son_data, data)
 
     # 获取当前监测主题匹配后的数据
 
@@ -614,7 +588,60 @@ def classification(T_id, data, info_y):
         i_data['ruleContent'] = i_data['ruleContent'].encode('latin1').decode('gbk')
         i_data['homonymWords'] = i_data['homonymWords'].encode('latin1').decode('gbk')
         i_data['exclusionWords'] = i_data['exclusionWords'].encode('latin1').decode('gbk')
-        insert_data_func(i_data)
+        insert_data_func(i_data, sub_data)
+        for data in sub_data:
+            if data['sort_num'] == 0:
+                post_data = {
+                    "cid": info_y['id'],
+                    "sn": data['SN'],
+                    "msld": i_data['subject_id'],
+                    "title": data['标题'],
+                    "msNodeld": i_data['subject_id'],
+                    "publishDate": data['时间']
+                }
+                post_mq.send_to_queue('task.msg.similar_2.1', str(post_data))
+                # ms_node_id为0 ，not_first_sort为0
+                insert_b_data = ((i_data['C_Id'], data['SN'], i_data['subject_id'], 0, 0, 0))
+                sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map " \
+                                                     "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
+                                                     "values (%d,%s,%s,%s,%s,%s)"
+                db_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data)
+            # elif data['sort_num']==1:
+            #     insert_b_data = ((item['C_Id'], data['SN'], item['subject_id'], data['parent_id'][0], 0, 0))
+            #     sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map " \
+            #                                          "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
+            #                                          "values (%d,%s,%s,%s,%s,%s)"
+            #     db_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data)
+            elif data['sort_num'] >= 1:
+                post_data = {
+                    "cid": info_y['id'],
+                    "sn": data['SN'],
+                    "msld": i_data['subject_id'],
+                    "title": data['标题'],
+                    "msNodeld":data['parent_id'][0],
+                    "publishDate":data['时间']
+                }
+                post_mq.send_to_queue('task.msg.similar_2.1', str(post_data))
+                if len(data['parent_id']) == 1:
+                    # ms_node_id为对应分类的ID ，not_first_sort为0
+                    insert_b_data = ((i_data['C_Id'], data['SN'], i_data['subject_id'], data['parent_id'][0], 0, 0))
+                    sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map " \
+                                                         "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
+                                                         "values (%d,%s,%s,%s,%s,%s)"
+                    db_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data)
+                    ...
+                elif len(data['parent_id'])> 1:
+                    insert_b_data = ((i_data['C_Id'], data['SN'], i_data['subject_id'], i_data['A_id'], 0, 0))
+                    sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map " \
+                                                         "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
+                                                         "values (%d,%s,%s,%s,%s,%s)"
+                    db_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data)
+                    for p in data['parent_id']:
+                        insert_b_data = ((i_data['C_Id'], data['SN'], i_data['subject_id'], p, 0, 1))
+                        sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map " \
+                                                             "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
+                                                             "values (%d,%s,%s,%s,%s,%s)"
+                        db_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data)
 
 
 def testfenlei(T_id='1387703706849402881'):
@@ -680,7 +707,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         # 生成数据的ID
         # data['sn-id'] = sn_id
         # 生成数据的SN
-        data['id']=id
+        data['id'] = id
         data['SN'] = ''.join(sn_id.split('-'))
 
         post_data = {
@@ -793,7 +820,6 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     # requests.get(url=url, proxies=proxies, params=data_2)
     # print("数据上传成功")
 
-
     myredis.close()
     post_mq.close_mq()
 
@@ -805,7 +831,7 @@ def testsql():
     """
     sql_ts_a = "insert into '%s' (id,industry_id,title,summary,content,url,author,publish_time)" \
                " values (''%s'','%s','%s','%s','%s','%s','%s','%s')" % (
-        'hike', 'hike', 'hike', 'hike', 'hike', 'hike', 'hike', 'hike', 'hike',)
+                   'hike', 'hike', 'hike', 'hike', 'hike', 'hike', 'hike', 'hike', 'hike',)
     print(sql_ts_a)
     # 插入A库
     # sql_record = "insert into record_log_table (industry,crawl_time,start_time,end_time,yqt_num,crawl_num,upload_num,
