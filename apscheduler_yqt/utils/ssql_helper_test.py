@@ -13,10 +13,13 @@ from utils.email_helper import my_Email
 from utils.ssql_pool_helper import DataBase, config_A, config_B, config_QBBA, config_QBBB, config_net_TS_A, \
     config_net_QBBA
 from utils.redis_helper import my_redis
+from tqdm import tqdm
 import uuid
 from utils import domain
-from datetime import datetime
+# from datetime import datetime
+import datetime
 from utils import post_mq
+
 pool = redis.ConnectionPool(host='localhost', port=6379, decode_responses=True)
 r = redis.Redis(connection_pool=pool)
 config = {
@@ -103,7 +106,7 @@ def find_info_count_B(myconfig):
         C_Id=p_data[0]['id'], start_time=start_time, end_time=end_time)
 
     count_B = db_qbbb.execute_query(sql_B)[0][0]
-    sql_insert_a = "insert into record_log_industry (industry,rocord_time,TS_A_num,QBB_B_num) values (%s,%s,%d,%d)"
+    sql_insert_a = "insert into record_log_industry (industry,record_time,TS_A_num,QBB_B_num) values (%s,%s,%d,%d)"
 
     db_a.execute(sql_insert_a, (industry_name, end_time, count_A, count_B))
 
@@ -143,15 +146,20 @@ def get_industry_keywords():
                     for i, d_a in enumerate(da):
                         if d_a and i == 0:
                             new_d['keywords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
+                            # new_d['keywords'] += re.sub('、', '|', d_a) + '|'
                         if d_a and i == 2:
                             new_d['excludewords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
+                            # new_d['excludewords'] += re.sub('、', '|', d_a) + '|'
                         if d_a and i == 1:
                             new_d['simultaneouswords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
+                            # new_d['simultaneouswords'] += re.sub('、', '|', d_a) + '|'
 
             if i == 1:
                 new_d['customer'] = (d[1].encode('latin1').decode('gbk'))
+                # new_d['customer'] = (d[1])
             else:
                 new_d['industry_name'] = (d[2].encode('latin1').decode('gbk'))
+                # new_d['industry_name'] = (d[2])
         new_d['keywords'] = new_d['keywords'][:-1]
         new_d['excludewords'] = new_d['excludewords'][:-1]
         new_d['simultaneouswords'] = new_d['simultaneouswords'][:-1]
@@ -298,23 +306,18 @@ def post_data(data_list, industry_name):
 
 def keywords_of_b(info, data):
     """
-     匹配主题的关键词
+    匹配主题的关键词
     :param info:项目信息或者子分类信息  也就是一些关键词
     :param data:爬取下来的数据
     :return:
     """
 
     def contain_keywords(keywords, str):
-        return any(k in str for k in keywords.split("|"))
+        return any(k in str for k in keywords.split("、"))
 
     # 处理数据
     new_data = []
     for d in data:
-        id = str(uuid.uuid4())
-        #生成数据的ID
-        d['id'] = id
-        #生成数据的SN
-        d['SN'] = ''.join(id.split('-'))
 
         # 关键词进行匹配规则
         if info['keywords'] != '':
@@ -322,18 +325,18 @@ def keywords_of_b(info, data):
                 if contain_keywords(info['keywords'], d['标题'] + d['转发内容'] + d['描述']):
                     new_data.append(d)
             elif info['simultaneouswords'] != '' and info['excludewords'] == '':
-                if contain_keywords(info['keywords'] + info['simultaneouswords'], d['标题'] + d['转发内容'] + d['描述']):
+                if contain_keywords(info['keywords'] + "、" + info['simultaneouswords'], d['标题'] + d['转发内容'] + d['描述']):
                     new_data.append(d)
             elif info['simultaneouswords'] != '' and info['excludewords'] != '':
-                if contain_keywords(info['keywords'] + info['simultaneouswords'], d['标题'] + d['转发内容'] + d['描述']):
+                if contain_keywords(info['keywords'] + "、" + info['simultaneouswords'], d['标题'] + d['转发内容'] + d['描述']):
                     if contain_keywords(info['excludewords'], d['标题'] + d['转发内容'] + d['描述']) != True:
                         new_data.append(d)
-    #根据域名进行匹配
+    # 根据域名进行匹配
     fi = domain.ExtractLevelDomain()
     for item in new_data:
         # 处理每一条数据
         # 生成时间
-        item['create_date'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        item['create_date'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         for i in range(1, 3):
             flag = 0
             # 获取XX子级域名
@@ -350,7 +353,8 @@ def keywords_of_b(info, data):
             # 插入更新TS_MediumURL数据
             domain_level = fi.parse_url_level(item['链接'], 1)
             url_data = (domain_level, "全网", domain_level, 8, 1)
-            sql_MediumSource_Type = "insert into TS_MediumURL (source_name,source_type,domain,medium_type,stat) values(%s,%s,%s,%d,%d)"
+            sql_MediumSource_Type = "insert into TS_MediumURL (source_name,source_type,domain,medium_type,stat)" \
+                                    " values(%s,%s,%s,%d,%d)"
             db_qbbb.execute(sql_MediumSource_Type, url_data)
             SQL_SELECT = "SELECT top 1 * FROM TS_MediumURL ORDER BY id DESC"
             URL_DATA = db_qbbb.execute_query(SQL_SELECT)[0]
@@ -373,6 +377,7 @@ def keywords_of_b(info, data):
         # 其他均为转发
         else:
             item['sort'] = 0
+    print("完毕")
     return new_data
 
 
@@ -383,43 +388,135 @@ def alone_keyword_(info, data):
     :param data:
     :return:
     """
+    #
+    print("单独进行分词")
 
     def contain_keywords(keywords, str):
-        return any(k in str for k in keywords.split("|"))
+        return any(k in str for k in keywords.split("、"))
 
     new_data = []
+    #
     for d in data:
-        print(d)
         if info['keywords'] != '':
             if info['excludewords'] == '' and info['simultaneouswords'] == '':
-                if contain_keywords(info['keywords'], d['Title'] + d['Body'] + d['Summary']):
+                if contain_keywords(info['keywords'], d['标题'] + d['转发内容'] + d['描述']):
                     new_data.append(d)
             elif info['simultaneouswords'] != '' and info['excludewords'] == '':
-                if contain_keywords(info['keywords'] + info['simultaneouswords'],
-                                    d['new_data'] + d['Body'] + d['Summary']):
+                if contain_keywords(info['keywords'] + "、" + info['simultaneouswords'], d['标题'] + d['转发内容'] + d['描述']):
                     new_data.append(d)
             elif info['simultaneouswords'] != '' and info['excludewords'] != '':
-                if contain_keywords(info['keywords'] + info['simultaneouswords'],
-                                    d['new_data'] + d['Body'] + d['Summary']):
-                    if contain_keywords(info['excludewords'], d['new_data'] + d['Body'] + d['Summary']) != True:
+                if contain_keywords(info['keywords'] + "、" + info['simultaneouswords'], d['标题'] + d['转发内容'] + d['描述']):
+                    if contain_keywords(info['excludewords'], d['标题'] + d['转发内容'] + d['描述']) != True:
                         new_data.append(d)
     return new_data
 
 
+def insert_base_of_b(info, data_list, industry_name):
+    """
+    处理数据插入到QBB_B.dbo.TS_DataMerge_Base
+    :param info:当前主题的一些信息（XXX词）
+    :param data_list:传入的数据
+    :return:
+    """
+
+    baseData = keywords_of_b(info, data_list)
+    # print(info)
+    new_base_data = []
+    iisql = {
+        'SN': '',
+        'C_Id': '',
+        'S_Id': '',
+        'URL': '',
+        'Title': '',
+        'Summary': '',
+        'Body': '',
+        'PublishDate_Std': '',
+        'source_type': '',
+        'group_SN': '',
+        'like_SN': '',
+        'is_original': '',
+        'location': '',
+        'Author_Name': '',
+    }
+    for item in baseData:
+        item_dict = dict()
+        item_dict.setdefault('SN', item['SN'])
+        item_dict.setdefault('C_Id', item['C_Id'])
+        item_dict.setdefault('S_Id', item['S_Id'])
+        item_dict.setdefault('URL', item['链接'])
+        item_dict.setdefault('Title', item['标题'])
+        item_dict.setdefault('Summary', item['描述'])
+        item_dict.setdefault('Body', item['转发内容'])
+        item_dict.setdefault('PublishDate_Std', item['时间'])
+        item_dict.setdefault('source_type', item['source_type'])
+        item_dict.setdefault('group_SN', item['SN'])
+        item_dict.setdefault('like_SN', item['SN'])
+        item_dict.setdefault('is_original', item['sort'])
+        item_dict.setdefault('location', item['area'])
+        item_dict.setdefault('Author_Name', item['发布人'])
+        item_dict.setdefault('create_date', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        new_base_data.append(tuple(item_dict.values()))
+
+        # sql_of_base = 'inser into TS_DataMerge_Base ({}) values (%s,%s,%s,%s,%s,%s,%s,%s,%d,%s,%s,%d,%s)'. \
+        #     format(",".join(item_dict.keys()))
+        # update on 2021-06-04 16:40:29
+        table_name = tables[industry_name].split(".")[-1]
+        post_data = {
+            "id": item['id'],
+            "cid": item['C_Id'],
+            "sn": item['SN'],
+            "emotionStatus": item['positive_prob_number'],
+            "tableName": table_name
+        }
+        # print(post_data)
+        post_mq.send_to_queue('task.msg.emotion_2.1', str(post_data))
+
+        post_mq.send_to_queue('task.msg.tag_2.1', str({"sN": item['SN'], "cId": item['C_Id']}))
+
+        # 数据插入B库
+    sql_of_base = 'insert into TS_DataMerge_Base ({}) values ({})'. \
+        format(",".join(iisql.keys()), ",".join(['%s'] * len(iisql.keys())))
+
+    db_qbbb.execute_many(sql_of_base, new_base_data)
+    print("插入B库数据量为", len(new_base_data))
+    # 第一级过滤 应当插入
+    first_datamerge_data = []
+    if len(baseData) != 0:
+        sql_of_Tid = "select T_Id from QBB_A.dbo.TS_Keywords where C_Id=%s" % baseData[0]['C_Id']
+        T_id = db_qbba.execute_query(sql_of_Tid)[0][0]
+        for item in baseData:
+            """
+            C_Id:客户id项目id
+            T_Id:Thream id 监测主题id
+            """
+
+            first_datamerge_data.append((item['C_Id'], item['SN'],T_id, 0, 0, 0))
+        sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map (c_id,SN,ms_id," \
+                                             "ms_node_id,classMethod,not_first_sort) " \
+                                             "values (%d,%s,%s,%s,%s,%s)"
+
+        db_qbbb.execute_many(sql_DataMerger_Extend_MSubject_Map, first_datamerge_data)
+    return baseData
+
+
 # 主题 theam subject id
-def classification(T_id, data, info):
+
+
+def classification(T_id, data, info_y):
     """
     分词
     :param T_id: 监测主题id
     :data:爬取的数据
     :return:
     """
+    print(info_y)
+    # 插入到B库同时获取插入后的数据
+    sub_data = insert_base_of_b(info_y, data, info_y['industry_name'])
 
-
-
-
+    # sub_data = insert_base_of_b(info_y, data, info_y['industry_name'])
     # 根据核心词、同现词、排除词进行数据过滤
     def insert_data_func(item):
+
         # print(item)
         # if item['parent_id'] != T_id:
         sql = "select A.id,C_Id,parent_id,subject_id,classId,ruleContent,homonymWords,exclusionWords from " \
@@ -427,64 +524,71 @@ def classification(T_id, data, info):
               "on A.id=B.classId where A.subject_id={0} and A.id!={0} and A.id={1}".format(T_id, item['parent_id'])
         # 查询父级数据进行数据插入
         item_parent = db_qbbb.execute_query(sql)
-        if len(item_parent) > 0:
+        if len(item_parent) != 0:
             # 有两个分类以上的插入数据规则
             # 插入多分类数据
+            print("有父级")
             info = dict()
-            info['keywords'] = item['ruleContent'].encode('latin-1').decode('gbk')
-            info['simultaneouswords'] = item['homonymWords'].encode('latin-1').decode('gbk')
-            info['excludewords'] = item['exclusionWords'].encode('latin-1').decode('gbk')
-            # 数据过滤
+            info['keywords'] = item['ruleContent']
+            info['simultaneouswords'] = item['homonymWords']
+            info['excludewords'] = item['exclusionWords']
+            # 数据过滤i_data
+
             ss_data = alone_keyword_(info, sub_data)
+            # ss_data = alone_keyword_(info, data)
             # 插入数据
             # DataMerger_Extend_MSubject_Map
             insert_data = []
+            print("之后的", len(ss_data))
+            # print(ss_data[0])
             for d in ss_data:
-                insert_data.append(d['id'], item['C_Id'], d['SN'], item['subject_id'], item['A_id'], 0, 1)
+                insert_data.append((item['C_Id'], d['SN'], item['subject_id'], item['A_id'], 0, 1))
+                # print(d['时间'])
                 post_data = {
-                    "cid":item['C_Id'],
-                    "sn":d['SN'],
-                    "msId":item['subject_id'],
-                    "title":d['title'],
-                    "msNodeId":item['A_id'],
-                    "publishDate":d['PublishDate_Std'],
+                    "cid": item['C_Id'],
+                    "sn": d['SN'],
+                    "msId": item['subject_id'],
+                    "title": d['标题'],
+                    "msNodeId": item['A_id'],
+                    "publishDate": d['时间'],
                 }
-                post_mq("task.msg.similar_2.1",str(post_data))
-            sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map (id,ci_d,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
-                                                 "values (%s,%d,%s,%s,%s,%s,%s)"
+                post_mq.send_to_queue("task.msg.similar_2.1", str(post_data))
+            sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map (c_id,SN,ms_id," \
+                                                 "ms_node_id,classMethod,not_first_sort) " \
+                                                 "values (%d,%s,%s,%s,%s,%s)"
             db_qbbb.execute_many(sql_DataMerger_Extend_MSubject_Map, insert_data)
-            print("分类")
+            # print("分类——", item['A_id'])
             i_d_p = dict(zip(listdict, list(item_parent[0])))
 
             # update on 2021-06-04 16:44:11
-
             return insert_data_func(i_d_p)
         else:
             # 单个分类的插入规则
             info = dict()
-            info['keywords'] = item['ruleContent'].encode('latin-1').decode('gbk')
-            info['simultaneouswords'] = item['homonymWords'].encode('latin-1').decode('gbk')
-            info['excludewords'] = item['exclusionWords'].encode('latin-1').decode('gbk')
+            info['keywords'] = item['ruleContent']
+            info['simultaneouswords'] = item['homonymWords']
+            info['excludewords'] = item['exclusionWords']
             # 数据过滤
             ss_data = keywords_of_b(info, sub_data)
             # 插入数据
             # DataMerger_Extend_MSubject_Map
-            insert_data = []
+            insert_b_datas = []
             # 只匹配了一个分类
             for d in ss_data:
-                insert_data.append(d['id'], item['C_Id'], d['SN'], item['subject_id'], item['A_id'], 0, 0)
-            sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map (id,ci_d,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
-                                                 "values (%s,%d,%s,%s,%s,%s,%s)"
-            print("单个分类")
-            db_qbbb.execute_many(sql_DataMerger_Extend_MSubject_Map, insert_data)
+                insert_b_datas.append(( item['C_Id'], d['SN'], item['subject_id'], item['A_id'], 0, 0))
+            sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map " \
+                                                 "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
+                                                 "values (%d,%s,%s,%s,%s,%s)"
+            print("单个分类", item['A_id'])
+            db_qbbb.execute_many(sql_DataMerger_Extend_MSubject_Map, insert_b_datas)
 
     # 获取当前监测主题匹配后的数据
-    sub_data = insert_base_of_b(info, data, info['industry_name'])
+
     """
         A.id:
             查询为当前监测主题的ID
             结果为(子)分类的id
-        C_id:(项目ID、客户ID)
+        C_Id:(项目ID、客户ID)
         parent_id:父类id
         subject_id:主题的Id===T_Id
         classId:和A.id一样 分类的id
@@ -500,19 +604,21 @@ def classification(T_id, data, info):
 
     # 获得当前监测主题下的所有子分类
     sub_datas = db_qbbb.execute_query(sql)
-    listdict = ['A_id', 'C_Id', 'parent_id', 'subject_id', 'classId', 'ruleContent', 'homonymWords',
+    listdict = ['A_id', 'C_Id', 'parent_id', 'subject_id',
+                'classId', 'ruleContent', 'homonymWords',
                 'exclusionWords']
     # 对子每一个分类进行过滤
     for item in sub_datas:
-        print(item)
+        print("分类")
         i_data = dict(zip(listdict, list(item)))
+        i_data['ruleContent'] = i_data['ruleContent'].encode('latin1').decode('gbk')
+        i_data['homonymWords'] = i_data['homonymWords'].encode('latin1').decode('gbk')
+        i_data['exclusionWords'] = i_data['exclusionWords'].encode('latin1').decode('gbk')
         insert_data_func(i_data)
 
-def testfenlei(T_id='1400323503130955778'):
+
+def testfenlei(T_id='1387703706849402881'):
     sql = "select A.id,C_Id,parent_id,subject_id,classId,ruleContent,homonymWords,exclusionWords from " \
-          "QBB_B.dbo.TS_MonitorSubject as A inner join QBB_B.dbo.TS_MonitorSubject_rules as B " \
-          "on A.id=B.classId where A.subject_id={0} and A.id!={0} order by A.id asc ".format(T_id)
-    sql_sub = "select parent_id,A.id,C_Id,subject_id,classId,ruleContent,homonymWords,exclusionWords from " \
           "QBB_B.dbo.TS_MonitorSubject as A inner join QBB_B.dbo.TS_MonitorSubject_rules as B " \
           "on A.id=B.classId where A.subject_id={0} and A.id!={0} order by A.id asc ".format(T_id)
     sub_datas = db_qbbb.execute_query(sql)
@@ -540,8 +646,10 @@ def testfenlei(T_id='1400323503130955778'):
     for item in sub_datas:
         i_data = dict(zip(listdict, list(item)))
         insert_data(i_data)
-        print("****"*20)
+        print("****" * 20)
         # print(item)
+
+
 def upload_many_data(data_list, industry_name, datacenter_id, info):
     """
     多数据插入
@@ -568,6 +676,12 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         worker = IdWorker(datacenter_id, work_id + 1, 0)
         id = worker.get_id()
         # print(datacenter_id,work_id+1,id)
+        sn_id = str(uuid.uuid4())
+        # 生成数据的ID
+        # data['sn-id'] = sn_id
+        # 生成数据的SN
+        data['id']=id
+        data['SN'] = ''.join(sn_id.split('-'))
 
         post_data = {
             "id": id,
@@ -613,9 +727,12 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         post_mq.send_to_queue("task.msg.event_2.1", str({"industryNewsId": id, "tableName": table_name.split(".")[-1]}))
 
     # sql_ts_a_second_data = "insert into TS_Second_Data (id,industry_id,ic_id,keywords_id,url) values (%d,%d,%s,%s,%s)"
-    sql_ts_a = "insert into TS_A." + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s)"
+    sql_ts_a = "insert into TS_A." + table_name + " (id,industry_id,title,summary,content,url,author," \
+                                                  "publish_time,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s)"
     #     schemas
-    sql_qbb_a = "insert into QBB_A." + table_name + "(id,industry_id,title,summary,content,url,author,publish_time,is_original,location,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+    sql_qbb_a = "insert into QBB_A." + table_name + "(id,industry_id,title,summary,content,url,author,publish_time," \
+                                                    "is_original,location,emotion_status) " \
+                                                    "values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
 
     sql_qbb_a_2 = "insert into QBB_A." + table_name + "({}) values ({})".format(",".join(data.keys()),
                                                                                 ",".join(['%s']) * len(data.keys()))
@@ -623,48 +740,40 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     #
     # 插入A库
     db_a.execute_many(sql_ts_a, tuple_data_list_ts_a)
-    # 二级数据表
-    # print(tuple_data_list_ts_a_second_data)
-    # db_a.execute_many(sql_ts_a_second_data, tuple_data_list_ts_a_second_data)
     # 插入qbba库
-    # print(tuple_data_list_qbb_a)
-    # db_qbba.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
+    db_qbba.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
 
-
-    for d in tuple_data_list_qbb_a:
-        db_qbba.execute(sql_qbb_a, d)
+    # for d in tuple_data_list_qbb_a:
+    #     db_qbba.execute(sql_qbb_a, d)
 
     # 内网a库
-    db_net_a.execute_many(sql_ts_a, tuple_data_list_ts_a)
+    # db_net_a.execute_many(sql_ts_a, tuple_data_list_ts_a)
     # db_net_qbba.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
 
     # update on 2021-06-04 13:32:01
-    # 插入到TS_DataMerge_Base
-
     # 查询主题多个id
     """
         info['id']:Customer ID
         info['xxxword']:所有检测主题XXX词
     
     """
-
     sql_of_Tid = "select T_Id,Word,SimultaneousWord,ExcludeWord from QBB_A.dbo.TS_Keywords where C_Id=%s group by" \
                  " T_Id,Word,SimultaneousWord,ExcludeWord" % info['id']
-    info_list=[]
+    info_list = []
 
-    #First check the topic ID based on the customer ID
+    # First check the topic ID based on the customer ID
     T_id = db_qbba.execute_query(sql_of_Tid)
     for tt in T_id:
-        info_t={
-            'id':info['id'],
-            'industry_name':info['industry_name'],
-            'keywords':tt[1],
-            'excludewords':tt[-1],
-            'simultaneouswords':tt[-2],
-            'T_Id':tt[0],#Monitoring subject ID
+        info_t = {
+            'id': info['id'],
+            'industry_name': info['industry_name'],
+            'keywords': tt[1].encode('latin1').decode('gbk'),
+            'excludewords': tt[-1].encode('latin1').decode('gbk'),
+            'simultaneouswords': tt[-2].encode('latin1').decode('gbk'),
+            'T_Id': tt[0],  # Monitoring subject ID
         }
         info_list.append(info_t)
-    #处理每个监测主题的数据
+    # 处理每个监测主题的数据
     for tid_item in info_list:
         classification(tid_item['T_Id'], data_list, tid_item)
 
@@ -683,83 +792,10 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     # requests.get(url=url, proxies=proxies, params=data_2_1)
     # requests.get(url=url, proxies=proxies, params=data_2)
     # print("数据上传成功")
+
+
     myredis.close()
-
-
-def insert_base_of_b(info, data_list,industry_name):
-    """
-    处理数据插入到QBB_B.dbo.TS_DataMerge_Base
-    :param info:当前主题的一些信息（XXX词）
-    :param data_list:传入的数据
-    :return:
-    """
-    baseData = keywords_of_b(info, data_list)
-    new_base_data = []
-    iisql={
-        'SN':'',
-        'C_Id':'',
-        'S_Id':'',
-        'URL':'',
-        'Title':'',
-        'Summary':'',
-        'Body':'',
-        'PublishDate_Std':'',
-        'source_type':'',
-        'group_SN':'',
-        'like_SN':'',
-        'is_original':'',
-        'location':''
-    }
-    for item in baseData:
-        item_dict = dict()
-        item_dict.setdefault('SN', item['SN'])
-        item_dict.setdefault('C_Id', item['C_ID'])
-        item_dict.setdefault('S_Id', item['S_Id'])
-        item_dict.setdefault('URL', item['链接'])
-        item_dict.setdefault('Title', item['标题'])
-        item_dict.setdefault('Summary', item['描述'])
-        item_dict.setdefault('Body', item['转发内容'])
-        item_dict.setdefault('PublishDate_Std', item['时间'])
-        item_dict.setdefault('source_type', item['source_type'])
-        item_dict.setdefault('group_SN', item['SN'])
-        item_dict.setdefault('like_SN', item['SN'])
-        item_dict.setdefault('is_original', item['sort'])
-        item_dict.setdefault('location', item['area'])
-        new_base_data.append(tuple(item_dict.values()))
-
-
-        # sql_of_base = 'inser into TS_DataMerge_Base ({}) values (%s,%s,%s,%s,%s,%s,%s,%s,%d,%s,%s,%d,%s)'. \
-        #     format(",".join(item_dict.keys()))
-        # update on 2021-06-04 16:40:29
-        table_name = tables[industry_name].split(".")[-1]
-        post_data = {
-            "id": item['id'],
-            "cid": item['C_ID'],
-            "sn": item['SN'],
-            "emotionStatus": item['positive_prob_number'],
-            "tableName": table_name
-        }
-        print(post_data)
-        post_mq.send_to_queue('task.msg.emotion_2.1', str(post_data))
-
-        post_mq.send_to_queue('task.msg.tag_2.1',str({"sN":item['SN'],"cId":item['C_ID']}))
-
-        # 数据插入B库
-    sql_of_base = 'insert into TS_DataMerge_Base ({}) values ({})'. \
-        format(",".join(iisql.keys()), ",".join(['%s'] * len(iisql.keys())))
-    db_qbbb.execute_many(sql_of_base, new_base_data)
-    # 第一级过滤 应当插入
-    first_datamerge_data = []
-    if len(baseData)!=0:
-        sql_of_Tid = "select T_Id from QBB_A.dbo.TS_Keywords where C_Id=%s" % baseData[0]['C_ID']
-        T_id = db_qbba.execute_query(sql_of_Tid)[0]
-        for item in baseData:
-            first_datamerge_data.append((item['id'], info['id'], item['SN'], T_id, 0, 0, 0))
-        sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map (id,c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
-                                             "values (%s,%d,%s,%s,%s,%s,%s)"
-
-        db_qbbb.execute_many(sql_DataMerger_Extend_MSubject_Map, first_datamerge_data)
-    return baseData
+    post_mq.close_mq()
 
 
 def testsql():
@@ -767,11 +803,14 @@ def testsql():
      测试sql语句
 
     """
-    sql_ts_a = "insert into '%s' (id,industry_id,title,summary,content,url,author,publish_time) values (''%s'','%s','%s','%s','%s','%s','%s','%s')" % (
+    sql_ts_a = "insert into '%s' (id,industry_id,title,summary,content,url,author,publish_time)" \
+               " values (''%s'','%s','%s','%s','%s','%s','%s','%s')" % (
         'hike', 'hike', 'hike', 'hike', 'hike', 'hike', 'hike', 'hike', 'hike',)
     print(sql_ts_a)
     # 插入A库
-    # sql_record = "insert into record_log_table (industry,crawl_time,start_time,end_time,yqt_num,crawl_num,upload_num,customer) values ('%s','%s','%s','%s','%s','%s','%s','%s')" % ('1', '2021-4-26 00:00:00', '2021-4-26 00:00:00', '2021-4-26 00:00:00', '1', '1', '1', '1')
+    # sql_record = "insert into record_log_table (industry,crawl_time,start_time,end_time,yqt_num,crawl_num,upload_num,
+    # customer) values ('%s','%s','%s','%s','%s','%s','%s','%s')" % ('1', '2021-4-26 00:00:00', '2021-4-26 00:00:00',
+    # '2021-4-26 00:00:00', '1', '1', '1', '1')
     sql_record = "insert into record_log_table values ('%s','%s','%s','%s','%s','%s','%s','%s')" % (
         '1', '2021-4-26 00:00:00', '2021-4-26 00:00:00', '2021-4-26 00:00:00', '1', '1', '1', '1')
     db_a.execute(sql_record)
@@ -779,7 +818,11 @@ def testsql():
 
 def get_month_data(time1, time2, industry_name):
     """
-    # 将所有行业的数据加载到内存中
+
+    :param time1:开始时间
+    :param time2:结束时间
+    :param industry_name:行业名字
+    :return:
     """
     myredis = my_redis()
 
@@ -792,15 +835,26 @@ def get_month_data(time1, time2, industry_name):
     #         myredis.redis.sadd(d[0], d[1])
     sql = "select industry_id,url from %s where publish_time between '%s' and '%s'" % (
         tables[industry_name], time1, time2)
-    # print(sql)
     datas = db_qbba.execute_query(sql)
-    for d in datas:
+    for d in tqdm(iterable=datas, desc="加载<%s>数据数据" % industry_name, unit='条'):
         myredis.redis.sadd(d[0], d[1])
+
+    sql = "select * from TS_MediumURl"
+    data = db_qbbb.execute_query(sql)
+    for d in tqdm(iterable=data, desc="加载url数据", unit='条'):
+        myredis.redis.hset("url", d[3], str(d))
+
     myredis.close()
 
 
 # 根据url进行二次滤重
 def filter_by_url(datalist, industry_name):
+    """
+
+    :param datalist: 传入的数据
+    :param industry_name:行业名字
+    :return:
+    """
     sql_industry_id = "select id from TS_Industry where name='" + industry_name + "'"
     industry_id = db_b.execute_query(sql_industry_id)[0][0]
     new_data_list = []
@@ -854,7 +908,8 @@ def customer_log():
         date_now = datetime.datetime.now().strftime('%Y-%m-%d 00:00:00')
         date_yesterday = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d 00:00:00")
 
-        sql_qbbb = "select count(*) from TS_DataMerge_Base where C_Id='{0}' and PublishDate_Std between '{2}' and '{1}'".format(
+        sql_qbbb = "select count(*) from TS_DataMerge_Base where C_Id='{0}' and PublishDate_Std " \
+                   "between '{2}' and '{1}'".format(
             customer['id'], date_now, date_yesterday)
         # qbbb 库查询的数量
         today_customer_num = db_qbbb.execute_query(sql_qbbb)[0][0]
@@ -865,12 +920,6 @@ def customer_log():
 
 
 if __name__ == '__main__':
-    # while 1:
-    # track_data_work()
-    # multi_thread()
-
-    # single_thread()
-
     # for d in get_industry_keywords():
     #     print(d)
     # track_data_task()
@@ -882,7 +931,8 @@ if __name__ == '__main__':
     # myredis=my_redis()
     # sql="select * from TS_MediumURl"
     # data=db_qbbb.execute_query(sql)
-    # for d in data:
+    #
+    # for d in tqdm(data):
     #     myredis.redis.hset("url",d[3],str(d))
     # print(myredis.redis.hexists("url","baidu.com"))
     # result=eval(myredis.redis.hget("url","baidu.com"))
@@ -892,17 +942,7 @@ if __name__ == '__main__':
     testfenlei()
     # print(find_info_count_B('2021-05-19 13:10:00','2021-05-19 13:10:01',1369902503931461634))
     # get_industry_keywords()
-    # sql_QBBB = "select * from TS_Customers where IsEnable=1"
 
-    # db_qbbb.execute_query(sql_QBBB)
-    # db_a.execute_query("select * from crawler_word")
-    # for data in get_track_datas():
-    #     print(data)
-    # track_data_task()
-
-    # for data in second_data_url_sql():
-    #     print(data)
-    #     print(data[5])
     # for d in db_net_a.execute_query("select * from TS_test"):
     #     print(d)
     # sql_of_Tid = "select T_Id from QBB_A.dbo.TS_Keywords where C_Id=%s" % "1369902503931461634"
