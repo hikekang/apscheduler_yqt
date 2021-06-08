@@ -337,7 +337,7 @@ def keywords_of_b(info, data):
         # 处理每一条数据
         # 生成时间
         item['create_date'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        for i in range(1, 3):
+        for i in range(3, 0,-1):
             flag = 0
             # 获取XX子级域名
             domain_level = fi.parse_url_level(item['链接'], i)
