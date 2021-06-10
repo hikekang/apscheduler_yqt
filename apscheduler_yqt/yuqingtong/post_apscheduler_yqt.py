@@ -796,9 +796,9 @@ if __name__ == '__main__':
     # work_it_one_day()
     # print('开始运行')
 
-    # p1 = Process(target=java_task, name='java程序')
+    p1 = Process(target=java_task, name='java程序')
     # p2 = Process(target=apscheduler,kwargs={'myconfig':myconfig},name='定时抓取')
-    # p1.start()
+    p1.start()
     # p2.start()
     # print("运行结束")
     work_it_hour(myconfig)

@@ -311,10 +311,6 @@ def keywords_of_b(info, data):
     :param data:爬取下来的数据
     :return:
     """
-
-    def contain_keywords(keywords, str):
-        return any(k in str for k in keywords.split("、"))
-
     # 处理数据
     new_data = []
     for d in data:
@@ -386,7 +382,8 @@ def keywords_of_b(info, data):
     print("完毕")
     return new_data
 
-
+def contain_keywords(keywords, str):
+    return any(k in str for k in keywords.split("、"))
 def alone_keyword_(info, data):
     """
     二级以上匹配
@@ -396,10 +393,6 @@ def alone_keyword_(info, data):
     """
     #
     print("单独进行分词")
-
-    def contain_keywords(keywords, str):
-        return any(k in str for k in keywords.split("、"))
-
     new_data = []
     #
     for d in data:
@@ -439,6 +432,50 @@ def alone_keyword_(info, data):
                         # new_data.append(d)
     # return new_data
     return data
+
+def match_alone_keyword_(info, d):
+    """
+
+    :param info:关键词信息
+    :param d:单条数据
+    :return:
+    """
+    #
+    print("单独进行匹配")
+
+
+    match_data=d['标题'] + d['转发内容'] + d['描述']
+    if info['keywords'] != '':
+        if info['excludewords'] == '' and info['simultaneouswords'] == '':
+            if contain_keywords(info['keywords'],match_data ):
+                d['sort_num'] += 1
+                if info['parent_id'] not in d['parent_id']:
+                    d['parent_id'].append(info['parent_id'])
+                    d['class_id'].append(info['class_id'])
+
+        elif info['simultaneouswords'] != '' and info['excludewords'] == '':
+            if contain_keywords(info['keywords'],match_data):
+                if contain_keywords(info['simultaneouswords'], match_data):
+                    d['sort_num'] += 1
+                    if info['parent_id'] not in d['parent_id']:
+                        d['parent_id'].append(info['parent_id'])
+                        d['class_id'].append(info['class_id'])
+        elif info['simultaneouswords'] == '' and info['excludewords'] != '':
+            if contain_keywords(info['keywords'], match_data):
+                if contain_keywords(info['excludewords'], match_data) != True:
+                    d['sort_num'] += 1
+                    if info['parent_id'] not in d['parent_id']:
+                        d['parent_id'].append(info['parent_id'])
+                        d['class_id'].append(info['class_id'])
+        elif info['simultaneouswords'] != '' and info['excludewords'] != '':
+            if contain_keywords(info['keywords'], match_data):
+                if contain_keywords(info['simultaneouswords'], match_data):
+                    if contain_keywords(info['excludewords'], match_data) != True:
+                        d['sort_num'] += 1
+                        if info['parent_id'] not in d['parent_id']:
+                            d['parent_id'].append(info['parent_id'])
+                            d['class_id'].append(info['class_id'])
+    return d
 
 
 def insert_base_of_b(info, data_list, industry_name):
@@ -632,7 +669,14 @@ def classification(T_id, sub_data, info_y):
                 "msNodeld": i_data['subject_id'],
                 "publishDate": data['时间']
             }
-            post_mq.send_to_queue('task.msg.similar_2.1', str(post_data))
+            proxies = {'http': None, 'https': None}
+            similar_data={
+                'queues': 'task.msg.similar_2.1',
+                'message': str(post_data)
+            }
+            url = 'http://localhost:8090/jms/send'
+            requests.get(url=url, proxies=proxies, params=similar_data)
+            # post_mq.send_to_queue('task.msg.similar_2.1', str(post_data))
             # ms_node_id为0 ，not_first_sort为0
             # insert_b_data = ((i_data['C_Id'], data['SN'], i_data['subject_id'], 0, 0, 0))
             insert_b_data = ((i_data['C_Id'], data['SN'],T_id, 0, 0, 0))
@@ -650,7 +694,14 @@ def classification(T_id, sub_data, info_y):
                 "msNodeld":data['parent_id'][0],#对应分类的id多分类时只发送⼀次即可，分类ID取not_first_sort=0时的数据
                 "publishDate":data['时间']
             }
-            post_mq.send_to_queue('task.msg.similar_2.1', str(post_data))
+            proxies = {'http': None, 'https': None}
+            similar_data = {
+                'queues': 'task.msg.similar_2.1',
+                'message': str(post_data)
+            }
+            url = 'http://localhost:8090/jms/send'
+            requests.get(url=url, proxies=proxies, params=similar_data)
+            # post_mq.send_to_queue('task.msg.similar_2.1', str(post_data))
             # 进行了一次匹配
             if len(data['parent_id']) == 1:
                 # 单个分类
@@ -734,7 +785,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     tuple_data_list_ts_a = []
     tuple_data_list_ts_a_second_data = []
     tuple_data_list_qbb_a = []
-    post_data_list = []
+    post_data_list_event_2_1 = []
 
     for work_id, data in enumerate(data_list):
         # 生成雪花id
@@ -753,11 +804,8 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         data['id'] = id
         # data['SN'] = ''.join(sn_id.split('-'))
 
-        post_data = {
-            "id": id,
-            "industryId": industry_id  # 行业id
-        }
-        post_data_list.append(post_data)
+        post_data = {"industryNewsId": id, "tableName": table_name.split(".")[-1]}
+        post_data_list_event_2_1.append(post_data)
         # 更新redis
         myredis.redis.sadd(industry_id, data['链接'])
         tuple_data_ts_a = (
@@ -794,7 +842,29 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         # tuple_data_list_ts_a_second_data.append(tuple_data_ts_a_second_data)
 
         # 发送mq updata on 2021-06-04 16:26:21
-        post_mq.send_to_queue("task.msg.event_2.1", str({"industryNewsId": id, "tableName": table_name.split(".")[-1]}))
+        # data_2_1 = {
+        #     'queues': 'reptile.stay.process_2.1',
+        #     'message': str(post_data_list)
+        # }
+        # data_2 = {
+        #     'queues': 'reptile.stay.process',
+        #     'message': str(post_data_list)
+        # }
+        #
+        # proxies = {'http': None, 'https': None}
+        # url = 'http://localhost:8090/jms/send_array'
+        # requests.get(url=url, proxies=proxies, params=data_2)
+        # post_mq.send_to_queue("task.msg.event_2.1", str({"industryNewsId": id, "tableName": table_name.split(".")[-1]}))
+        # post_mq.content_send_close("task.msg.event_2.1", str({"industryNewsId": id, "tableName": table_name.split(".")[-1]}))
+        # print("发送task.msg.event_2.1完毕")
+    tag_data = {
+        'queues': 'task.msg.event_2.1',
+        'message': str(post_data_list_event_2_1)
+    }
+    url = 'http://localhost:8090/jms/send_array'
+    proxies = {'http': None, 'https': None}
+    requests.get(url=url, proxies=proxies, params=tag_data)
+
 
     # sql_ts_a_second_data = "insert into TS_Second_Data (id,industry_id,ic_id,keywords_id,url) values (%d,%d,%s,%s,%s)"
     sql_ts_a = "insert into TS_A." + table_name + " (id,industry_id,title,summary,content,url,author," \
@@ -829,7 +899,8 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     """
     sql_of_Tid = "select T_Id,Word,SimultaneousWord,ExcludeWord from QBB_A.dbo.TS_Keywords where C_Id=%s group by" \
                  " T_Id,Word,SimultaneousWord,ExcludeWord" % info['id']
-    info_list = []
+
+    thream_info_list = []
 
     # First check the topic ID based on the customer ID
     T_id = db_qbba.execute_query(sql_of_Tid)
@@ -842,12 +913,62 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
             'simultaneouswords': tt[-2].encode('latin1').decode('gbk') if tt[-2] else '',
             'T_Id': tt[0],  # Monitoring subject ID
         }
-        info_list.append(info_t)
+        thream_info_list.append(info_t)
+
+
+    fi = domain.ExtractLevelDomain()
+    print("数据量为:",len(data_list))
+    for index,d in enumerate(data_list):
+        d['sort_num']=0
+        d['parent_id']=[]
+        d['create_date'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        for i in range(3, 0, -1):
+            flag = 0
+            # 获取XX子级域名
+            domain_level = fi.parse_url_level(d['链接'], i)
+            if r.hexists("url", domain_level):
+                ret = eval(r.hget("url", domain_level))
+                d['S_Id'] = ret[-2]  # medium_type
+                # source_type:TS_MediumURL 的 id 自动增长
+                d['source_type'] = ret[0]
+                flag = 1
+                break
+        # 没有domain匹配成功插入
+        if flag == 0:
+            # 插入更新TS_MediumURL数据
+            domain_level = fi.parse_url_level(d['链接'], 1)
+            url_data = (domain_level, "全网", domain_level, 8, 1)
+            sql_MediumSource_Type = "insert into TS_MediumURL (source_name,source_type,domain,medium_type,stat)" \
+                                    " values(%s,%s,%s,%d,%d)"
+            db_qbbb.execute(sql_MediumSource_Type, url_data)
+            SQL_SELECT = "SELECT top 1 * FROM TS_MediumURL ORDER BY id DESC"
+            URL_DATA = db_qbbb.execute_query(SQL_SELECT)[0]
+            # 更新redis
+            r.hset("url", domain_level, str(URL_DATA))
+            # 更改数据
+            d['S_Id'] = 8
+            d['source_type'] = URL_DATA[0]
+
+        # 原创转发处理
+        # 当数据为微信/问答类时（S_Id=3/9）均为原创
+        if d['S_Id'] == 3 or d['S_Id'] == 9:
+            d['sort'] = 1
+        # 微博数据
+        elif d['S_Id'] == 7:
+            if d['sort'] == "原创":
+                d['sort'] = 1
+            elif d['sort'] == "转发":
+                d['sort'] = 0
+        # 其他均为转发
+        else:
+            d['sort'] = 0
+        print("第几个:",index)
+        mark_java_match_data(d,thream_info_list)
     # 处理每个监测主题的数据
 
-    for tid_item in info_list:
-        sub_data = insert_base_of_b(tid_item, data_list, tid_item['industry_name'])
-        classification(tid_item['T_Id'], sub_data, tid_item)
+    # for tid_item in thream_info_list:
+    #     sub_data = insert_base_of_b(tid_item, data_list, tid_item['industry_name'])
+    #     classification(tid_item['T_Id'], sub_data, tid_item)
 
     # # 消息队列
     # data_2_1 = {
@@ -858,7 +979,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     #     'queues': 'reptile.stay.process',
     #     'message': str(post_data_list)
     # }
-    #
+    # 
     # proxies = {'http': None, 'https': None}
     # url = 'http://localhost:8090/jms/send_array'
     # requests.get(url=url, proxies=proxies, params=data_2_1)
@@ -866,8 +987,260 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     # print("数据上传成功")
 
     myredis.close()
-    post_mq.close_mq()
+    # post_mq.close_mq()
 
+def match_inser_alone_data(data,info,T_id):
+    """
+
+    :param data:传入来的单条数据
+    :param info:
+    :param T_id:一级主题id
+    :return:
+    """
+
+    # 只匹配了一级主题
+    if data['sort_num'] == 0:
+        post_data = {
+            "cid": info['id'],
+            "sn": data['SN'],
+            # "msld": d['subject_id'],
+            "msld": T_id,
+            "title": data['标题'],
+            "msNodeld": data['subject_id'],
+            "publishDate": data['时间']
+        }
+        proxies = {'http': None, 'https': None}
+        similar_data = {
+            'queues': 'task.msg.similar_2.1',
+            'message': str(post_data)
+        }
+        url = 'http://localhost:8090/jms/send'
+        requests.get(url=url, proxies=proxies, params=similar_data)
+        # post_mq.send_to_queue('task.msg.similar_2.1', str(post_data))
+        # ms_node_id为0 ，not_first_sort为0
+        # insert_b_data = ((i_data['C_Id'], data['SN'], data['subject_id'], 0, 0, 0))
+        insert_b_data = ((data['C_Id'], data['SN'], T_id, 0, 0, 0))
+        sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map " \
+                                             "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
+                                             "values (%d,%s,%s,%s,%s,%s)"
+        db_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data)
+    # 进行了1次或多次匹配
+    elif data['sort_num'] >= 1:
+        post_data = {
+            "cid": info['id'],
+            "sn": data['SN'],
+            "msld": data['subject_id'],
+            "title": data['标题'],
+            "msNodeld": data['class_id'][0],  # 对应分类的id多分类时只发送⼀次即可，分类ID取not_first_sort=0时的数据
+            "publishDate": data['时间']
+        }
+        proxies = {'http': None, 'https': None}
+        similar_data = {
+            'queues': 'task.msg.similar_2.1',
+            'message': str(post_data)
+        }
+        url = 'http://localhost:8090/jms/send'
+        requests.get(url=url, proxies=proxies, params=similar_data)
+        # post_mq.send_to_queue('task.msg.similar_2.1', str(post_data))
+        # 进行了一次匹配
+        if len(data['class_id']) == 1:
+            # 单个分类
+            # ms_node_id为对应分类的ID ，not_first_sort为0
+            # insert_b_data = ((i_data['C_Id'], data['SN'], data['subject_id'], data['class_id'], 0, 0))
+            # insert_b_data = ((data['C_Id'], data['SN'], T_id, data['class_id'], 0, 1))
+            insert_b_data_parent = ((data['C_Id'], data['SN'], T_id, data['class_id'][0], 0, 0))
+            sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map " \
+                                                 "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
+                                                 "values (%d,%s,%s,%s,%s,%s)"
+            # db_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data)
+            db_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data_parent)
+        elif len(data['class_id']) > 1:
+            # insert_b_data = ((i_data['C_Id'], data['SN'], data['subject_id'], data['class_id'], 0, 1))
+            # insert_b_data = ((data['C_Id'], data['SN'], T_id, data['class_id'], 0, 1))
+            # sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map " \
+            #                                      "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
+            #                                      "values (%d,%s,%s,%s,%s,%s)"
+            # db_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data)
+            for index, p in enumerate(data['class_id']):
+                if (index == 0):
+                    # insert_b_data = ((i_data['C_Id'], data['SN'], data['subject_id'], p, 0, 0))
+                    insert_b_data = ((data['C_Id'], data['SN'], T_id, p, 0, 0))
+                    sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map " \
+                                                         "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
+                                                         "values (%d,%s,%s,%s,%s,%s)"
+                    db_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data)
+                else:
+                    # insert_b_data = ((i_data['C_Id'], data['SN'], data['subject_id'], p, 0, 1))
+                    insert_b_data = ((data['C_Id'], data['SN'], T_id, p, 0, 1))
+                    sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map " \
+                                                         "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
+                                                         "values (%d,%s,%s,%s,%s,%s)"
+                    db_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data)
+def mark_java_match_data(d,theam_list):
+    """
+
+    :param d:单条数据处理
+    :param theam_list:主题列表
+    :return:
+    """
+    iisql = {
+        'SN': '',
+        'C_Id': '',
+        'S_Id': '',
+        'URL': '',
+        'Title': '',
+        'Summary': '',
+        'Body': '',
+        'PublishDate_Std': '',
+        'source_type': '',
+        'group_SN': '',
+        'like_SN': '',
+        'is_original': '',
+        'location': '',
+        'Author_Name': '',
+        'create_date': ''
+    }
+    match_data = d['标题'] + d['转发内容'] + d['描述']
+    # 监测主题关键词进行匹配规则
+    for info in theam_list:
+        # 每个主题对应一个SN
+        sn_id = str(uuid.uuid4())
+        d['SN'] = ''.join(sn_id.split('-'))
+        d['class_id'] = []
+        d['sort_num']=0
+        d['subject_id']=info['T_Id']
+        item_dict = dict()
+        item_dict.setdefault('SN', d['SN'])
+        item_dict.setdefault('C_Id', d['C_Id'])
+        item_dict.setdefault('S_Id', d['S_Id'])
+        item_dict.setdefault('URL', d['链接'])
+        item_dict.setdefault('Title', d['标题'])
+        item_dict.setdefault('Summary', d['描述'])
+        item_dict.setdefault('Body', d['转发内容'])
+        item_dict.setdefault('PublishDate_Std', d['时间'])
+        item_dict.setdefault('source_type', d['source_type'])
+        item_dict.setdefault('group_SN', d['SN'])
+        item_dict.setdefault('like_SN', d['SN'])
+        item_dict.setdefault('is_original', d['sort'])
+        item_dict.setdefault('location', d['area'])
+        item_dict.setdefault('Author_Name', d['发布人'])
+        item_dict.setdefault('create_date', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        table_name = tables[info['industry_name']].split(".")[-1]
+        post_data = {
+            "id": d['id'],
+            "cid": d['C_Id'],
+            "sn": d['SN'],
+            "emotionStatus": d['positive_prob_number'],
+            "tableName": table_name
+        }
+        # print(post_data)
+        emotion_2_data = {
+            'queues': 'task.msg.emotion_2.1',
+            'message': str(post_data)
+        }
+        url = 'http://localhost:8090/jms/send'
+        # 单条
+        # url = 'http://localhost:8090/jms/send'
+        proxies = {'http': None, 'https': None}
+        requests.get(url=url, proxies=proxies, params=emotion_2_data)
+        # post_mq.send_to_queue('task.msg.emotion_2.1', str(post_data))
+        tag_data = {
+            'queues': 'task.msg.tag_2.1',
+            'message': str({"sN": d['SN'], "cId": d['C_Id']})
+        }
+        requests.get(url=url, proxies=proxies, params=tag_data)
+        # post_mq.send_to_queue('task.msg.tag_2.1', str({"sN": d['SN'], "cId": d['C_Id']}))
+
+        # 数据插入B库
+        sql_of_base = 'insert into TS_DataMerge_Base ({}) values ({})'. \
+            format(",".join(iisql.keys()), ",".join(['%s'] * len(iisql.keys())))
+        db_qbbb.execute(sql_of_base, tuple(item_dict.values()))
+
+        if info['keywords'] != '':
+            if info['excludewords'] == '' and info['simultaneouswords'] == '':
+                if contain_keywords(info['keywords'], match_data):
+                    # new_data.append(d)
+                    # 子类
+                    sub_class_match_data(info,d)
+                    match_inser_alone_data(d,info,info['T_Id'])
+            elif info['simultaneouswords'] != '' and info['excludewords'] == '':
+                if contain_keywords(info['keywords'], match_data):
+                    if contain_keywords(info['simultaneouswords'], match_data):
+                        sub_class_match_data(info,d)
+                        match_inser_alone_data(d, info, info['T_Id'])
+            elif info['simultaneouswords'] == '' and info['excludewords'] != '':
+                if contain_keywords(info['keywords'], match_data):
+                    if contain_keywords(info['excludewords'], match_data) != True:
+                        sub_class_match_data(info,d)
+                        match_inser_alone_data(d, info, info['T_Id'])
+            elif info['simultaneouswords'] != '' and info['excludewords'] != '':
+                if contain_keywords(info['keywords'], match_data):
+                    if contain_keywords(info['simultaneouswords'], match_data):
+                        if contain_keywords(info['excludewords'], match_data) != True:
+                            sub_class_match_data(info,d)
+                            match_inser_alone_data(d, info, info['T_Id'])
+
+def sub_class_match_data(info,d):
+    """
+    匹配分类
+    :param info:监测主题的信息
+    :param d:单条数据
+    :return:
+    """
+    sql = "select A.id,C_Id,parent_id,subject_id,classId,ruleContent,homonymWords,exclusionWords from " \
+          "QBB_B.dbo.TS_MonitorSubject as A inner join QBB_B.dbo.TS_MonitorSubject_rules as B " \
+          "on A.id=B.classId where A.subject_id={0} and A.id!={0} and parent_id={0}".format(info['T_Id'])
+
+    # 获得当前监测主题下的所有子分类
+    sub_class_datas = db_qbbb.execute_query(sql)
+    listdict = ['A_id', 'C_Id', 'parent_id', 'subject_id',
+                'classId', 'ruleContent', 'homonymWords',
+                'exclusionWords']
+    # 子类进行匹配
+    def match_sub_class_data(class_info,data):
+        """
+        子类进行匹配
+        :param class_info:子类信息
+        :param data:单条
+        :return:
+        """
+        sql_sub_class = "select A.id,C_Id,parent_id,subject_id,classId,ruleContent,homonymWords,exclusionWords from " \
+                  "QBB_B.dbo.TS_MonitorSubject as A inner join QBB_B.dbo.TS_MonitorSubject_rules as B " \
+                  "on A.id=B.classId where A.subject_id={0} and A.id!={0} " \
+                  "and parent_id={1}".format(class_info['subject_id'], class_info['A_id'])
+        # 查看当前分类下面是否有子分类
+        item_sub_class = db_qbbb.execute_query(sql_sub_class)
+
+        info = dict()
+        info['keywords'] = class_info['ruleContent']
+        info['simultaneouswords'] = class_info['homonymWords']
+        info['excludewords'] = class_info['exclusionWords']
+        # 当前分类的id
+
+        info['parent_id'] = class_info['parent_id']
+        # 当前id
+        info['class_id'] = class_info['A_id']
+
+        # 是否匹配当前分类 进行处理 sort_num和parent_id
+        curent_class_data = match_alone_keyword_(info, data)
+        if len(curent_class_data['class_id'])!=0:
+            # 获取当前级别的数据
+            for i_data in item_sub_class:
+                item_son_data = dict(zip(listdict, list(i_data)))
+                item_son_data['ruleContent'] = item_son_data['ruleContent'].encode('latin1').decode('gbk')
+                item_son_data['homonymWords'] = item_son_data['homonymWords'].encode('latin1').decode('gbk')
+                item_son_data['exclusionWords'] = item_son_data['exclusionWords'].encode('latin1').decode('gbk')
+                match_sub_class_data(item_son_data, curent_class_data)
+
+    # 对子每一个二级分类进行过滤
+
+    for item in sub_class_datas:
+        i_data = dict(zip(listdict, list(item)))
+        d['subject_id'] = i_data['subject_id']
+        i_data['ruleContent'] = i_data['ruleContent'].encode('latin1').decode('gbk')
+        i_data['homonymWords'] = i_data['homonymWords'].encode('latin1').decode('gbk')
+        i_data['exclusionWords'] = i_data['exclusionWords'].encode('latin1').decode('gbk')
+        match_sub_class_data(i_data, d)
 
 def testsql():
     """
@@ -996,8 +1369,8 @@ if __name__ == '__main__':
     # track_data_task()
     # record_log()
 
-    # for d in merger_industry_data(get_industry_keywords()):
-    #     print(d)
+    for d in merger_industry_data(get_industry_keywords()):
+        print(d)
 
     # myredis=my_redis()
     # sql="select * from TS_MediumURl"
@@ -1021,17 +1394,17 @@ if __name__ == '__main__':
     # print(T_id)
 
 
-    sql = "select A.id,C_Id,parent_id,subject_id,classId,ruleContent,homonymWords,exclusionWords from " \
-          "QBB_B.dbo.TS_MonitorSubject as A inner join QBB_B.dbo.TS_MonitorSubject_rules as B " \
-          "on A.id=B.classId where A.subject_id={0} and A.id!={0}".format('1387703706849402881')
-
-    # 获得当前监测主题下的所有子分类
-    sub_datas = db_qbbb.execute_query(sql)
-    listdict = ['A_id', 'C_Id', 'parent_id', 'subject_id', 'classId', 'ruleContent', 'homonymWords', 'exclusionWords']
-    for item in sub_datas:
-        print("分类")
-        i_data = dict(zip(listdict, list(item)))
-        i_data['ruleContent'] = i_data['ruleContent'].encode('latin1').decode('gbk')
-        i_data['homonymWords'] = i_data['homonymWords'].encode('latin1').decode('gbk')
-        i_data['exclusionWords'] = i_data['exclusionWords'].encode('latin1').decode('gbk')
-        print(i_data)
+    # sql = "select A.id,C_Id,parent_id,subject_id,classId,ruleContent,homonymWords,exclusionWords from " \
+    #       "QBB_B.dbo.TS_MonitorSubject as A inner join QBB_B.dbo.TS_MonitorSubject_rules as B " \
+    #       "on A.id=B.classId where A.subject_id={0} and A.id!={0}".format('1387703706849402881')
+    # 
+    # # 获得当前监测主题下的所有子分类
+    # sub_datas = db_qbbb.execute_query(sql)
+    # listdict = ['A_id', 'C_Id', 'parent_id', 'subject_id', 'classId', 'ruleContent', 'homonymWords', 'exclusionWords']
+    # for item in sub_datas:
+    #     print("分类")
+    #     i_data = dict(zip(listdict, list(item)))
+    #     i_data['ruleContent'] = i_data['ruleContent'].encode('latin1').decode('gbk')
+    #     i_data['homonymWords'] = i_data['homonymWords'].encode('latin1').decode('gbk')
+    #     i_data['exclusionWords'] = i_data['exclusionWords'].encode('latin1').decode('gbk')
+    #     print(i_data)
