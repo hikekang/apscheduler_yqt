@@ -393,7 +393,6 @@ def alone_keyword_(info, data):
     """
     #
     print("单独进行分词")
-    new_data = []
     #
     for d in data:
         d['class_id']=''
@@ -783,7 +782,6 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     industry_id = db_b.execute_query(sql_industry_id)[0][0]
 
     tuple_data_list_ts_a = []
-    tuple_data_list_ts_a_second_data = []
     tuple_data_list_qbb_a = []
     post_data_list_event_2_1 = []
 
@@ -796,13 +794,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         """
         worker = IdWorker(datacenter_id, work_id + 1, 0)
         id = worker.get_id()
-        # print(datacenter_id,work_id+1,id)
-        # sn_id = str(uuid.uuid4())
-        # 生成数据的ID
-        # data['sn-id'] = sn_id
-        # 生成数据的SN
         data['id'] = id
-        # data['SN'] = ''.join(sn_id.split('-'))
 
         post_data = {"industryNewsId": id, "tableName": table_name.split(".")[-1]}
         post_data_list_event_2_1.append(post_data)
@@ -812,51 +804,12 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
             id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
             data['positive_prob_number'])
 
-        dict_data_TS_A = {
-            'id': id,
-            'industry_id': industry_id,
-            'title': data['标题'],
-            'summary': data['描述'],
-            'content': data['转发内容'],
-            'url': data['链接'],
-            'author': data['发布人'],
-            'publish_time': data['时间'],
-            'emotion_status': data['发布人'],
-        }
-
         tuple_data_qbb_a = (
             id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
             data['is_original'], data['area'], data['positive_prob_number'])
-        # tuple_data_qbb_a = (
-        #     id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
-        #     data['positive_prob_number'])
-
         tuple_data_list_ts_a.append(tuple_data_ts_a)
 
         tuple_data_list_qbb_a.append(tuple_data_qbb_a)
-        # print(tuple_data_qbb_a[0])
-
-        # 二层数据
-
-        # tuple_data_ts_a_second_data = (id, industry_id, data['ic_id'], data['keywords_id'], data['链接'])
-        # tuple_data_list_ts_a_second_data.append(tuple_data_ts_a_second_data)
-
-        # 发送mq updata on 2021-06-04 16:26:21
-        # data_2_1 = {
-        #     'queues': 'reptile.stay.process_2.1',
-        #     'message': str(post_data_list)
-        # }
-        # data_2 = {
-        #     'queues': 'reptile.stay.process',
-        #     'message': str(post_data_list)
-        # }
-        #
-        # proxies = {'http': None, 'https': None}
-        # url = 'http://localhost:8090/jms/send_array'
-        # requests.get(url=url, proxies=proxies, params=data_2)
-        # post_mq.send_to_queue("task.msg.event_2.1", str({"industryNewsId": id, "tableName": table_name.split(".")[-1]}))
-        # post_mq.content_send_close("task.msg.event_2.1", str({"industryNewsId": id, "tableName": table_name.split(".")[-1]}))
-        # print("发送task.msg.event_2.1完毕")
     tag_data = {
         'queues': 'task.msg.event_2.1',
         'message': str(post_data_list_event_2_1)
@@ -874,24 +827,12 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
                                                     "is_original,location,emotion_status) " \
                                                     "values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
 
-    sql_qbb_a_2 = "insert into QBB_A." + table_name + "({}) values ({})".format(",".join(data.keys()),
-                                                                                ",".join(['%s']) * len(data.keys()))
-    # print(tuple_data_list_ts_a)
     #
     # 插入A库
     db_a.execute_many(sql_ts_a, tuple_data_list_ts_a)
     # 插入qbba库
     db_qbba.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
 
-    # for d in tuple_data_list_qbb_a:
-    #     db_qbba.execute(sql_qbb_a, d)
-
-    # 内网a库
-    # db_net_a.execute_many(sql_ts_a, tuple_data_list_ts_a)
-    # db_net_qbba.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
-
-    # update on 2021-06-04 13:32:01
-    # 查询主题多个id
     """
         info['id']:Customer ID
         info['xxxword']:所有检测主题XXX词
@@ -964,34 +905,13 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
             d['sort'] = 0
         print("第几个:",index)
         mark_java_match_data(d,thream_info_list)
-    # 处理每个监测主题的数据
-
-    # for tid_item in thream_info_list:
-    #     sub_data = insert_base_of_b(tid_item, data_list, tid_item['industry_name'])
-    #     classification(tid_item['T_Id'], sub_data, tid_item)
-
-    # # 消息队列
-    # data_2_1 = {
-    #     'queues': 'reptile.stay.process_2.1',
-    #     'message': str(post_data_list)
-    # }
-    # data_2 = {
-    #     'queues': 'reptile.stay.process',
-    #     'message': str(post_data_list)
-    # }
-    # 
-    # proxies = {'http': None, 'https': None}
-    # url = 'http://localhost:8090/jms/send_array'
-    # requests.get(url=url, proxies=proxies, params=data_2_1)
-    # requests.get(url=url, proxies=proxies, params=data_2)
-    # print("数据上传成功")
 
     myredis.close()
     # post_mq.close_mq()
 
-def match_inser_alone_data(data,info,T_id):
+def match_insert_alone_data(data,info,T_id):
     """
-
+    最终插入数据
     :param data:传入来的单条数据
     :param info:
     :param T_id:一级主题id
@@ -1016,9 +936,6 @@ def match_inser_alone_data(data,info,T_id):
         }
         url = 'http://localhost:8090/jms/send'
         requests.get(url=url, proxies=proxies, params=similar_data)
-        # post_mq.send_to_queue('task.msg.similar_2.1', str(post_data))
-        # ms_node_id为0 ，not_first_sort为0
-        # insert_b_data = ((i_data['C_Id'], data['SN'], data['subject_id'], 0, 0, 0))
         insert_b_data = ((data['C_Id'], data['SN'], T_id, 0, 0, 0))
         sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map " \
                                              "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
@@ -1044,33 +961,20 @@ def match_inser_alone_data(data,info,T_id):
         # post_mq.send_to_queue('task.msg.similar_2.1', str(post_data))
         # 进行了一次匹配
         if len(data['class_id']) == 1:
-            # 单个分类
-            # ms_node_id为对应分类的ID ，not_first_sort为0
-            # insert_b_data = ((i_data['C_Id'], data['SN'], data['subject_id'], data['class_id'], 0, 0))
-            # insert_b_data = ((data['C_Id'], data['SN'], T_id, data['class_id'], 0, 1))
-            insert_b_data_parent = ((data['C_Id'], data['SN'], T_id, data['class_id'][0], 0, 0))
+            insert_b_data = ((data['C_Id'], data['SN'], T_id, data['class_id'][0], 0, 0))
             sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map " \
                                                  "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
                                                  "values (%d,%s,%s,%s,%s,%s)"
-            # db_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data)
-            db_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data_parent)
+            db_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data)
         elif len(data['class_id']) > 1:
-            # insert_b_data = ((i_data['C_Id'], data['SN'], data['subject_id'], data['class_id'], 0, 1))
-            # insert_b_data = ((data['C_Id'], data['SN'], T_id, data['class_id'], 0, 1))
-            # sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map " \
-            #                                      "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
-            #                                      "values (%d,%s,%s,%s,%s,%s)"
-            # db_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data)
             for index, p in enumerate(data['class_id']):
                 if (index == 0):
-                    # insert_b_data = ((i_data['C_Id'], data['SN'], data['subject_id'], p, 0, 0))
                     insert_b_data = ((data['C_Id'], data['SN'], T_id, p, 0, 0))
                     sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map " \
                                                          "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
                                                          "values (%d,%s,%s,%s,%s,%s)"
                     db_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data)
                 else:
-                    # insert_b_data = ((i_data['C_Id'], data['SN'], data['subject_id'], p, 0, 1))
                     insert_b_data = ((data['C_Id'], data['SN'], T_id, p, 0, 1))
                     sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map " \
                                                          "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
@@ -1078,7 +982,7 @@ def match_inser_alone_data(data,info,T_id):
                     db_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data)
 def mark_java_match_data(d,theam_list):
     """
-
+    一条一条数据进行处理
     :param d:单条数据处理
     :param theam_list:主题列表
     :return:
@@ -1103,83 +1007,107 @@ def mark_java_match_data(d,theam_list):
     match_data = d['标题'] + d['转发内容'] + d['描述']
     # 监测主题关键词进行匹配规则
     for info in theam_list:
-        # 每个主题对应一个SN
-        sn_id = str(uuid.uuid4())
-        d['SN'] = ''.join(sn_id.split('-'))
-        d['class_id'] = []
-        d['sort_num']=0
-        d['subject_id']=info['T_Id']
-        item_dict = dict()
-        item_dict.setdefault('SN', d['SN'])
-        item_dict.setdefault('C_Id', d['C_Id'])
-        item_dict.setdefault('S_Id', d['S_Id'])
-        item_dict.setdefault('URL', d['链接'])
-        item_dict.setdefault('Title', d['标题'])
-        item_dict.setdefault('Summary', d['描述'])
-        item_dict.setdefault('Body', d['转发内容'])
-        item_dict.setdefault('PublishDate_Std', d['时间'])
-        item_dict.setdefault('source_type', d['source_type'])
-        item_dict.setdefault('group_SN', d['SN'])
-        item_dict.setdefault('like_SN', d['SN'])
-        item_dict.setdefault('is_original', d['sort'])
-        item_dict.setdefault('location', d['area'])
-        item_dict.setdefault('Author_Name', d['发布人'])
-        item_dict.setdefault('create_date', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        table_name = tables[info['industry_name']].split(".")[-1]
-        post_data = {
-            "id": d['id'],
-            "cid": d['C_Id'],
-            "sn": d['SN'],
-            "emotionStatus": d['positive_prob_number'],
-            "tableName": table_name
-        }
-        # print(post_data)
-        emotion_2_data = {
-            'queues': 'task.msg.emotion_2.1',
-            'message': str(post_data)
-        }
-        url = 'http://localhost:8090/jms/send'
-        # 单条
-        # url = 'http://localhost:8090/jms/send'
-        proxies = {'http': None, 'https': None}
-        requests.get(url=url, proxies=proxies, params=emotion_2_data)
-        # post_mq.send_to_queue('task.msg.emotion_2.1', str(post_data))
-        tag_data = {
-            'queues': 'task.msg.tag_2.1',
-            'message': str({"sN": d['SN'], "cId": d['C_Id']})
-        }
-        requests.get(url=url, proxies=proxies, params=tag_data)
-        # post_mq.send_to_queue('task.msg.tag_2.1', str({"sN": d['SN'], "cId": d['C_Id']}))
+        if match_this_theam(info,match_data):
+            # 每个主题对应一个SN
+            sn_id = str(uuid.uuid4())
+            d['SN'] = ''.join(sn_id.split('-'))
+            d['class_id'] = []
+            d['sort_num']=0
+            d['subject_id']=info['T_Id']
+            item_dict = dict()
+            item_dict.setdefault('SN', d['SN'])
+            item_dict.setdefault('C_Id', d['C_Id'])
+            item_dict.setdefault('S_Id', d['S_Id'])
+            item_dict.setdefault('URL', d['链接'])
+            item_dict.setdefault('Title', d['标题'])
+            item_dict.setdefault('Summary', d['描述'])
+            item_dict.setdefault('Body', d['转发内容'])
+            item_dict.setdefault('PublishDate_Std', d['时间'])
+            item_dict.setdefault('source_type', d['source_type'])
+            item_dict.setdefault('group_SN', d['SN'])
+            item_dict.setdefault('like_SN', d['SN'])
+            item_dict.setdefault('is_original', d['sort'])
+            item_dict.setdefault('location', d['area'])
+            item_dict.setdefault('Author_Name', d['发布人'])
+            item_dict.setdefault('create_date', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            table_name = tables[info['industry_name']].split(".")[-1]
+            post_data = {
+                "id": d['id'],
+                "cid": d['C_Id'],
+                "sn": d['SN'],
+                "emotionStatus": d['positive_prob_number'],
+                "tableName": table_name
+            }
+            # 情感处理发送的数据
+            emotion_2_data = {
+                'queues': 'task.msg.emotion_2.1',
+                'message': str(post_data)
+            }
+            url = 'http://localhost:8090/jms/send'
+            # 单条
+            proxies = {'http': None, 'https': None}
+            requests.get(url=url, proxies=proxies, params=emotion_2_data)
+            tag_data = {
+                'queues': 'task.msg.tag_2.1',
+                'message': str({"sN": d['SN'], "cId": d['C_Id']})
+            }
+            requests.get(url=url, proxies=proxies, params=tag_data)
+            # 数据插入B库
+            sql_of_base = 'insert into TS_DataMerge_Base ({}) values ({})'. \
+                format(",".join(iisql.keys()), ",".join(['%s'] * len(iisql.keys())))
+            db_qbbb.execute(sql_of_base, tuple(item_dict.values()))
 
-        # 数据插入B库
-        sql_of_base = 'insert into TS_DataMerge_Base ({}) values ({})'. \
-            format(",".join(iisql.keys()), ",".join(['%s'] * len(iisql.keys())))
-        db_qbbb.execute(sql_of_base, tuple(item_dict.values()))
-
-        if info['keywords'] != '':
-            if info['excludewords'] == '' and info['simultaneouswords'] == '':
-                if contain_keywords(info['keywords'], match_data):
-                    # new_data.append(d)
-                    # 子类
-                    sub_class_match_data(info,d)
-                    match_inser_alone_data(d,info,info['T_Id'])
-            elif info['simultaneouswords'] != '' and info['excludewords'] == '':
-                if contain_keywords(info['keywords'], match_data):
-                    if contain_keywords(info['simultaneouswords'], match_data):
+            if info['keywords'] != '':
+                if info['excludewords'] == '' and info['simultaneouswords'] == '':
+                    if contain_keywords(info['keywords'], match_data):
+                        # 下面的子类进行匹配
                         sub_class_match_data(info,d)
-                        match_inser_alone_data(d, info, info['T_Id'])
-            elif info['simultaneouswords'] == '' and info['excludewords'] != '':
-                if contain_keywords(info['keywords'], match_data):
-                    if contain_keywords(info['excludewords'], match_data) != True:
-                        sub_class_match_data(info,d)
-                        match_inser_alone_data(d, info, info['T_Id'])
-            elif info['simultaneouswords'] != '' and info['excludewords'] != '':
-                if contain_keywords(info['keywords'], match_data):
-                    if contain_keywords(info['simultaneouswords'], match_data):
+                        match_insert_alone_data(d,info,info['T_Id'])
+                elif info['simultaneouswords'] != '' and info['excludewords'] == '':
+                    if contain_keywords(info['keywords'], match_data):
+                        if contain_keywords(info['simultaneouswords'], match_data):
+                            sub_class_match_data(info,d)
+                            match_insert_alone_data(d, info, info['T_Id'])
+                elif info['simultaneouswords'] == '' and info['excludewords'] != '':
+                    if contain_keywords(info['keywords'], match_data):
                         if contain_keywords(info['excludewords'], match_data) != True:
                             sub_class_match_data(info,d)
-                            match_inser_alone_data(d, info, info['T_Id'])
+                            match_insert_alone_data(d, info, info['T_Id'])
+                elif info['simultaneouswords'] != '' and info['excludewords'] != '':
+                    if contain_keywords(info['keywords'], match_data):
+                        if contain_keywords(info['simultaneouswords'], match_data):
+                            if contain_keywords(info['excludewords'], match_data) != True:
+                                sub_class_match_data(info,d)
+                                match_insert_alone_data(d, info, info['T_Id'])
 
+
+def match_this_theam(info,match_data):
+    if info['keywords'] != '':
+        if info['excludewords'] == '' and info['simultaneouswords'] == '':
+            if contain_keywords(info['keywords'], match_data):
+                # 下面的子类进行匹配
+                return True
+            else:
+                return False
+        elif info['simultaneouswords'] != '' and info['excludewords'] == '':
+            if contain_keywords(info['keywords'], match_data):
+                if contain_keywords(info['simultaneouswords'], match_data):
+                    return True
+                else:
+                    return False
+        elif info['simultaneouswords'] == '' and info['excludewords'] != '':
+            if contain_keywords(info['keywords'], match_data):
+                if contain_keywords(info['excludewords'], match_data) != True:
+                    return True
+                else:
+                    return False
+        elif info['simultaneouswords'] != '' and info['excludewords'] != '':
+            if contain_keywords(info['keywords'], match_data):
+                if contain_keywords(info['simultaneouswords'], match_data):
+                    if contain_keywords(info['excludewords'], match_data) != True:
+                        return True
+                    else:
+                        return False
 def sub_class_match_data(info,d):
     """
     匹配分类
@@ -1242,23 +1170,6 @@ def sub_class_match_data(info,d):
         i_data['exclusionWords'] = i_data['exclusionWords'].encode('latin1').decode('gbk')
         match_sub_class_data(i_data, d)
 
-def testsql():
-    """
-     测试sql语句
-
-    """
-    sql_ts_a = "insert into '%s' (id,industry_id,title,summary,content,url,author,publish_time)" \
-               " values (''%s'','%s','%s','%s','%s','%s','%s','%s')" % (
-                   'hike', 'hike', 'hike', 'hike', 'hike', 'hike', 'hike', 'hike', 'hike',)
-    print(sql_ts_a)
-    # 插入A库
-    # sql_record = "insert into record_log_table (industry,crawl_time,start_time,end_time,yqt_num,crawl_num,upload_num,
-    # customer) values ('%s','%s','%s','%s','%s','%s','%s','%s')" % ('1', '2021-4-26 00:00:00', '2021-4-26 00:00:00',
-    # '2021-4-26 00:00:00', '1', '1', '1', '1')
-    sql_record = "insert into record_log_table values ('%s','%s','%s','%s','%s','%s','%s','%s')" % (
-        '1', '2021-4-26 00:00:00', '2021-4-26 00:00:00', '2021-4-26 00:00:00', '1', '1', '1', '1')
-    db_a.execute(sql_record)
-
 
 def get_month_data(time1, time2, industry_name):
     """
@@ -1271,12 +1182,6 @@ def get_month_data(time1, time2, industry_name):
     myredis = my_redis()
 
     myredis.redis.flushall()
-    # for tb in tables.values():
-    #     sql = "select industry_id,url from %s where publish_time between '%s' and '%s'" % (tb, time1, time2)
-    #     print(sql)
-    #     datas = db_a.execute_query(sql)
-    #     for d in datas:
-    #         myredis.redis.sadd(d[0], d[1])
     sql = "select industry_id,url from %s where publish_time between '%s' and '%s'" % (
         tables[industry_name], time1, time2)
     datas = db_qbba.execute_query(sql)
