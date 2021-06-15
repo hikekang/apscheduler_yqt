@@ -52,7 +52,8 @@ class YQTSpider(object):
     def __init__(self, myconfig, spider_driver=None, start_time=None, end_time=None, *args, **kwargs):
 
         if spider_driver is None:
-            self.spider_driver = WebDriverHelper.init_webdriver(is_headless=config.HEAD_LESS)  # type:MyWebDriver
+            headless_config = eval(myconfig.getValueByDict('chromerdriver', 'is_headless'))
+            self.spider_driver = WebDriverHelper.init_webdriver(is_headless=headless_config)  # type:MyWebDriver
         else:
             self.spider_driver = spider_driver  # type:MyWebDriver
         self.wait = WebDriverWait(self.spider_driver, config.WAIT_TIME)
@@ -434,7 +435,8 @@ class YQTSpider(object):
                 maxpage = int(content_all['data']['maxpage'])
                 if maxpage != 0:
                     if maxpage>50:
-                        maxpage=50
+                        # maxpage=50
+                        maxpag = int(self.myconfig.getValueByDict('spider_config', 'maxpage'))
                     for i in range(1, maxpage + 1):
                         payload_part['searchCondition']['page'] = i
                         logger.info(f"抓取的关键字为{payload_part['searchCondition']['searchSecondKeyword']}，抓取到第{i}页")
@@ -714,11 +716,11 @@ def work_it(myconfig, start_time, end_time):
             p_data.append(project_data)
     print(p_data)
     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=p_data[0], is_one_day=False)
+    yqt_spider.spider_driver.close()
     chrome_service.stop()
 
 
 def work_it_hour(myconfig):
-
     # end_time = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d ") + "00:00:00"
     time_info = myconfig.getDictBySection('time_info')
     if list(time_info.keys())[0] == 'minutes':
@@ -764,10 +766,15 @@ def work_it_one_day(myconfig):
 
 def apscheduler(myconfig):
     trigger1 = CronTrigger(hour='0-23', minute='01', second=00, jitter=5)
+    cron_info = myconfig.getDictBySection('cron_info')
+    # for key,value in cron_info.items():
+    #     cron_info[key]=eval(value)
+    tigger_hour = CronTrigger(**cron_info)
     trigger2 = CronTrigger(hour='0', minute='01', second=00, jitter=5)
     sched = BlockingScheduler()
     sched.add_job(work_it_hour, trigger1, max_instances=10, id='my_job_id',kwargs={'myconfig':myconfig})
-    sched.add_job(work_it_one_day, trigger2, max_instances=10, id='my_job_id_ever',kwargs={'myconfig':myconfig})
+    # sched.add_job(work_it_one_day, trigger2, max_instances=10, id='my_job_id_ever',kwargs={'myconfig':myconfig})
+    sched.add_job(work_it_one_day, tigger_hour, max_instances=10, id='my_job_id_ever',kwargs={'myconfig':myconfig})
     sched.add_job(ssql_helper.find_info_count_B, trigger2, max_instances=10, id='my_job_id_ever_count',kwargs={'myconfig':myconfig})
     sched.start()
 
