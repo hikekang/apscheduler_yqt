@@ -176,6 +176,7 @@ class YQTSpider(object):
             "中性": 0.5
         }
         data_list = []
+        # 带有二层数据的数据
         secod_content = SecondData(self.cookie, payload).get_content()
         if secod_content!=None:
             for item in secod_content['data']['icontentCommonNetList']:
@@ -219,7 +220,6 @@ class YQTSpider(object):
                             data['发布人'] = ''
                     if (len(data['发布人']) > 15):
                         data['发布人'] = ''
-                # print(data['attitude'],item['customFlag1'],item['customFlag1Code'],item['aiCustomFlag1'])
                 if data['attitude']=='中性':
                     data['positive_prob_number'] = 0.5
                 elif data['attitude']=='喜悦':
@@ -262,15 +262,19 @@ class YQTSpider(object):
             elif data["标题"] == "转发微博":
                 if len(data["转发内容"]) >= 20:
                     data["标题"] = data["转发内容"][0:20]
+                    data['描述'] = data["转发内容"][0:20]
                 else:
                     data["标题"] = data["转发内容"]
-                data['描述'] = data["转发内容"]
+                    data['描述'] = data["转发内容"]
 
             if data['描述'] != "" and data["转发内容"] == "" and len(data["转发内容"]) == 0:
                 data["转发内容"] = data['描述']
 
             if data['转发内容'] != "" and data['描述'] == "" and len(data['转发内容']) != 0:
-                data['描述'] = data['转发内容']
+                if len(data["转发内容"]) >= 20:
+                    data["标题"] = data["转发内容"][0:20]
+                else:
+                    data['描述'] = data['转发内容']
 
             if "weibo.com" in data["链接"] and data["sort"] != "":
                 if data["sort"] == "原创":
@@ -283,14 +287,13 @@ class YQTSpider(object):
                 data['is_original'] = 2
             sec_list.append(data)
         t2 = time.time()
-        print("花费时间:", t2 - t1)
-        print("数据处理完毕之后的数量", len(sec_list))
+        logger.info("数据处理花费时间:", t2 - t1)
+        logger.info("数据处理完毕之后的数量", len(sec_list))
         return sec_list
 
     # 第一次根据爬取链接去重
     def quchong(self, dir_list, key):
-        print("第一次链接去重")
-        print(len(dir_list))
+        logger.info("第一次链接去重之前数据量为：",len(dir_list))
         new_dirlist = []
         values = []
         for d in dir_list:
@@ -298,7 +301,9 @@ class YQTSpider(object):
                 new_dirlist.append(d)
                 values.append(d[key])
 
-        print("第一次滤重之后的数量:", self.first_len)
+        logger.info("第一次滤重之后的数量:", self.first_len)
+
+        # 本次打开浏览器直至抓取结束的数据量
         self.first_len += len(new_dirlist)
         return new_dirlist
 
@@ -355,6 +360,7 @@ class YQTSpider(object):
                     f"{self.last_end_time}_{self.next_end_time}_{self.next_page_num}_{self.data_file_path}")
 
     def _turn_page(self, time_sleep):
+        # 资源上锁
         lock = threading.Lock()
         def thread_all(i):
             payload_all = {"searchCondition": {
@@ -394,11 +400,13 @@ class YQTSpider(object):
             }}
             payload_all['searchCondition']['page'] = i
             # 数据进行处理
-            data_list = self.clear_data(self._parse(payload_all))
+            raw_data=self._parse(payload_all)
+            data_list = self.clear_data(raw_data)
             logger.info('数据抓取完毕')
             # 插入到数据库，返回一个成功插入的值
             # 上传数据
             if data_list:
+                # 数据上传
                 ssql_helper.upload_many_data(data_list, self.industry_name,i,self.info)
                 logger.info(f"正在抓取第{i}页数据")
                 logger.info(f"解析到{len(data_list)}条数据")
@@ -409,8 +417,7 @@ class YQTSpider(object):
                 logger.info(f"保存完毕")
                 time.sleep(time_sleep)
         def thread_part(keyword,datacenter_id):
-            print("jinlai")
-            print(keyword)
+            logger.info("本次抓取的关键词为：",keyword)
             payload_part = {"searchCondition": {"keywordId": int(self.keyword_id), "accurateSwitch": 1,
                                                 "bloggerAuthenticationStatusMultiple": "0",
                                                 "blogPostsStatus": 0, "comblineflg": 2, "dataView": 0, "displayIcon": 1,
@@ -436,7 +443,7 @@ class YQTSpider(object):
                 if maxpage != 0:
                     if maxpage>50:
                         # maxpage=50
-                        maxpag = int(self.myconfig.getValueByDict('spider_config', 'maxpage'))
+                        maxpage = int(self.myconfig.getValueByDict('spider_config', 'maxpage'))
                     for i in range(1, maxpage + 1):
                         payload_part['searchCondition']['page'] = i
                         logger.info(f"抓取的关键字为{payload_part['searchCondition']['searchSecondKeyword']}，抓取到第{i}页")
@@ -530,11 +537,10 @@ class YQTSpider(object):
                 # pool.join()
 
                 # update on 2021-05-25 11:20:57
-                print(keywords)
                 with ThreadPoolExecutor(10) as pool:
                     for datacenter_id,keyword in enumerate(keywords):
                         pool.submit(thread_part,keyword,datacenter_id+1)
-                    print("wanbi")
+                    logger.info("分词抓取完毕")
                 return True
 
             elif(total_count<5000 and maxpage>0 ):
@@ -561,7 +567,11 @@ class YQTSpider(object):
             return False
 
     def _crawl2(self, time_sleep):
+        """
 
+        :param time_sleep:
+        :return:
+        """
         # 翻页并抓取数据
         resp = self._turn_page(time_sleep)
         if resp:
@@ -573,11 +583,14 @@ class YQTSpider(object):
                 # 记录文件的路径
                 record_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                                 f"record\{self.project_name}", f"{self}_记录.xlsx")
-                # A库中的数量
-                sql_number_A = ssql_helper.find_info_count(self.interval[0], self.interval[1], self.industry_name)
+                # 本次抓取TS_A库和QBBB_B库、中的数量
+                sql_number_A,sql_number_B = ssql_helper.find_info_count(self.interval[0],
+                                                                        self.interval[1],
+                                                                        self.myconfig,
+                                                                        self.info,
+                                                                        yqt_count)
                 time.sleep(1)
-                myconfig=config.redconfig()
-                sql_number_B = ssql_helper.find_info_count_B(myconfig)
+                # myconfig=config.redconfig()
                 # 需要增加一个B库中的数量
                 data_list = [self.project_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                              self.last_end_time, self.next_end_time]
@@ -603,12 +616,17 @@ class YQTSpider(object):
 
                 # 数据统计记录
                 ssql_helper.record_log(record_dict)
-                # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
+                # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,
+                # post_info['number'],post_info2['number'],sql_number,data_list=data_list)
                 return True
+            else:
+                return False
+        else:
+            return False
     def modifi_keywords_new(self):
         #     yqt_tree_li act ng-star-inserted
         driver = self.spider_driver
-        print("点击")
+        logger.info("点击")
         span = driver.find_element_by_xpath('//span[@class="yqt_tree_li act ng-star-inserted"]')
         span.click()
         driver.switch_to.window(driver.window_handles[1])
@@ -651,44 +669,46 @@ class YQTSpider(object):
         ck = ''
         for cookie in web_cookies:
             ck = ck + cookie['name'] + "=" + cookie['value'] + ";"
-        # 设置cookie
+
+        # 设置完关键词之后获取cookie
         self.cookie = ck
 
     def start(self, start_time, end_time, time_sleep, info, is_one_day):
-        # try:
-        # 1.登录
-        if not self._login():
-            raise Exception("登录环节出现问题")
-        self.interval = [start_time, end_time]
-        self.last_end_time = self.interval[0]
-        self.next_end_time = self.interval[1]
-        # 抓取数据
-        print("获取关键词")
-        self.info = info
-        self.keyword = info['keywords']
-        self.SimultaneousWord = info['simultaneouswords']
-        self.excludewords = info['excludewords']
-        self.C_Id=info['id']
-        # 重新设置项目路径
+        try:
+            # 1.登录
+            if not self._login():
+                raise Exception("登录环节出现问题")
+            self.interval = [start_time, end_time]
+            self.last_end_time = self.interval[0]
+            self.next_end_time = self.interval[1]
+            # 抓取数据
+            logger.info("获取关键词")
+            self.info = info
+            self.keyword = info['keywords']
+            self.SimultaneousWord = info['simultaneouswords']
+            self.excludewords = info['excludewords']
+            self.C_Id=info['id']
+            # 重新设置项目路径
 
-        self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                           f"data\{self.project_name}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
-                                           f"{self}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
-                                               ':', '_'))
-        print(self.data_file_path)
-        # 设置关键词
-        self.modifi_keywords_new()
+            self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                               f"data\{self.project_name}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
+                                               f"{self}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
+                                                   ':', '_'))
+            logger.info(self.data_file_path)
+            # 设置关键词
+            self.modifi_keywords_new()
 
-        # 抓取数据并记录
-        resp = self._crawl2(time_sleep)
-        if resp:
-            logger.info("全部抓取完毕，结束")
-                # pyautogui.alert("抓取完成...")
-        # except Exception as e:
-        #     logger.warning(e)
-        # finally:
-        #     if self.spider_driver.service.is_connectable():
-        #         self.spider_driver.quit()
+            # 抓取数据并记录
+            resp = self._crawl2(time_sleep)
+            if resp:
+                logger.info("全部抓取完毕，结束")
+                    # pyautogui.alert("抓取完成...")
+        except Exception as e:
+            logger.warning(e)
+        finally:
+            if self.spider_driver.service.is_connectable():
+                self.spider_driver.quit()
+                self.spider_driver.close()
 
 
 # 自定义时间抓取任务
@@ -698,7 +718,6 @@ def work_it(myconfig, start_time, end_time):
     # infos = config.row_list
     # from config.ini
     # myconfig = config.redconfig()
-    print("111")
     # 获取驱动文件路径
     chromedriver_path = myconfig.getValueByDict('chromerdriver', 'path')
     chrome_service = Service(chromedriver_path)
@@ -708,16 +727,18 @@ def work_it(myconfig, start_time, end_time):
     yqt_spider = YQTSpider(myconfig, start_time=start_time, end_time=end_time)
 
     p_data = []
-    project_list_1 = ssql_helper.get_industry_keywords()
-    project_list = ssql_helper.merger_industry_data(project_list_1)
-    for project_data in project_list:
-        # if project_data['industry_name'] == '流通贸易':
-        if project_data['industry_name'] == yqt_spider.industry_name:
-            p_data.append(project_data)
-    print(p_data)
-    yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=p_data[0], is_one_day=False)
-    yqt_spider.spider_driver.close()
-    chrome_service.stop()
+    customer_list_data = ssql_helper.get_industry_keywords()
+
+    # project_list = ssql_helper.merger_industry_data(customer_list_data)
+    # for project_data in project_list:
+    #     if project_data['industry_name'] == yqt_spider.industry_name:
+    #         p_data.append(project_data)
+    # logger.info(p_data)
+
+    for d in customer_list_data:
+        if d['keywords']!='':
+            yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=d, is_one_day=False)
+            chrome_service.stop()
 
 
 def work_it_hour(myconfig):
@@ -775,7 +796,7 @@ def apscheduler(myconfig):
     sched.add_job(work_it_hour, trigger1, max_instances=10, id='my_job_id',kwargs={'myconfig':myconfig})
     # sched.add_job(work_it_one_day, trigger2, max_instances=10, id='my_job_id_ever',kwargs={'myconfig':myconfig})
     sched.add_job(work_it_one_day, tigger_hour, max_instances=10, id='my_job_id_ever',kwargs={'myconfig':myconfig})
-    sched.add_job(ssql_helper.find_info_count_B, trigger2, max_instances=10, id='my_job_id_ever_count',kwargs={'myconfig':myconfig})
+    sched.add_job(ssql_helper.find_day_data_count, trigger2, max_instances=10, id='my_job_id_ever_count',kwargs={'myconfig':myconfig})
     sched.start()
 
 
