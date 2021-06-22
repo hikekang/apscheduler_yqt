@@ -438,11 +438,13 @@ class YQTSpider(object):
                                                 "duplicateShowMultiple": "0", "attribute": "1",
                                                 "chartStart": str(self.last_end_time),
                                                 "chartEnd": str(self.next_end_time), "page": 1, "pageSize": 100}}
-            payload_part['searchCondition']['searchSecondKeyword'] = "({0})+({1})".format(keyword, self.SimultaneousWord)
+            # payload_part['searchCondition']['searchSecondKeyword'] = "({0})+({1})".format(keyword, self.SimultaneousWord)
+            payload_part['searchCondition']['searchSecondKeyword'] = keyword
             # print(payload_part)
             content_all = SecondData(self.cookie, payload_part).get_content_by_keywords()
             if content_all != None:
                 maxpage = int(content_all['data']['maxpage'])
+                print("最大页数为%d",maxpage)
                 if maxpage != 0:
                     if maxpage>50:
                         # maxpage=50
@@ -459,10 +461,10 @@ class YQTSpider(object):
                                 logger.info(f"解析到{len(data_list)}条数据")
                                 self.post_number += len(data_list)
                                 # SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path,sheet_name=self.info['sheet_name'])
-                                lock.acquire()
-                                SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path,
-                                                       sheet_name=self.industry_name)
-                                lock.release()
+                                # lock.acquire()
+                                # SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path,
+                                #                        sheet_name=self.industry_name)
+                                # lock.release()
                                 logger.info(f"保存完毕")
         """
         翻页
