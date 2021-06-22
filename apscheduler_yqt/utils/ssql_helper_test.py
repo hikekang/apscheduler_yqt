@@ -179,7 +179,8 @@ def get_industry_keywords():
             'excludewords': '',  # 排除词
             'simultaneouswords': '',  # 同现词
             'email':'',
-            'yqt_keywords':'('
+            'yqt_keywords':'(',
+            'project_words':[]
         }
         # principals
         for i, dd in enumerate(d):
@@ -191,22 +192,34 @@ def get_industry_keywords():
 
                 data_A = db_qbba.execute_query(sql_QBBA)
                 for da in data_A:
+                    project_word={
+                        "keywords":"(",
+                        "simultaneouswords":"",
+                        "excludewords":""
+                    }
                     for i, d_a in enumerate(da):
                         if d_a and i == 0:
                             new_d['keywords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
                             # new_d['keywords'] += re.sub('、', '|', d_a) + '|'
                             new_d['yqt_keywords']+="("+re.sub('、', '|', d_a.encode('latin1').decode('gbk'))
+                            project_word['keywords']+="("+re.sub('、', '|', d_a.encode('latin1').decode('gbk'))
+
                         # if d_a and i == 2:
                         if d_a and i == 2:
                             new_d['excludewords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
+                            project_word['excludewords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
                             # new_d['excludewords'] += re.sub('、', '|', d_a) + '|'
 
                         if d_a and i == 1:
                             new_d['simultaneouswords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
                             new_d['yqt_keywords'] += "+("+re.sub('、', '|', d_a.encode('latin1').decode('gbk')) +"))|"
+                            project_word['keywords'] += "+("+re.sub('、', '|', d_a.encode('latin1').decode('gbk')) +"))"
                             # new_d['simultaneouswords'] += re.sub('、', '|', d_a) + '|'
                         elif d_a==None and i==1:
                             new_d['yqt_keywords']+=")|"
+                            project_word['keywords'] +="))"
+                        # project_word['keywords']+=')'
+                    new_d['project_words'].append(project_word)
                 new_d['yqt_keywords']+=")"
                 new_d['yqt_keywords']=replace_char1(new_d['yqt_keywords'],"",-2)
             if i == 1:
@@ -953,9 +966,8 @@ if __name__ == '__main__':
     # for d in merger_industry_data(get_industry_keywords()):
     #     print(d)
     #     print("***"*20)
-
     for data in get_industry_keywords():
-        print(data)
+        pprint(data)
     # c_d=get_industry_keywords()
     # mao_d=[]
     # for d in c_d:
