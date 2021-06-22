@@ -18,6 +18,7 @@ import uuid
 from utils import domain
 # from datetime import datetime
 import datetime
+from urllib import parse
 from utils import post_mq
 from pprint import pprint
 
@@ -80,7 +81,6 @@ db_net_qbba = DataBase('sqlserver', config_net_QBBA)
 优速 流通贸易
 一嗨  汽车业
 '''
-
 
 def find_curent_num(start_time, end_time, myconfig,info,yqt_count):
     """
@@ -160,6 +160,10 @@ def find_day_data_count(myconfig):
 # B库中查询客户名称以及行业名称 对应的关键词  使用服务器的数据库
 
 def get_industry_keywords():
+    def replace_char1(string, char, index):
+        string = list(string)
+        string[index] = char
+        return ''.join(string)
     # qbbb库查询所有启用项目
     sql_qbbb = "select * from TS_Customers where IsEnable=1"
     # get enable project
@@ -174,7 +178,8 @@ def get_industry_keywords():
             'keywords': '',  # 关键词
             'excludewords': '',  # 排除词
             'simultaneouswords': '',  # 同现词
-            'email':''
+            'email':'',
+            'yqt_keywords':'('
         }
         # principals
         for i, dd in enumerate(d):
@@ -190,13 +195,20 @@ def get_industry_keywords():
                         if d_a and i == 0:
                             new_d['keywords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
                             # new_d['keywords'] += re.sub('、', '|', d_a) + '|'
+                            new_d['yqt_keywords']+="("+re.sub('、', '|', d_a.encode('latin1').decode('gbk'))
+                        # if d_a and i == 2:
                         if d_a and i == 2:
                             new_d['excludewords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
                             # new_d['excludewords'] += re.sub('、', '|', d_a) + '|'
+
                         if d_a and i == 1:
                             new_d['simultaneouswords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
+                            new_d['yqt_keywords'] += "+("+re.sub('、', '|', d_a.encode('latin1').decode('gbk')) +"))|"
                             # new_d['simultaneouswords'] += re.sub('、', '|', d_a) + '|'
-
+                        elif d_a==None and i==1:
+                            new_d['yqt_keywords']+=")|"
+                new_d['yqt_keywords']+=")"
+                new_d['yqt_keywords']=replace_char1(new_d['yqt_keywords'],"",-2)
             if i == 1:
                 new_d['customer'] = (d[1].encode('latin1').decode('gbk'))
                 # new_d['customer'] = (d[1])
@@ -249,10 +261,11 @@ def get_industry_keywords():
             new_d = word
             new_d['industry_name'] = '化妆品'
             new_eight.append(new_d)
-        if word['industry_name'] in '娱乐、旅游业':
+        if word['industry_name'] in '娱乐、旅游业、其它、公关传统':
             new_d = word
             new_d['industry_name'] = '旅游业'
             new_eight.append(new_d)
+
     # for d in new_eight:
     #     print(d)
     return new_eight
@@ -293,6 +306,40 @@ def merger_industry_data(list_msg):
 
     return n_e_d
 
+def merger_industry_data_industry(list_msg):
+    """
+    同一个行业的项目关键词进行合并
+    """
+    set_mark = {i['industry_name'] for i in list_msg}
+    # 设置动态命名模板
+    list_name_template = 'list_data_'
+    # 创建local对象，准备创建动态变量
+    createver = locals()
+    # 循环遍历数据并创建动态列表变量接收
+    for mark in set_mark:
+        # 动态创建变量
+        createver[list_name_template + mark.replace('-', '_')] = [dict_current for dict_current in list_msg if
+                                                                  dict_current['industry_name'] == mark]
+    n_d = []
+    for name in set_mark:
+        # print(list_name_template + name + ':', end='\t')  # 打印自动创建的变量名称，采用tab分隔
+        # exec('print(' + list_name_template + name + ')')  # 打印变量内容（列表）
+        exec('n_d.append(' + list_name_template + name + ')')  # 打印变量内容（列表）
+    n_e_d = []
+    for industry_word in n_d:
+        # print(industry_word)
+        words = ''
+        for i, word in enumerate(industry_word):
+            if i != 0:
+                industry_word[0]['keywords'] += word['keywords']
+                industry_word[0]['customer'] += "_" + word['customer']
+                industry_word[0]['excludewords'] += word['excludewords']
+                industry_word[0]['simultaneouswords'] += word['simultaneouswords']
+                # industry_word[0][]
+        n_e_d.append(industry_word[0])
+    # 八个行业
+    return n_e_d
+
 
 def post_data(data_list, industry_name):
     """
@@ -300,7 +347,7 @@ def post_data(data_list, industry_name):
     """
 
     table_name = tables[industry_name]
-    sql_industry_id = "select id from TS_Industry where name='" + industry_name + "'"
+    sql_industry_id = "select id from TS_Industry where name='" + table_name + "'"
     # print(sql_industry_id)
     # sql_industry_id="select id from TS_Industry wh"
     industry_id = db_b.execute_query(sql_industry_id)[0][0]
@@ -492,18 +539,18 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         thream_info_list.append(info_t)
 
 
-    fi = domain.ExtractLevelDomain()
     print("数据量为:",len(data_list))
     for index,d in enumerate(data_list):
         d['sort_num']=0
         d['parent_id']=[]
         d['create_date'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        for i in range(3, 0, -1):
-            flag = 0
-            # 获取XX子级域名
-            domain_level = fi.parse_url_level(d['链接'], i)
-            if r.hexists("url", domain_level):
-                ret = eval(r.hget("url", domain_level))
+
+        domain_sub=parse.urlparse(d['链接']).netloc.replace("www.","")
+        rx = domain_sub.split(".")
+        domain_search='.'.join(rx)
+        for i in range(0, len(rx) - 1):
+            if r.hexists("url", '.'.join(rx[i:])):
+                ret = eval(r.hget("url", domain_search))
                 d['S_Id'] = ret[-2]  # medium_type
                 # source_type:TS_MediumURL 的 id 自动增长
                 d['source_type'] = ret[0]
@@ -511,16 +558,16 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
                 break
         # 没有domain匹配成功插入
         if flag == 0:
+            # if r.hexists("url", '.'.join(rx[0:])):
             # 插入更新TS_MediumURL数据
-            domain_level = fi.parse_url_level(d['链接'], 1)
-            url_data = (domain_level, "全网", domain_level, 8, 1)
+            url_data = (domain_search, "全网", domain_search, 8, 1)
             sql_MediumSource_Type = "insert into TS_MediumURL (source_name,source_type,domain,medium_type,stat)" \
                                     " values(%s,%s,%s,%d,%d)"
             db_qbbb.execute(sql_MediumSource_Type, url_data)
             SQL_SELECT = "SELECT top 1 * FROM TS_MediumURL ORDER BY id DESC"
             URL_DATA = db_qbbb.execute_query(SQL_SELECT)[0]
             # 更新redis
-            r.hset("url", domain_level, str(URL_DATA))
+            r.hset("url", domain_search, str(URL_DATA))
             # 更改数据
             d['S_Id'] = 8
             d['source_type'] = URL_DATA[0]
@@ -905,12 +952,30 @@ def customer_log():
 if __name__ == '__main__':
     # for d in merger_industry_data(get_industry_keywords()):
     #     print(d)
-    c_d=get_industry_keywords()
-    mao_d=[]
-    for d in c_d:
-        if d['industry_name']=='流通贸易':
-            mao_d.append(d)
+    #     print("***"*20)
 
-
-
-    pprint(mao_d)
+    for data in get_industry_keywords():
+        print(data)
+    # c_d=get_industry_keywords()
+    # mao_d=[]
+    # for d in c_d:
+    #     if d['industry_name']=='流通贸易':
+    #         mao_d.append(d)
+    # pprint(mao_d)
+    # url='http://thsggzyjy.tonghua.gov.cn/jyxx/004002/004002003/004002003002/20210621/e40bfb43-1a2c-41a7-bed5-8c68429f4a53.html'
+    # fi = domain.ExtractLevelDomain()
+    # for i in range(3, 0, -1):
+    #     flag = 0
+    #     print(i)
+    #     获取XX子级域名
+        # domain_level = fi.parse_url_level(url, i)
+        # print(domain_level)
+    #     if r.hexists("url", domain_level):
+    #         ret = eval(r.hget("url", domain_level))
+    #         print(ret[-2])  # medium_type)
+    #         # source_type:TS_MediumURL 的 id 自动增长
+    #         print(ret[0])
+    #         flag = 1
+    #         break
+    # if flag==0:
+    #     print("匹配成功")
