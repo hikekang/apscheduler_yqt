@@ -541,8 +541,8 @@ class YQTSpider(object):
 
                 # update on 2021-05-25 11:20:57
                 with ThreadPoolExecutor(1) as pool:
-                    for datacenter_id,keyword in enumerate(keywords):
-                        pool.submit(thread_part,keyword,datacenter_id+1)
+                    for datacenter_id,item in enumerate(self.info['project_words']):
+                        pool.submit(thread_part,item['keywords'],datacenter_id+1)
                     logger.info("分词抓取完毕")
                 return True
 
@@ -659,12 +659,12 @@ class YQTSpider(object):
         keywords.clear()
         keywords.clear()
         time.sleep(0.3)
-        if self.SimultaneousWord:
-            keyword = "({0})+({1})".format(self.keyword, self.SimultaneousWord)
-        else:
-            keyword = self.keyword
-        keywords.send_keys(keyword)
-        print(keyword)
+        # if self.SimultaneousWord:
+        #     keyword = "({0})+({1})".format(self.keyword, self.SimultaneousWord)
+        # else:
+        #     keyword = self.keyword
+        keywords.send_keys(self.info['yqt_keywords'])
+        # print(keyword)
         time.sleep(0.3)
         fitler_keywords = driver.find_element_by_xpath('//div[@id="senior-area2"]')
         fitler_keywords.clear()
@@ -846,12 +846,12 @@ if __name__ == '__main__':
     # work_it_one_day()
     # print('开始运行')
 
-    # p1 = Process(target=java_task, name='java程序')
+    p1 = Process(target=java_task, name='java程序')
     # # p2 = Process(target=apscheduler,kwargs={'myconfig':myconfig},name='定时抓取')
-    # p1.start()
+    p1.start()
     # # p2.start()
     # # print("运行结束")
-    # work_it_hour(myconfig)
+    work_it_hour(myconfig)
     # # except Exception as e:
     # #     my_e = my_Email()
     # #     my_e.send_message(str(e), "程序预警")
