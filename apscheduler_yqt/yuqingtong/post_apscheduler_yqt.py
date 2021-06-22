@@ -42,7 +42,7 @@ from utils import ssql_helper_test as ssql_helper
 import re
 from selenium.webdriver.chrome.service import Service
 from multiprocessing import Process
-from utils.email_helper import my_Email
+# from utils.email_helper import my_Email
 from lxml import etree
 from utils.post_helper import SecondData
 from concurrent.futures import ThreadPoolExecutor
@@ -190,6 +190,7 @@ class YQTSpider(object):
                     '发布人': item.get('author'),
                     'ic_id': item['id'],
                     'keywords_id': item['keywordId'],
+                    # attitude:item['distrution']
                     'attitude': item['emotion'],
                     'images':"" ,
                     'reposts_count': item['forwardNumber'],
@@ -287,13 +288,13 @@ class YQTSpider(object):
                 data['is_original'] = 2
             sec_list.append(data)
         t2 = time.time()
-        logger.info("数据处理花费时间:", t2 - t1)
-        logger.info("数据处理完毕之后的数量", len(sec_list))
+        # logger.info("数据处理花费时间:", t2 - t1)
+        # logger.info("数据处理完毕之后的数量", len(sec_list))
         return sec_list
 
     # 第一次根据爬取链接去重
     def quchong(self, dir_list, key):
-        logger.info("第一次链接去重之前数据量为：",len(dir_list))
+        logger.info("第一次链接去重之前数据量为：%s",str(len(dir_list)))
         new_dirlist = []
         values = []
         for d in dir_list:
@@ -301,10 +302,11 @@ class YQTSpider(object):
                 new_dirlist.append(d)
                 values.append(d[key])
 
-        logger.info("第一次滤重之后的数量:", self.first_len)
+        self.first_len += len(new_dirlist)
+        logger.info("第一次滤重之后的数量:%s", str(self.first_len))
 
         # 本次打开浏览器直至抓取结束的数据量
-        self.first_len += len(new_dirlist)
+
         return new_dirlist
 
     def _is_page_loaded(self, count=1):
@@ -398,6 +400,7 @@ class YQTSpider(object):
                 "page": 1,
                 "pageSize": 100
             }}
+
             payload_all['searchCondition']['page'] = i
             # 数据进行处理
             raw_data=self._parse(payload_all)
@@ -417,7 +420,7 @@ class YQTSpider(object):
                 logger.info(f"保存完毕")
                 time.sleep(time_sleep)
         def thread_part(keyword,datacenter_id):
-            logger.info("本次抓取的关键词为：",keyword)
+            logger.info(f"本次抓取的关键词为：{keyword}")
             payload_part = {"searchCondition": {"keywordId": int(self.keyword_id), "accurateSwitch": 1,
                                                 "bloggerAuthenticationStatusMultiple": "0",
                                                 "blogPostsStatus": 0, "comblineflg": 2, "dataView": 0, "displayIcon": 1,
@@ -537,7 +540,7 @@ class YQTSpider(object):
                 # pool.join()
 
                 # update on 2021-05-25 11:20:57
-                with ThreadPoolExecutor(10) as pool:
+                with ThreadPoolExecutor(1) as pool:
                     for datacenter_id,keyword in enumerate(keywords):
                         pool.submit(thread_part,keyword,datacenter_id+1)
                     logger.info("分词抓取完毕")
@@ -554,7 +557,7 @@ class YQTSpider(object):
                 #     thread.join()
 
                 #update on 2021-05-25 11:22:06
-                with ThreadPoolExecutor(10) as pool:
+                with ThreadPoolExecutor(1) as pool:
                     for i in range(1,maxpage+1):
                         pool.submit(thread_all, i)
 
@@ -584,7 +587,7 @@ class YQTSpider(object):
                 record_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                                 f"record\{self.project_name}", f"{self}_记录.xlsx")
                 # 本次抓取TS_A库和QBBB_B库、中的数量
-                sql_number_A,sql_number_B = ssql_helper.find_info_count(self.interval[0],
+                sql_number_A,sql_number_B = ssql_helper.find_curent_num(self.interval[0],
                                                                         self.interval[1],
                                                                         self.myconfig,
                                                                         self.info,
@@ -597,6 +600,10 @@ class YQTSpider(object):
                 # 本地记录文件保存
                 SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number_A,sql_number_B,
                                               data_list=data_list)
+                record_day_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                                f"record\{self.project_name}", f"{self}_{self.project_name}记录.xlsx")
+                # SpiderHelper.save_record_day_data(record_day_file_path, yqt_count, sql_number_B)
+                # my_Email().send_xlsx(record_file_path)
                 # record_dict = (self.industry_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
                 # self.next_end_time, yqt_count, self.post_number, self.project_name)
 
@@ -618,6 +625,7 @@ class YQTSpider(object):
                 ssql_helper.record_log(record_dict)
                 # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,
                 # post_info['number'],post_info2['number'],sql_number,data_list=data_list)
+                print("结束返回")
                 return True
             else:
                 return False
@@ -633,6 +641,8 @@ class YQTSpider(object):
         # 获取keywords_id
         keyword_id = driver.current_url.split("=")[-1]
         self.keyword_id = keyword_id
+        doc = etree.HTML(driver.page_source)
+        # self.userSearchSetId=doc.xpath('//input[@id="view.userSearchSetId"]')[0].text
         driver.close()
         driver.switch_to.window(driver.window_handles[0])
         banzi = span.find_element_by_xpath('.//i[@class="anticon ant-dropdown-trigger"]')
@@ -705,10 +715,13 @@ class YQTSpider(object):
                     # pyautogui.alert("抓取完成...")
         except Exception as e:
             logger.warning(e)
-        finally:
-            if self.spider_driver.service.is_connectable():
-                self.spider_driver.quit()
-                self.spider_driver.close()
+        # finally:
+        #     print("进入finally")
+        #     if self.spider_driver.service.is_connectable():
+        #         print("进入finally2")
+        #         self.spider_driver.quit()
+        #         self.spider_driver.close()
+        #         print("关闭")
 
 
 # 自定义时间抓取任务
@@ -735,10 +748,19 @@ def work_it(myconfig, start_time, end_time):
     #         p_data.append(project_data)
     # logger.info(p_data)
 
+    # 根据项目进行抓取，方便统计
+    industry_keywords=myconfig.getValueByDict('industry_info','industry_keywords')
     for d in customer_list_data:
-        if d['keywords']!='':
-            yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=d, is_one_day=False)
-            chrome_service.stop()
+        if d['industry_name'] in industry_keywords:
+            if d['keywords']!='':
+                yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=d, is_one_day=False)
+                print("完成一轮")
+
+    if yqt_spider.spider_driver.service.is_connectable():
+        print("进入finally2")
+        yqt_spider.spider_driver.close()
+        print("关闭")
+    chrome_service.stop()
 
 
 def work_it_hour(myconfig):
@@ -824,13 +846,13 @@ if __name__ == '__main__':
     # work_it_one_day()
     # print('开始运行')
 
-    p1 = Process(target=java_task, name='java程序')
-    # p2 = Process(target=apscheduler,kwargs={'myconfig':myconfig},name='定时抓取')
-    p1.start()
-    # p2.start()
-    # print("运行结束")
-    work_it_hour(myconfig)
-    # except Exception as e:
-    #     my_e = my_Email()
-    #     my_e.send_message(str(e), "程序预警")
-    # # work_it_hour()
+    # p1 = Process(target=java_task, name='java程序')
+    # # p2 = Process(target=apscheduler,kwargs={'myconfig':myconfig},name='定时抓取')
+    # p1.start()
+    # # p2.start()
+    # # print("运行结束")
+    # work_it_hour(myconfig)
+    # # except Exception as e:
+    # #     my_e = my_Email()
+    # #     my_e.send_message(str(e), "程序预警")
+    # # # work_it_hour()
