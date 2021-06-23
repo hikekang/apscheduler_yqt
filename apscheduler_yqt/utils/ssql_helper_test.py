@@ -492,7 +492,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         data['id'] = id
 
         post_data = {"industryNewsId": id, "tableName": table_name.split(".")[-1]}
-        post_data_list_event_2_1.append(post_data)
+        # post_data_list_event_2_1.append(post_data)
         # 更新redis
         myredis.redis.sadd(industry_id, data['链接'])
         tuple_data_ts_a = (
@@ -505,13 +505,13 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         tuple_data_list_ts_a.append(tuple_data_ts_a)
 
         tuple_data_list_qbb_a.append(tuple_data_qbb_a)
-    tag_data = {
-        'queues': 'task.msg.event_2.1',
-        'message': str(post_data_list_event_2_1)
-    }
-    url = 'http://localhost:8090/jms/send_array'
-    proxies = {'http': None, 'https': None}
-    requests.get(url=url, proxies=proxies, params=tag_data)
+        tag_data = {
+            'queues': 'task.msg.event_2.1',
+            'message': str(post_data)
+        }
+        url = 'http://localhost:8090/jms/send_array'
+        proxies = {'http': None, 'https': None}
+        requests.get(url=url, proxies=proxies, params=tag_data)
 
 
     # sql_ts_a_second_data = "insert into TS_Second_Data (id,industry_id,ic_id,keywords_id,url) values (%d,%d,%s,%s,%s)"
@@ -554,6 +554,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
 
     print("数据量为:",len(data_list))
     for index,d in enumerate(data_list):
+        print("111第几个:", index)
         d['sort_num']=0
         d['parent_id']=[]
         d['create_date'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -561,9 +562,10 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         domain_sub=parse.urlparse(d['链接']).netloc.replace("www.","")
         rx = domain_sub.split(".")
         domain_search='.'.join(rx)
+        print(domain_search)
         for i in range(0, len(rx) - 1):
             if r.hexists("url", '.'.join(rx[i:])):
-                ret = eval(r.hget("url", domain_search))
+                ret = eval(r.hget("url", '.'.join(rx[i:])))
                 d['S_Id'] = ret[-2]  # medium_type
                 # source_type:TS_MediumURL 的 id 自动增长
                 d['source_type'] = ret[0]
@@ -598,8 +600,10 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         # 其他均为转发
         else:
             d['sort'] = 0
+
         print("第几个:",index)
         mark_java_match_data(d,thream_info_list)
+        print("完成")
 
     myredis.close()
     # post_mq.close_mq()
@@ -743,7 +747,7 @@ def mark_java_match_data(d,theam_list):
             proxies = {'http': None, 'https': None}
             requests.get(url=url, proxies=proxies, params=emotion_2_data)
             tag_data = {
-                'queues': 'task.msg.tag_2.1',
+                'queues': 'task.msg.tags_2.1',
                 'message': str({"sN": d['SN'], "cId": d['C_Id']})
             }
             requests.get(url=url, proxies=proxies, params=tag_data)
@@ -777,6 +781,12 @@ def mark_java_match_data(d,theam_list):
 
 
 def match_this_theam(info,match_data):
+    """
+
+    :param info: 传进来的主题信息
+    :param match_data:要匹配的数据
+    :return:
+    """
     if info['keywords'] != '':
         if info['excludewords'] == '' and info['simultaneouswords'] == '':
             if contain_keywords(info['keywords'], match_data):
