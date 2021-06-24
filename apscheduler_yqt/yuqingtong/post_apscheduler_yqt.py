@@ -184,9 +184,9 @@ class YQTSpider(object):
                     # '时间': item['captureTime'].replace("T"," ").replace(".000+0000",""),
                     '时间': item['publishedMinute'],
                     '标题': ex(item['title']) if item['title']!=None else item['title'],
-                    '描述': ex(item['content']) if item['content']!=None else item['content'],  # 微博原创
+                    '描述': ex(item['summary']) if item['summary']!=None else item['summary'],  # 微博原创
                     '链接': item['webpageUrl'],
-                    '转发内容': ex(item['forwarderContent']) if item['forwarderContent']!=None else item['forwarderContent'],
+                    '转发内容': '',
                     '发布人': item.get('author'),
                     'ic_id': item['id'],
                     'keywords_id': item['keywordId'],
@@ -203,14 +203,20 @@ class YQTSpider(object):
                     'area': item['province'],
                     'C_Id':self.info['id']# 客户id
                 }
+
+                if item['forwarderContent']!=None:
+                    data['转发内容']+=ex(item['forwarderContent'])
+                if item['ocrContents'] != None:
+                    data['转发内容'] += ex(item['ocrContents'])
+
                 if item['forwarderImages']:
                     for item_pic in item['forwarderImages']:
                         data['images']+=item_pic['bmiddlePic']
                 if data['sort'] == '原创':
                     data['转发内容'] = data['描述']
-                if len(data['标题']) > 20:
-                    data['标题'] = data['标题'][0:20]
 
+                # if len(data['标题']) > 20:
+                #     data['标题'] = data['标题'][0:20]
                 if data['发布人']:
                     if '：' in data['发布人'] or ":" in data['发布人']:
                         publish_man = re.sub(':|：', '', data['发布人'])
@@ -268,6 +274,8 @@ class YQTSpider(object):
                     data["标题"] = data["转发内容"]
                     data['描述'] = data["转发内容"]
 
+
+
             if data['描述'] != "" and data["转发内容"] == "" and len(data["转发内容"]) == 0:
                 data["转发内容"] = data['描述']
 
@@ -276,7 +284,16 @@ class YQTSpider(object):
                     data["标题"] = data["转发内容"][0:20]
                 else:
                     data['描述'] = data['转发内容']
+            if "转发微博" in data['描述'] and data["转发内容"] != "":
+                if len(data["转发内容"]) >= 20:
+                    data["标题"] = data["转发内容"][0:20]
+                else:
+                    data['描述'] = data['转发内容']
 
+            if data['site_name'] == "新浪微博":
+                data['标题'] =data['描述']
+            if len(data['描述']) > 20:
+                data['描述'] = data['描述'][0:20]
             if "weibo.com" in data["链接"] and data["sort"] != "":
                 if data["sort"] == "原创":
                     data['is_original'] = 1
@@ -448,11 +465,12 @@ class YQTSpider(object):
                 if maxpage != 0:
                     if maxpage>50:
                         # maxpage=50
-                        maxpage = int(self.myconfig.getValueByDict('spider_config', 'maxpage'))
-                    for i in range(1, maxpage + 1):
+                        maxpage_info = int(self.myconfig.getValueByDict('spider_config', 'maxpage'))
+
+                    for i in range(1, 31):
                         payload_part['searchCondition']['page'] = i
                         logger.info(f"抓取的关键字为{payload_part['searchCondition']['searchSecondKeyword']}，抓取到第{i}页")
-                        content = self._parse(payload_part)
+                        content = SecondData(self.cookie, payload_part).get_content_by_keywords()
                         if content != None:
                             data_list = self.clear_data(content)
                             if data_list:
@@ -559,9 +577,13 @@ class YQTSpider(object):
                 #     thread.join()
 
                 #update on 2021-05-25 11:22:06
-                with ThreadPoolExecutor(1) as pool:
-                    for i in range(1,maxpage+1):
-                        pool.submit(thread_all, i)
+                # with ThreadPoolExecutor(1) as pool:
+                #     for i in range(1,maxpage+1):
+                #         pool.submit(thread_all, i)
+
+                for i in range(1,maxpage+1):
+                    thread_all(i)
+
 
                     # pool = ThreadPool()
                 # pool.map(thread_part, range(0,maxpage+1))
@@ -752,11 +774,13 @@ def work_it(myconfig, start_time, end_time):
 
     # 根据项目进行抓取，方便统计
     industry_keywords=myconfig.getValueByDict('industry_info','industry_keywords')
+    customer_name=myconfig.getValueByDict('industry_info','project_name')
     for d in customer_list_data:
         if d['industry_name'] in industry_keywords:
-            if d['keywords']!='':
-                yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=d, is_one_day=False)
-                print("完成一轮")
+            if d['customer']==customer_name:
+                if d['keywords']!='':
+                    yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=d, is_one_day=False)
+                    print("完成一轮")
 
     if yqt_spider.spider_driver.service.is_connectable():
         print("进入finally2")
@@ -841,7 +865,7 @@ if __name__ == '__main__':
     myconfig = config.redconfig()
     print("加载数据")
     industry_name=myconfig.getValueByDict('industry_info', 'industry_name')
-    ssql_helper.get_month_data(time1, today,industry_name)
+    # ssql_helper.get_month_data(time1, today,industry_name)
     # print("加载完毕")
     # xlsx_work()
     # work_it_2()
