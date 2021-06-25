@@ -204,16 +204,23 @@ class YQTSpider(object):
                     'C_Id':self.info['id']# 客户id
                 }
 
+                if item['content'] != None:
+                    data['转发内容'] += ex(item['content'])
+                    # print(data['转发内容'])
+                    print('content')
                 if item['forwarderContent']!=None:
                     data['转发内容']+=ex(item['forwarderContent'])
+                    print('forwarderContent')
                 if item['ocrContents'] != None:
                     data['转发内容'] += ex(item['ocrContents'])
+                    print('ocrContents')
+
 
                 if item['forwarderImages']:
                     for item_pic in item['forwarderImages']:
                         data['images']+=item_pic['bmiddlePic']
-                if data['sort'] == '原创':
-                    data['转发内容'] = data['描述']
+                # if data['sort'] == '原创':
+                #     data['转发内容'] = data['描述']
 
                 # if len(data['标题']) > 20:
                 #     data['标题'] = data['标题'][0:20]
@@ -260,41 +267,45 @@ class YQTSpider(object):
                     data["标题"] = data["转发内容"][0:20]
                 else:
                     data["标题"] = data["转发内容"]
-            #     2.转发微博并且转发内容为空的使舍去
+            #2.转发微博并且转发内容为空的使舍去
             elif data["标题"] == "转发微博" and data["转发内容"] == "":
                 # new_data_list.remove(data)
                 print("标题为转发微博，转发内容为空")
                 continue
-            #     3.转发类型的微博，取前内容的前20个字符作为标题
+            #3.转发类型的微博，取前内容的前20个字符作为标题
             elif data["标题"] == "转发微博":
-                if len(data["转发内容"]) >= 20:
+                if len(data["转发内容"]) >= 50:
                     data["标题"] = data["转发内容"][0:20]
-                    data['描述'] = data["转发内容"][0:20]
+                    data['描述'] = data["转发内容"][0:120]
                 else:
                     data["标题"] = data["转发内容"]
                     data['描述'] = data["转发内容"]
-
-
 
             if data['描述'] != "" and data["转发内容"] == "" and len(data["转发内容"]) == 0:
                 data["转发内容"] = data['描述']
 
             if data['转发内容'] != "" and data['描述'] == "" and len(data['转发内容']) != 0:
-                if len(data["转发内容"]) >= 20:
-                    data["标题"] = data["转发内容"][0:20]
-                else:
-                    data['描述'] = data['转发内容']
-            if "转发微博" in data['描述'] and data["转发内容"] != "":
-                if len(data["转发内容"]) >= 20:
-                    data["标题"] = data["转发内容"][0:20]
-                else:
-                    data['描述'] = data['转发内容']
+                # if len(data["转发内容"]) >= 20:
+                #     data["标题"] = data["转发内容"][0:20]
+                # else:
+                #     data['描述'] = data['转发内容']
+                data['描述'] = data['转发内容']
 
-            if data['site_name'] == "新浪微博":
-                data['标题'] =data['描述']
-            if len(data['描述']) > 20:
-                data['描述'] = data['描述'][0:20]
+            if data['描述']=="转发微博" and data["转发内容"] != "":
+                if len(data["转发内容"]) >= 50:
+                    data['描述'] = data['转发内容'][0:120]
+                else:
+                    data['描述']=data['转发内容']
+
+            if "微博" in data['site_name']:
+                print("处理标题")
+                data['标题'] =data['描述'][0:20]
+            if len(data['描述']) > 120:
+                print("处理描述")
+                data['描述'] = data['描述'][0:120]
+
             if "weibo.com" in data["链接"] and data["sort"] != "":
+                data['标题'] = data['描述'][0:20]
                 if data["sort"] == "原创":
                     data['is_original'] = 1
                 elif data["sort"] == "转发":
@@ -560,7 +571,7 @@ class YQTSpider(object):
                 # pool.join()
 
                 # update on 2021-05-25 11:20:57
-                with ThreadPoolExecutor(1) as pool:
+                with ThreadPoolExecutor(10) as pool:
                     for datacenter_id,item in enumerate(self.info['project_words']):
                         pool.submit(thread_part,item['keywords'],datacenter_id+1)
                     logger.info("分词抓取完毕")
@@ -577,7 +588,7 @@ class YQTSpider(object):
                 #     thread.join()
 
                 #update on 2021-05-25 11:22:06
-                # with ThreadPoolExecutor(1) as pool:
+                # with ThreadPoolExecutor(10) as pool:
                 #     for i in range(1,maxpage+1):
                 #         pool.submit(thread_all, i)
 
@@ -865,19 +876,20 @@ if __name__ == '__main__':
     myconfig = config.redconfig()
     print("加载数据")
     industry_name=myconfig.getValueByDict('industry_info', 'industry_name')
-    # ssql_helper.get_month_data(time1, today,industry_name)
+    ssql_helper.get_month_data(time1, today,industry_name)
     # print("加载完毕")
     # xlsx_work()
     # work_it_2()
     # work_it_one_day()
     # print('开始运行')
 
-    p1 = Process(target=java_task, name='java程序')
+    # p1 = Process(target=java_task, name='java程序')
     # # p2 = Process(target=apscheduler,kwargs={'myconfig':myconfig},name='定时抓取')
-    p1.start()
+    # p1.start()
     # # p2.start()
     # # print("运行结束")
     work_it_hour(myconfig)
+    print("抓取结束")
     # # except Exception as e:
     # #     my_e = my_Email()
     # #     my_e.send_message(str(e), "程序预警")
