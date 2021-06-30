@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 """
    File Name：     email_helper
-   Description :
+   Description :   发送email
    Author :       hike
    time：          2021/5/8 13:47
 """
 import smtplib
 from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
+from email.mime.multipart import MIMEMultipart
 class my_Email():
     def __init__(self):
         # 设置服务器所需信息
@@ -45,3 +47,21 @@ class my_Email():
             print('success')
         except smtplib.SMTPException as e:
             print('error',e) #打印错误
+    def send_xlsx(self,execel_name):
+        file_name=execel_name
+        attFile = MIMEApplication(open(file_name, 'rb').read())
+        attFile.add_header('Content-Disposition', 'attachment', filename=file_name)
+        message = MIMEMultipart()
+        message['From'] = self.sender
+        message['To'] = self.receivers[0]
+        message['Subject'] = 'title'
+        message.attach(attFile)
+        try:
+            smtpObj = smtplib.SMTP()
+            smtpObj.connect(self.mail_host, 25)
+            smtpObj.login(self.mail_user, self.mail_pass)
+            smtpObj.sendmail(self.sender, self.receivers, message.as_string())
+            print('success')
+            smtpObj.quit()
+        except smtplib.SMTPException as e:
+            print('error', e)

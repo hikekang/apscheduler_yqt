@@ -10,16 +10,17 @@ POOL = PooledDB(
     mincached=2,  # 初始化时，链接池中至少创建的链接，0表示不创建
     blocking=True,  # 连接池中如果没有可用连接后，是否阻塞等待。True，等待；False，不等待然后报错
     ping=0,
-    # ping MySQL服务端，检查是否服务可用。# 如：0 = None = never, 1 = default = whenever it is requested, 2 = when a cursor is created, 4 = when a query is executed, 7 = always
+    # ping MySQL服务端，检查是否服务可用。
+    # 如：0 = None = never, 1 = default = whenever it is requested, 2 = when a cursor is created, 4 = when a query is executed, 7 = always
 
     port=1433,
     # charset='cp936',
     # charset='cp936',
 
-    host='127.0.0.1',
-    user='sa',
-    password='1q2w3e...',
-    database='Social360_A',
+    host='223.223.180.9',
+    user='tuser1',
+    password='tsuser1@123aA',
+    database='TS_A',
 
     # host='123.56.250.57',
     # user='social',
@@ -58,7 +59,7 @@ class SqlHelper(object):
 
 
 def task(i):
-    sql = "select top 2 * from listpage;"
+    sql = "select * from crawler_word;"
     with SqlHelper() as cur:
         cur.execute(sql)
         data = cur.fetchall()

@@ -13,17 +13,15 @@ from fake_useragent import UserAgent
 
 from utils.snowflake import IdWorker
 import pymssql
-from utils import getdatabyselenium
-import redis
+from utils.redis_helper import my_redis
 import time
 import re
 import stomp
-from utils.getdatabyselenium import get_data_it
+from utils.getdatabyselenium import get_num_driver
 import requests
 from utils import extract_content
 
-pool = redis.ConnectionPool(host='localhost', port=6379, decode_responses=True)
-r = redis.Redis(connection_pool=pool)
+
 config = {
     'server': '223.223.180.9',
     'user': 'tuser1',
@@ -238,7 +236,8 @@ def post_data(data_list, industry_name):
     cursor_B.execute(sql_industry_id)
 
     industry_id = cursor_B.fetchone()[0]
-    print(len(data_list))
+    # print(len(data_list))
+    my_red = my_redis()
     for data in data_list:
         worker = IdWorker(1, 2, 0)
         # 生成雪花id
@@ -257,7 +256,9 @@ def post_data(data_list, industry_name):
             "industryId": industry_id
         }
         # 更新redis
-        r.sadd(industry_id, data['链接'])
+
+        my_red.redis.sadd(industry_id, data['链接'])
+
 
         # 滤重
         # post_mq.send_to_queue('reptile.stay.process',str(data))
@@ -280,6 +281,7 @@ def post_data(data_list, industry_name):
         # proxies = {"http": None, "https": None}
         requests.get(url, proxies=proxies)
     print("数据上传成功")
+    # my_red.close()
 
 
 def upload_many_data(data_list, industry_name):
@@ -299,6 +301,7 @@ def upload_many_data(data_list, industry_name):
     tuple_data_list_qbb_a = []
     post_data_list = []
     worker = IdWorker(1, 2, 0)
+    my_red = my_redis()
     for data in data_list:
         # 生成雪花id
 
@@ -309,7 +312,8 @@ def upload_many_data(data_list, industry_name):
         }
         post_data_list.append(post_data)
         # 更新redis
-        r.sadd(industry_id, data['链接'])
+
+        my_red.redis.sadd(industry_id, data['链接'])
 
         tuple_data_ts_a = (
             id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
@@ -357,6 +361,7 @@ def upload_many_data(data_list, industry_name):
     requests.get(url=url, proxies=proxies, params=data_2_1)
     requests.get(url=url, proxies=proxies, params=data_2)
     print("数据上传成功")
+    # my_red.close()
 
 def close_all_db():
     cursor_A.close()
@@ -396,14 +401,16 @@ def get_month_data(time1, time2):
     """
     # 将所有行业的数据加载到内存中
     """
-    r.flushall()
+    my_red = my_redis()
+    my_red.redis.flushall()
     for tb in tables.values():
         sql = "select industry_id,url from %s where publish_time between '%s' and '%s'" % (tb, time1, time2)
         print(sql)
         cursor_A.execute(sql)
         datas = cursor_A.fetchall()
         for d in datas:
-            r.sadd(d[0], d[1])
+            my_red.redis.sadd(d[0], d[1])
+    # my_red.close()
 
 
 # 根据url进行二次滤重
@@ -411,16 +418,18 @@ def filter_by_url(datalist, industry_name):
     """
 
     """
+    my_red=my_redis()
     sql_industry_id = "select id from TS_Industry where name='" + industry_name + "'"
     cursor_B.execute(sql_industry_id)
     industry_id = cursor_B.fetchone()[0]
     new_data_list = []
     # redis滤重
     for data in datalist:
-        if r.sismember(industry_id, data['链接']) == False:
+        if my_red.redis.sismember(industry_id, data['链接']) == False:
             new_data_list.append(data)
     print("rediss 滤重之后的数量")
     print(len(new_data_list))
+    # my_red.close()
     return new_data_list
 def record_log(data):
     """
@@ -564,8 +573,10 @@ def track_data_task():
     直接扫描表
     数据库中获取链接进行追踪
     """
+    driver = get_num_driver()
     for data in get_track_datas_qbbb():
-        num = getdatabyselenium.get_data_it(data[1])
+
+        num = driver.get_data_it(data[1])
         # data=getdatabyselenium.get_data_it(url['url'])
         create_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         #     转发、评论、点赞
@@ -582,6 +593,8 @@ def track_data_task():
         sql_track_task="update TS_track_task set is_done=1 where sn='%s' "%data[2]
         cursor_QBBB.execute(sql_track_task)
         # print('追踪完毕')
+
+    driver.close()
 
 
 def track_data_number_sql2(sn, data):
@@ -661,10 +674,11 @@ def get_url_from_stomp(frame_body_list):
     try:
         if frame_body_list:
             print("开始抓数据")
+            driver=get_num_driver()
             for frame_body in frame_body_list:
                 pattern = re.compile(r'http://weibo.com(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
                 url = re.findall(pattern, frame_body)
-                data = get_data_it(url[0])
+                data = driver.get_data_it(url[0])
                 sn = frame_body.split('"')[3]
                 track_data_number_sql2(sn, data)
                 for x in range(3):
@@ -674,6 +688,8 @@ def get_url_from_stomp(frame_body_list):
     except Exception as e:
         print(e)
         return False
+    finally:
+        driver.close()
 
 
 def track_data_work():
@@ -709,9 +725,9 @@ if __name__ == '__main__':
 
     # single_thread()
 
-    # for d in get_industry_keywords():
-    #     print(d)
-    # track_data_task()
+    for d in get_industry_keywords():
+        print(d)
+    track_data_task()
     # record_log()
 
     # for d in merger_industry_data(get_industry_keywords()):
@@ -724,4 +740,4 @@ if __name__ == '__main__':
     # for data in second_data_url_sql():
     #     print(data)
     #     print(data[5])
-    customer_log()
+    # customer_log()

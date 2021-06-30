@@ -110,7 +110,6 @@ class DataBase(object):
         except Exception as e:
             print('sql:[{}]meet error'.format(sql))
             print(e.args[-1])
-            return ()
         finally:
             if conn:
                 conn.close()
@@ -131,6 +130,7 @@ class DataBase(object):
             cur = conn.cursor()
             cur.executemany(sql, data)
             conn.commit()
+            print("执行sql成功")
         except Exception as e:
             print('[{}]meet error'.format(sql))
             print(e.args[-1])

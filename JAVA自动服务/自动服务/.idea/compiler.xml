@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="dg-ts-service" />
+        <module name="pull-news-service" />
+        <module name="trackercrawler" />
+        <module name="ts-server-comn" />
+      </profile>
+    </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="dg-ts-service" target="1.8" />
+      <module name="pull-news-service" target="1.8" />
+      <module name="trackercrawler" target="1.8" />
+      <module name="ts-server-comn" target="1.8" />
+      <module name="自动服务" target="1.8" />
+    </bytecodeTargetLevel>
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="dg-ts-service" options="-parameters" />
+      <module name="pull-news-service" options="-parameters" />
+      <module name="trackercrawler" options="-parameters" />
+      <module name="ts-server-comn" options="-parameters" />
+    </option>
+  </component>
+</project>

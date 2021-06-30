@@ -19,12 +19,14 @@ from utils.webdriverhelper import MyWebDriver
 from utils.my_pyautogui import pyautogui
 from utils.webdriverhelper import WebDriverHelper
 from yuqingtong import config
-from utils.ssql_helper import track_data_number_sql
+from utils.ssql_helper import record_log
 from utils import ssql_helper
 import re
 class YQTSpider(object):
 
     def __init__(self,info,spider_driver=None, start_time=None,end_time=None,  *args, **kwargs):
+        self.keyword=info['keywords']
+        self.infos=info
         if spider_driver is None:
             self.spider_driver = WebDriverHelper.init_webdriver(is_headless=config.HEAD_LESS)  # type:MyWebDriver
         else:
@@ -127,137 +129,7 @@ class YQTSpider(object):
             return True
         else:
             return self._login(count=count + 1)
-    # 解析页面进行数据抓取和保存
-    def _parse(self, page_source):
-        # 解析源码
-        doc = pq(page_source)
 
-        items = doc.find('tbody tr.ng-scope').items()
-
-        data_list = []
-        for item in items:
-            td_title = item.find('td:nth-child(2)')
-            td_origins = item.find('td:nth-child(4)')
-            td_time = item.find('td:last-child')
-
-
-            def parse_time(td_time):
-                from datetime import datetime
-                ymd_1 = td_time.find('span:first-child').text()
-                ymd_2 = td_time.find('span:last-child').text()
-                try:
-                    if "年" in ymd_1:  # 不是今年的数据
-                        ymd = "".join([ymd_1, ymd_2])
-                    elif "今天" in ymd_2:  # 今天的数据
-                        ymd = " ".join([f"{str(datetime.now().date())}", ymd_1])
-                        return datetime.strptime(ymd, "%Y-%m-%d %H:%M").strftime("%Y-%m-%d %H:%M:%S")
-                    else:
-                        ymd = " ".join([f"{datetime.now().year}年" + ymd_2, ymd_1])
-                    return datetime.strptime(ymd, "%Y年%m月%d日 %H:%M").strftime("%Y-%m-%d %H:%M:%S")
-                except Exception as e:
-                    logger.warning(e)
-                    logger.warning(td_time)
-
-            # 转发类型  原创
-            sort = td_title.find('div.news-item-tools.font-size-0 span.tag-yuan').text()
-            # 转发内容
-            repost_content = td_title.find('div.item-title.resend-news-item-title').text().replace('\n', '')
-            pinglun=td_title.find('div.inline-block.mr10.tag-ping').text().replace('\n','')#评论
-
-            if repost_content:
-                sort = "转发"
-            if pinglun:
-                sort = "评论"
-            # 微博原创类型的内容、转发类型的评论内容、其他类型的内容
-            content = td_title.find('div.item-title.news-item-title.contenttext.ng-binding').text().replace('\n', ''),
-
-            title = td_title.find('span[ng-bind-html="icc.title | trustAsHtml"]').text().replace('\n', '')
-            site_name = td_origins.find('span[ng-bind="icc.captureWebsiteName"]').text()
-
-            if (site_name == '新浪微博' or site_name=='今日头条'):
-                data = {
-                    '时间': parse_time(td_time),
-                    '标题': content[0].replace("'",""),
-                    '描述': content[0].replace("'",""),#微博原创
-                    '链接': td_title.find('.news-item-tools.font-size-0 div:nth-child(2)>div>ul>li:nth-child(4) a').attr(
-                        "href"),
-                    '转发内容': repost_content.replace("'",""),
-                    '发布人': td_title.find('a[ng-bind="icc.author"]').text(),
-                    'attitude': td_title.find(
-                        'div[ng-show="view.resultPresent != 3"] div.sensitive-status-content:not(.ng-hide)>span:first-child').text(),
-                    'images': ",".join([img.attr('src') for img in item.find('.actizPicShow img').items()]),
-                    'reposts_count': item.find(
-                        'div.news-item-title.color-gray-6.font-size-12.ng-scope span:first>span').text(),
-
-                    'comments_count': item.find(
-                        'div.news-item-title.color-gray-6.font-size-12.ng-scope span:nth-child(3)>span').text(),
-                    'sort': sort,
-
-                    'industry': td_title.find(
-                        '.news-item-tools.font-size-0 div:nth-child(1) div[ng-if="secondTrade!=null"]').text(),
-
-                    'related_words': td_title.find(
-                        '.news-item-tools.font-size-0 div:nth-child(1) span[ng-bind="icc.referenceKeyword"]').text(),
-
-                    'site_name': td_origins.find('span[ng-bind="icc.captureWebsiteName"]').text(),
-                    'area': td_origins.find('div[ng-bind="icc.province"]').text(),
-
-                }
-                # 针对微博而言
-                if sort=='评论':
-                    data['链接']=td_title.find('.news-item-tools.font-size-0 div:nth-child(2)>div>ul>li:nth-child(3) a').attr("href")
-                    # 评论的内容
-                    biaoti=td_title.find('div.item-title.news-item-title.dot.ng-binding').text().replace('\n', '').replace("'","")
-                    data['标题']=repost_content.replace("'","")[0:20]
-                    data['发布人']=td_title.find('a[ng-if="icc.commentAuthor != null"]').text()
-                    data['描述']=repost_content.replace("'","")
-                elif sort=='原创':
-                    data['转发内容']=data['描述']
-            else:
-                data = {
-                    '时间': parse_time(td_time),
-                    '标题': title.replace("'",""),
-                    '描述': content[0].replace("'",""),
-                    '链接': td_title.find('.news-item-tools.font-size-0 div:nth-child(2)>div>ul>li:nth-child(4) a').attr(
-                        "href"),
-                    '转发内容': repost_content.replace("'",""),
-                    # '发布人': td_title.find('div[class="profile-title inline-block"]>a>span:first-child').text(),
-                    '发布人': td_title.find('div[class="profile-title inline-block"]>a>span[ng-if*="icc.author"]').text(),
-                    'attitude': td_title.find(
-                        'div[ng-show="view.resultPresent != 3"] div.sensitive-status-content:not(.ng-hide)>span:first-child').text(),
-                    'images': ",".join([img.attr('src') for img in item.find('.actizPicShow img').items()]),
-                    'reposts_count': item.find(
-                        'div.news-item-title.color-gray-6.font-size-12.ng-scope span:first>span').text(),
-
-                    'comments_count': item.find(
-                        'div.news-item-title.color-gray-6.font-size-12.ng-scope span:nth-child(3)>span').text(),
-
-                    'sort': sort,
-
-                    'industry': td_title.find(
-                        '.news-item-tools.font-size-0 div:nth-child(1) div[ng-if="secondTrade!=null"]').text(),
-
-                    'related_words': td_title.find(
-                        '.news-item-tools.font-size-0 div:nth-child(1) span[ng-bind="icc.referenceKeyword"]').text(),
-
-                    'site_name': td_origins.find('span[ng-bind="icc.captureWebsiteName"]').text(),
-                    'area': td_origins.find('div[ng-bind="icc.province"]').text(),
-
-                }
-            # print(data)
-            publish_man=re.sub(':|：','',data['发布人'])
-            data['发布人']=publish_man
-            positive_prob = td_title.find('div.sensitive-status-wrapper.p-r>div:first-child>span:first-child').text()
-            positive_dict = {
-                "敏感": 0.1,
-                "非敏感": 0.9,
-                "中性": 0.5
-            }
-            # print(td_time)
-            data['positive_prob_number'] = positive_dict[positive_prob]
-            # 查看近一个月中是否存在，滤重
-            data_list.append(data)
-        return data_list
 
     # 数据处理
     def clear_data(self,data_list):
@@ -310,6 +182,145 @@ class YQTSpider(object):
                 new_dirlist.append(d)
                 values.append(d[key])
         return new_dirlist
+
+    # 解析页面进行数据抓取和保存
+    def _parse(self, page_source):
+        # 解析源码
+        doc = pq(page_source)
+
+        items = doc.find('tbody tr.ng-scope').items()
+
+        data_list = []
+        for item in items:
+            td_title = item.find('td:nth-child(2)')
+            td_origins = item.find('td:nth-child(4)')
+            td_time = item.find('td:last-child')
+
+            def parse_time(td_time):
+                from datetime import datetime
+                ymd_1 = td_time.find('span:first-child').text()
+                ymd_2 = td_time.find('span:last-child').text()
+                try:
+                    if "年" in ymd_1:  # 不是今年的数据
+                        ymd = "".join([ymd_1, ymd_2])
+                    elif "今天" in ymd_2:  # 今天的数据
+                        ymd = " ".join([f"{str(datetime.now().date())}", ymd_1])
+                        return datetime.strptime(ymd, "%Y-%m-%d %H:%M").strftime("%Y-%m-%d %H:%M:%S")
+                    else:
+                        ymd = " ".join([f"{datetime.now().year}年" + ymd_2, ymd_1])
+                    return datetime.strptime(ymd, "%Y年%m月%d日 %H:%M").strftime("%Y-%m-%d %H:%M:%S")
+                except Exception as e:
+                    logger.warning(e)
+                    logger.warning(td_time)
+
+            # 转发类型  原创
+            sort = td_title.find('div.news-item-tools.font-size-0 span.tag-yuan').text()
+            # 转发内容
+            repost_content = td_title.find('div.item-title.resend-news-item-title').text().replace('\n', '')
+            pinglun = td_title.find('div.inline-block.mr10.tag-ping').text().replace('\n', '')  # 评论
+
+            if repost_content:
+                sort = "转发"
+            if pinglun:
+                sort = "评论"
+            # 微博原创类型的内容、转发类型的评论内容、其他类型的内容
+            content = td_title.find('div.item-title.news-item-title.contenttext.ng-binding').text().replace('\n',
+                                                                                                            ''),
+
+            title = td_title.find('span[ng-bind-html="icc.title | trustAsHtml"]').text().replace('\n', '')
+            site_name = td_origins.find('span[ng-bind="icc.captureWebsiteName"]').text()
+
+            if (site_name == '新浪微博' or site_name == '今日头条'):
+                data = {
+                    '时间': parse_time(td_time),
+                    '标题': content[0].replace("'", ""),
+                    '描述': content[0].replace("'", ""),  # 微博原创
+                    '链接': td_title.find(
+                        '.news-item-tools.font-size-0 div:nth-child(2)>div>ul>li:nth-child(4) a').attr(
+                        "href"),
+                    '转发内容': repost_content.replace("'", ""),
+                    '发布人': td_title.find('a[ng-bind="icc.author"]').text(),
+                    'attitude': td_title.find(
+                        'div[ng-show="view.resultPresent != 3"] div.sensitive-status-content:not(.ng-hide)>span:first-child').text(),
+                    'images': ",".join([img.attr('src') for img in item.find('.actizPicShow img').items()]),
+                    'reposts_count': item.find(
+                        'div.news-item-title.color-gray-6.font-size-12.ng-scope span:first>span').text(),
+
+                    'comments_count': item.find(
+                        'div.news-item-title.color-gray-6.font-size-12.ng-scope span:nth-child(3)>span').text(),
+                    'sort': sort,
+
+                    'industry': td_title.find(
+                        '.news-item-tools.font-size-0 div:nth-child(1) div[ng-if="secondTrade!=null"]').text(),
+
+                    'related_words': td_title.find(
+                        '.news-item-tools.font-size-0 div:nth-child(1) span[ng-bind="icc.referenceKeyword"]').text(),
+
+                    'site_name': td_origins.find('span[ng-bind="icc.captureWebsiteName"]').text(),
+                    'area': td_origins.find('div[ng-bind="icc.province"]').text(),
+
+                }
+                # 针对微博而言
+                if sort == '评论':
+                    data['链接'] = td_title.find(
+                        '.news-item-tools.font-size-0 div:nth-child(2)>div>ul>li:nth-child(3) a').attr("href")
+                    # 评论的内容
+                    biaoti = td_title.find('div.item-title.news-item-title.dot.ng-binding').text().replace('\n',
+                                                                                                           '').replace(
+                        "'", "")
+                    data['标题'] = repost_content.replace("'", "")[0:20]
+                    data['发布人'] = td_title.find('a[ng-if="icc.commentAuthor != null"]').text()
+                    data['描述'] = repost_content.replace("'", "")
+                elif sort == '原创':
+                    data['转发内容'] = data['描述']
+            else:
+                data = {
+                    '时间': parse_time(td_time),
+                    '标题': title.replace("'", ""),
+                    '描述': content[0].replace("'", ""),
+                    '链接': td_title.find(
+                        '.news-item-tools.font-size-0 div:nth-child(2)>div>ul>li:nth-child(4) a').attr(
+                        "href"),
+                    '转发内容': repost_content.replace("'", ""),
+                    # '发布人': td_title.find('div[class="profile-title inline-block"]>a>span:first-child').text(),
+                    '发布人': td_title.find(
+                        'div[class="profile-title inline-block"]>a>span[ng-if*="icc.author"]').text(),
+                    'attitude': td_title.find(
+                        'div[ng-show="view.resultPresent != 3"] div.sensitive-status-content:not(.ng-hide)>span:first-child').text(),
+                    'images': ",".join([img.attr('src') for img in item.find('.actizPicShow img').items()]),
+                    'reposts_count': item.find(
+                        'div.news-item-title.color-gray-6.font-size-12.ng-scope span:first>span').text(),
+
+                    'comments_count': item.find(
+                        'div.news-item-title.color-gray-6.font-size-12.ng-scope span:nth-child(3)>span').text(),
+
+                    'sort': sort,
+
+                    'industry': td_title.find(
+                        '.news-item-tools.font-size-0 div:nth-child(1) div[ng-if="secondTrade!=null"]').text(),
+
+                    'related_words': td_title.find(
+                        '.news-item-tools.font-size-0 div:nth-child(1) span[ng-bind="icc.referenceKeyword"]').text(),
+
+                    'site_name': td_origins.find('span[ng-bind="icc.captureWebsiteName"]').text(),
+                    'area': td_origins.find('div[ng-bind="icc.province"]').text(),
+
+                }
+            # print(data)
+            publish_man = re.sub(':|：', '', data['发布人'])
+            data['发布人'] = publish_man
+            positive_prob = td_title.find(
+                'div.sensitive-status-wrapper.p-r>div:first-child>span:first-child').text()
+            positive_dict = {
+                "敏感": 0.1,
+                "非敏感": 0.9,
+                "中性": 0.5
+            }
+            # print(td_time)
+            data['positive_prob_number'] = positive_dict[positive_prob]
+            # 查看近一个月中是否存在，滤重
+            data_list.append(data)
+        return data_list
 
     def parse_data(self):
         """
@@ -686,6 +697,8 @@ class YQTSpider(object):
                              f"record\{self.info['customer']}",f"{self}_记录.xlsx")
                 sql_number=ssql_helper.find_info_count(self.interval[0],self.interval[1],self.info['industry_name'])
                 data_list=[self.info['customer'],datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),self.last_end_time,self.next_end_time]
+                record_dict=(self.info['industry_name'],datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),self.last_end_time,self.next_end_time,yqt_count,self.post_number,self.info['customer'])
+                record_log(record_dict)
                 SpiderHelper.save_record_auto(record_file_path,yqt_count,self.post_number,sql_number,data_list=data_list)
                 # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
                 return True
@@ -737,7 +750,6 @@ class YQTSpider(object):
         self.next_end_time = self.interval[1]
         # 抓取数据
         print("获取关键词")
-        self.infos=infos
         # 循环进行项目采取数据
         for info in infos:
             self.info = info
@@ -746,7 +758,6 @@ class YQTSpider(object):
                                                f"data\{info['customer']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
                                                f"{self}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
                                                    ':', '_'))
-            self.keyword=info['keywords']
             # 设置关键词
             self.modifi_keywords()
 
@@ -773,6 +784,7 @@ class YQTSpider(object):
                 self.spider_driver.quit()
                 self.spider_driver = WebDriverHelper.init_webdriver(is_headless=config.HEAD_LESS)
                 self.wait = WebDriverWait(self.spider_driver, config.WAIT_TIME)
+                # noinspection PyArgumentList
                 self.start(resp)
             elif resp is True:
                 os.remove(self.process_file_path)
@@ -812,7 +824,6 @@ def work_it():
     for info in infos:
         yqt_spider = YQTSpider(info,start_time=start_time, end_time=end_time)
         yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2,info=info)
-
 def work_it_2():
     end_time = datetime.datetime.now().strftime('%Y-%m-%d %H') + ":00:00"
     one_hour_ago = datetime.datetime.now() - datetime.timedelta(hours=1)
@@ -835,7 +846,7 @@ def work_it_2():
 
     #
 def apscheduler():
-    trigger1 = CronTrigger(hour='9-18', minute='49', second=10, jitter=5)
+    trigger1 = CronTrigger(hour='0-23', minute='49', second=10, jitter=5)
 
     sched = BlockingScheduler()
     sched.add_job(work_it_2, trigger1, id='my_job_id')

@@ -13,12 +13,15 @@ from apscheduler.triggers.cron import CronTrigger
 def my_job():
     print('my_job, {}'.format(time.ctime()))
 
+def my_job2():
+    print('my_job2, {}'.format(time.ctime()))
+
 
 if __name__ == "__main__":
     scheduler = BlockingScheduler()
 
     # 第一秒执行作业
-    intervalTrigger=CronTrigger(second=1)
+    intervalTrigger=CronTrigger(second='*/2')
 
     # 每天的19:30:01执行作业
     # intervalTrigger=CronTrigger(hour=19, minute=30, second=1)
@@ -41,10 +44,11 @@ if __name__ == "__main__":
     sched.add_job(my_job, 'cron', month='6-8,11-12', day='3rd fri', hour='0-3')
 
     # 表示从星期一到星期五5:30（AM）直到2014-05-30 00:00:00
-    sched.add_job(my_job(), 'cron', day_of_week='mon-fri', hour=5, minute=30, end_date='2014-05-30')
+    sched.add_job(my_job, 'cron', day_of_week='mon-fri', hour=5, minute=30, end_date='2014-05-30')
 
     # 表示每5秒执行该程序一次，相当于interval 间隔调度中seconds = 5
     sched.add_job(my_job, 'cron', minute='*/10',second='*/5')
 
     scheduler.add_job(my_job, intervalTrigger, id='my_job_id')
+    scheduler.add_job(my_job2, intervalTrigger, id='my_job_id2')
     scheduler.start()

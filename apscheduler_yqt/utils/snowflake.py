@@ -15,12 +15,13 @@ from utils.exceptions import InvalidSystemClock
 
 
 # 64位ID的划分
-WORKER_ID_BITS = 5
-DATACENTER_ID_BITS = 5
-SEQUENCE_BITS = 12
+WORKER_ID_BITS = 7
+DATACENTER_ID_BITS = 6
+SEQUENCE_BITS = 10
 
 # 最大取值计算
 MAX_WORKER_ID = -1 ^ (-1 << WORKER_ID_BITS)  # 2**5-1 0b11111
+# print(MAX_WORKER_ID)
 MAX_DATACENTER_ID = -1 ^ (-1 << DATACENTER_ID_BITS)
 
 # 移位偏移计算
@@ -52,6 +53,7 @@ class IdWorker(object):
         """
         # sanity check
         if worker_id > MAX_WORKER_ID or worker_id < 0:
+            # print(worker_id)
             raise ValueError('worker_id值越界')
 
         if datacenter_id > MAX_DATACENTER_ID or datacenter_id < 0:
@@ -62,20 +64,23 @@ class IdWorker(object):
         self.sequence = sequence
 
         self.last_timestamp = -1  # 上次计算的时间戳
+        self.id=set()
 
     def _gen_timestamp(self):
         """
         生成整数时间戳
         :return:int timestamp
         """
-        return int(time.time() * 1000)
+        # time.sleep(0.001)
+        return int(time.time()*1000)
 
-    def get_id(self):
+    def get_id(self,i=None):
         """
         获取新ID
         :return:
         """
         timestamp = self._gen_timestamp()
+        # print(timestamp)
 
         # 时钟回拨
         if timestamp < self.last_timestamp:
@@ -93,18 +98,45 @@ class IdWorker(object):
 
         new_id = ((timestamp - TWEPOCH) << TIMESTAMP_LEFT_SHIFT) | (self.datacenter_id << DATACENTER_ID_SHIFT) | \
                  (self.worker_id << WOKER_ID_SHIFT) | self.sequence
+        # n_id=int(str(new_id)[1:-1])
+        # self.id.add(new_id)
+        # print(n_id)
+        # print(new_id)
         return new_id
 
     def _til_next_millis(self, last_timestamp):
         """
         等到下一毫秒
+        等到下0.1秒
         """
         timestamp = self._gen_timestamp()
         while timestamp <= last_timestamp:
             timestamp = self._gen_timestamp()
         return timestamp
 
-
+import threading
+from multiprocessing.dummy import Pool as ThreadPool
 if __name__ == '__main__':
-    worker = IdWorker(1, 2, 0)
-    print(worker.get_id())
+    worker1 = IdWorker(1, 2, 0)
+    worker2 = IdWorker(1, 3, 0)
+    worker3 = IdWorker(2, 3, 1)
+    print(worker1.get_id())
+    print(worker2.get_id())
+    print(worker3.get_id())
+
+    # pool = ThreadPool()
+    # pool.map(worker.get_id, range(500))
+    # pool.close()
+    # pool.join()
+
+    # print(time.time())
+    # for i in range(50):
+    #     threading.Thread(target=worker.get_id).start()
+    # id=674696343490031394880
+    # str_id=str(id)[1:-1]
+    # print(len(str_id))
+    # print(str_id)
+    # print(len(worker.id))
+    # print(worker.id)
+    # print(len(worker.id))
+    # print(time.time())

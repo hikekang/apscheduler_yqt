@@ -12,17 +12,19 @@ from apscheduler.triggers.interval import IntervalTrigger
 # BackgroundScheduler它可以在后台运行，不会阻塞主线程的执行，来看下面的代码
 def my_job():
     print('my_job, {}'.format(time.ctime()))
-
+def my_job2():
+    print('my_job2, {}'.format(time.ctime()))
 
 if __name__ == "__main__":
     scheduler = BackgroundScheduler()
-    intervalTrigger=IntervalTrigger(seconds=1)
-    scheduler.add_job(my_job, intervalTrigger, id='my_job_id')
-    # 表示每隔3天17时19分07秒执行一次任务
-    scheduler.add_job(my_job, 'interval', days=3, hours=17, minutes=19)
+    intervalTrigger=IntervalTrigger(seconds=5)
 
+    scheduler.add_job(my_job, intervalTrigger, id='my_job_id')
+    scheduler.add_job(my_job2, intervalTrigger, id='my_job_id_2')
+    # 表示每隔3天17时19分07秒执行一次任务
+    # scheduler.add_job(my_job, 'interval', days=3, hours=17, minutes=19)
 
     scheduler.start()
-    print('=== end. ===')
-    while True:
-        time.sleep(1)
+    # print('=== end. ===')
+    # while True:
+    #     time.sleep(1)

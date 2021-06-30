@@ -5,6 +5,8 @@
    Author :       hike
    time：          2021/5/7 11:03
 """
+from concurrent.futures.thread import ThreadPoolExecutor
+
 from utils.snowflake import IdWorker
 import redis
 import re
@@ -423,7 +425,7 @@ def match_alone_keyword_(info, d):
     :return:
     """
     #
-    print("单独进行匹配")
+    # print("单独进行匹配")
 
 
     match_data=d['标题'] + d['转发内容'] + d['描述']
@@ -553,16 +555,23 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
 
 
     print("数据量为:",len(data_list))
-    for index,d in enumerate(data_list):
-        print("111第几个:", index)
-        d['sort_num']=0
-        d['parent_id']=[]
+    def load_data(index,d):
+        """
+
+        :param index:
+        :param d:
+        :return:
+        """
+        print("第几个:", index)
+        d['sort_num'] = 0
+        d['parent_id'] = []
         d['create_date'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        domain_sub=parse.urlparse(d['链接']).netloc.replace("www.","")
+        domain_sub = parse.urlparse(d['链接']).netloc.replace("www.", "")
         rx = domain_sub.split(".")
-        domain_search='.'.join(rx)
-        print(domain_search)
+        domain_search = '.'.join(rx)
+        # print(domain_search)
+        flag = 0
         for i in range(0, len(rx) - 1):
             if r.hexists("url", '.'.join(rx[i:])):
                 ret = eval(r.hget("url", '.'.join(rx[i:])))
@@ -601,10 +610,13 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         else:
             d['sort'] = 0
 
-        print("第几个:",index)
-        mark_java_match_data(d,thream_info_list)
+        # print("第几个:",index)
+        mark_java_match_data(d, thream_info_list)
         print("完成")
 
+    with ThreadPoolExecutor(4) as pool:
+        for index,d in enumerate(data_list):
+            pool.submit(load_data,index,d)
     myredis.close()
     # post_mq.close_mq()
 

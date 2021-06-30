@@ -71,4 +71,32 @@ config = {
     }
 def get_industry_name(*args):
     print(args)
-get_industry_name(config)
+# get_industry_name(config)
+
+datalist=[
+    {
+        'name': 'hike',
+        'age': 19
+    },
+{
+    'name':'hike',
+    'age':18
+},
+{
+    'name':'hike',
+    'age':18
+},
+{
+    'name':'hike',
+    'age':15
+},
+]
+
+def filter_data(datalist):
+    for data in datalist:
+        if data['age']==15:
+            datalist.remove(data)
+    return  datalist
+print(filter_data(datalist))
+
+

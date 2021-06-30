@@ -46,7 +46,7 @@ from multiprocessing import Process
 from lxml import etree
 from utils.post_helper import SecondData
 from concurrent.futures import ThreadPoolExecutor
-
+# 教程
 class YQTSpider(object):
 
     def __init__(self, myconfig, spider_driver=None, start_time=None, end_time=None, *args, **kwargs):
@@ -207,13 +207,13 @@ class YQTSpider(object):
                 if item['content'] != None:
                     data['转发内容'] += ex(item['content'])
                     # print(data['转发内容'])
-                    print('content')
+                    # print('content')
                 if item['forwarderContent']!=None:
                     data['转发内容']+=ex(item['forwarderContent'])
-                    print('forwarderContent')
+                    # print('forwarderContent')
                 if item['ocrContents'] != None:
                     data['转发内容'] += ex(item['ocrContents'])
-                    print('ocrContents')
+                    # print('ocrContents')
 
 
                 if item['forwarderImages']:
@@ -298,10 +298,10 @@ class YQTSpider(object):
                     data['描述']=data['转发内容']
 
             if "微博" in data['site_name']:
-                print("处理标题")
+                # print("处理标题")
                 data['标题'] =data['描述'][0:20]
             if len(data['描述']) > 120:
-                print("处理描述")
+                # print("处理描述")
                 data['描述'] = data['描述'][0:120]
 
             if "weibo.com" in data["链接"] and data["sort"] != "":
@@ -588,12 +588,12 @@ class YQTSpider(object):
                 #     thread.join()
 
                 #update on 2021-05-25 11:22:06
-                # with ThreadPoolExecutor(10) as pool:
-                #     for i in range(1,maxpage+1):
-                #         pool.submit(thread_all, i)
+                with ThreadPoolExecutor(10) as pool:
+                    for i in range(1,maxpage+1):
+                        pool.submit(thread_all, i)
 
-                for i in range(1,maxpage+1):
-                    thread_all(i)
+                # for i in range(1,maxpage+1):
+                #     thread_all(i)
 
 
                     # pool = ThreadPool()

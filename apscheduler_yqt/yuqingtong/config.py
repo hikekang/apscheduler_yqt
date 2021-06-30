@@ -1,13 +1,20 @@
 # -*- coding: utf-8 -*-
 import configparser
 import os
-
+from apscheduler.triggers.cron import CronTrigger
+from apscheduler.schedulers.blocking import BlockingScheduler
 
 from openpyxl import load_workbook
-
 #数据加载
-
-wb=load_workbook('../config.xlsx',data_only=True)
+# dir_path=os.path.dirname(os.path.dirname(os.path.relpath(__file__)))
+# print(dir_path)
+# config_xlsx_path=os.path.join(dir_path,'config.xlsx')
+# print(config_xlsx_path)
+# wb=load_workbook(config_xlsx_path,data_only=True)
+# wb=load_workbook('../config.xlsx',data_only=True)
+dir_path=os.path.dirname(os.getcwd())
+config_xlsx_path = os.path.join(dir_path, r'config.xlsx')
+wb = load_workbook(config_xlsx_path, data_only=True)
 sheet=wb['info']
 
 # 获取用户名信息
@@ -80,8 +87,8 @@ class redconfig():
         if filepath:
             self.config_path=filepath
         else:
-            self.config_path=os.path.join(os.path.dirname(os.path.realpath(__file__)),'config.ini')
-        # print(self.config_path)
+            self.config_path=os.path.join(os.path.dirname(os.getcwd()), 'config.ini')
+        print(self.config_path)
         self.config=configparser.ConfigParser()
         self.config.read(self.config_path,encoding='utf-8')
 
@@ -92,10 +99,24 @@ class redconfig():
         return dict(self.config.items(section))
 
 
+def print_it():
+    print("kkk")
+
 if __name__ == '__main__':
     myconfig=redconfig()
-    print(myconfig.getValueByDict('yqt_info','username'))
-    print(myconfig.getDictBySection('yqt_info'))
+    # print(myconfig.getValueByDict('yqt_info','username'))
+    # print(myconfig.getDictBySection('time_info'))
+    cron_info=myconfig.getDictBySection('cron_info')
+    # for key,value in cron_info.items():
+    #     cron_info[key]=eval(value)
+    tigger1=CronTrigger(**cron_info)
+    print(tigger1.fields)
+    scheduler=BlockingScheduler()
+    scheduler.add_job(print_it,tigger1,max_instances=10,id='212')
+    scheduler.start()
 
-
+    # dir_path = os.path.dirname(os.path.dirname(os.path.relpath(__file__)))
+    # dir_path=os.path.dirname(os.getcwd())
+    # config_xlsx_path = os.path.join(dir_path, r'config.xlsx')
+    # wb = load_workbook(config_xlsx_path, data_only=True)
 

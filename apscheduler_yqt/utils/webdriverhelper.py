@@ -4,10 +4,12 @@
 # @Email   : 450730239@qq.com
 # @File    : webdriverhelper.py
 from selenium.webdriver.chrome.webdriver import WebDriver
-from selenium import webdriver
+from seleniumwire  import webdriver
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+from browsermobproxy import Server
+from selenium.webdriver.chrome.options import Options
 
 import time
 
@@ -167,6 +169,10 @@ class WebDriverHelper(object):
 
 if __name__ == '__main__':
     driver = WebDriverHelper.init_webdriver()
+    driver.get("https://freeplus.tmall.com/")
+    time.sleep(2)
+    driver.get("http://www.baidu.com/")
+    time.sleep(2)
     driver.get("https://freeplus.tmall.com/")
     # driver = WebDriverHelper.init_webdriver()
     # driver.get("https://freeplus.tmall.com/category.htm?spm=a1z10.1-b-s.w5001-14539001898.3.261d6c15VxC53p&scene=taobao_shop")

@@ -915,3 +915,38 @@ yqt_spider.py[line:512] - INFO - 2021-03-30 17:46:23 - 保存完毕
 yqt_spider.py[line:515] - INFO - 2021-03-30 17:46:23 - 抓取到最大页，停止
 yqt_spider.py[line:575] - INFO - 2021-03-30 17:46:25 - 解析到终止时间，抓取完成
 base.py[line:144] - INFO - 2021-03-30 17:46:31 - Job "work_it (trigger: cron[hour='9-18', minute='*/3', second='0'], next run at: 2021-03-30 17:48:22 CST)" executed successfully
+yqt_spider.py[line:69] - INFO - 2021-04-07 11:23:53 - 开始登录....1
+yqt_spider.py[line:80] - INFO - 2021-04-07 11:24:04 - 获取验证码....
+yqt_spider.py[line:95] - INFO - 2021-04-07 11:24:08 - 获取验证码:2FZI2G
+yqt_spider.py[line:536] - INFO - 2021-04-07 11:24:12 - 任务时间区间：2021-04-06 09:00:00 --- 2021-04-07 10:59:59
+yqt_spider.py[line:373] - INFO - 2021-04-07 11:24:19 - 页面加载完全
+yqt_spider.py[line:373] - INFO - 2021-04-07 11:24:27 - 页面加载完全
+yqt_spider.py[line:401] - INFO - 2021-04-07 11:24:27 - 更改100条数据/每页
+yqt_spider.py[line:295] - INFO - 2021-04-07 11:24:27 - 设置时间区间...
+yqt_spider.py[line:373] - INFO - 2021-04-07 11:24:36 - 页面加载完全
+yqt_spider.py[line:336] - INFO - 2021-04-07 11:24:36 - 当前数据量:13084
+yqt_spider.py[line:305] - INFO - 2021-04-07 11:24:36 - 页面数据大于5000条，调整时间区段
+yqt_spider.py[line:312] - INFO - 2021-04-07 11:24:36 - 时间区间小于一天，继续细化调整
+yqt_spider.py[line:295] - INFO - 2021-04-07 11:24:36 - 设置时间区间...
+yqt_spider.py[line:69] - INFO - 2021-04-07 11:27:02 - 开始登录....1
+yqt_spider.py[line:80] - INFO - 2021-04-07 11:27:07 - 获取验证码....
+yqt_spider.py[line:95] - INFO - 2021-04-07 11:27:10 - 获取验证码:3CBWM3
+yqt_spider.py[line:536] - INFO - 2021-04-07 11:27:14 - 任务时间区间：2021-04-06 09:00:00 --- 2021-04-06 11:59:59
+yqt_spider.py[line:373] - INFO - 2021-04-07 11:27:17 - 页面加载完全
+yqt_spider.py[line:373] - INFO - 2021-04-07 11:27:23 - 页面加载完全
+yqt_spider.py[line:401] - INFO - 2021-04-07 11:27:23 - 更改100条数据/每页
+yqt_spider.py[line:295] - INFO - 2021-04-07 11:27:23 - 设置时间区间...
+yqt_spider.py[line:373] - INFO - 2021-04-07 11:27:36 - 页面加载完全
+yqt_spider.py[line:336] - INFO - 2021-04-07 11:27:36 - 当前数据量:2753
+yqt_spider.py[line:303] - INFO - 2021-04-07 11:27:36 - 小于5000条,符合条件
+yqt_spider.py[line:321] - INFO - 2021-04-07 11:27:36 - 当前时间区间:2021-04-06 09:00:00  -- 2021-04-06 11:59:59
+yqt_spider.py[line:373] - INFO - 2021-04-07 11:27:36 - 页面加载完全
+yqt_spider.py[line:484] - INFO - 2021-04-07 11:27:37 - 进入成功
+yqt_spider.py[line:510] - INFO - 2021-04-07 11:27:37 - 当前第【1】页,共28页
+yqt_spider.py[line:513] - INFO - 2021-04-07 11:27:39 - 解析到100条数据
+yqt_spider.py[line:515] - INFO - 2021-04-07 11:27:39 - 保存完毕
+yqt_spider.py[line:521] - INFO - 2021-04-07 11:27:39 - 点击下一页.....
+yqt_spider.py[line:373] - INFO - 2021-04-07 11:27:47 - 页面加载完全
+yqt_spider.py[line:510] - INFO - 2021-04-07 11:27:47 - 当前第【2】页,共28页
+yqt_spider.py[line:513] - INFO - 2021-04-07 11:27:49 - 解析到100条数据
+yqt_spider.py[line:69] - INFO - 2021-04-07 11:27:56 - 开始登录....1

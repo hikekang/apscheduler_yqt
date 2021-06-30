@@ -1,3 +1,4 @@
+
 import requests
 import json
 import csv
@@ -62,6 +63,8 @@ class SpiderHelper(object):
                 writer.writerow(data)
     @staticmethod
     def save_xlsx(data_list, out_file,sheet_name):
+        # threadLock = threading.Lock()
+        # threadLock.acquire()
         head_xlsx = ['时间', '标题', '描述', '链接', '转发内容', '发布人', 'attitude', 'images', 'reposts_count', 'comments_count',
                      'sort', 'industry', 'related_words', 'site_name', 'area']
 
@@ -88,6 +91,7 @@ class SpiderHelper(object):
                 sheet.append(values)
             wb.save(out_file)
             wb.close()
+        # threadLock.release()
     @staticmethod
     def save_record(out_file,yq_number,xlsx_num,post_num,post_num2,sql_num,data_list):
         '''
@@ -143,7 +147,7 @@ class SpiderHelper(object):
             print("记录完成")
 
     @staticmethod
-    def save_record_auto(out_file, yq_number,post_number,sql_num, data_list):
+    def save_record_auto(out_file, yq_number,post_number,sql_num_A,sql_num_B, data_list):
         '''
         创建一个路径+文件
         拿到
@@ -156,7 +160,7 @@ class SpiderHelper(object):
             数据量相差太多预警并且记录
         '''
         # head_xlsx = ['项目名称', '抓取时间', '开始时间', '结束时间', '舆情通数量', 'xlsx数量', 'post数量', 'seq数量', '最终差异']
-        head_xlsx = ['项目名称', '抓取时间', '开始时间', '结束时间', '舆情通数量','上传数量', 'seq数量', '最终差异']
+        head_xlsx = ['项目名称', '抓取时间', '开始时间', '结束时间', '舆情通数量','上传数量', 'seqA数量', 'seqB数量','最终差异']
         dir = os.path.dirname(out_file)
         if not os.path.exists(dir):
             os.makedirs(dir)
@@ -169,8 +173,9 @@ class SpiderHelper(object):
             sheet.append(head_xlsx)
             data_list.append(yq_number)
             data_list.append(post_number)
-            data_list.append(sql_num)
-            chayi = yq_number - sql_num
+            data_list.append(sql_num_A)
+            data_list.append(sql_num_B)
+            chayi = yq_number - sql_num_A
             # if chayi / yq_number >= 0.3:
             #     print('预警')
             data_list.append(chayi)
@@ -183,11 +188,47 @@ class SpiderHelper(object):
             sheet = wb['record']
             data_list.append(yq_number)
             data_list.append(post_number)
-            data_list.append(sql_num)
-            chayi = post_number - sql_num
+            data_list.append(sql_num_A)
+            data_list.append(sql_num_B)
+            chayi = post_number - sql_num_A
             # if chayi / yq_number >= 0.3:
             #     print('预警')
             data_list.append(chayi)
+            sheet.append(data_list)
+            wb.save(out_file)
+            wb.close()
+            print("记录完成")
+
+    @staticmethod
+    def save_record_day_data(out_file, yq_number,sql_num_B):
+        '''
+        创建一个路径+文件
+        拿到
+            ①拿到舆情通数量
+            ②xlsx 数量
+            ③post返回数量
+            ④seq入库查询数量
+        记录数值
+        '''
+        data_list=[]
+        head_xlsx = ['项目名称', '舆情通数量', '天颂数量']
+        dir = os.path.dirname(out_file)
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        if not os.path.exists(out_file):
+            wb = Workbook(out_file)
+            sheet = wb.create_sheet(title='报表')
+            # 写入表头
+            # for i,item in enumerate(head_xlsx):
+            #     sheet.cell(row=1,column=i+1,value=item)
+            sheet.append(head_xlsx)
+            data_list.append(yq_number)
+            data_list.append(sql_num_B)
+        else:
+            wb = load_workbook(out_file)
+            sheet = wb['报表']
+            data_list.append(yq_number)
+            data_list.append(sql_num_B)
             sheet.append(data_list)
             wb.save(out_file)
             wb.close()
