@@ -5,6 +5,7 @@
    Author :       hike
    time：          2021/5/7 11:03
 """
+import os
 from concurrent.futures.thread import ThreadPoolExecutor
 
 from utils.snowflake import IdWorker
@@ -23,7 +24,8 @@ import datetime
 from urllib import parse
 from utils import post_mq
 from pprint import pprint
-
+from utils.spider_helper import SpiderHelper
+from yuqingtong import config as myconfig
 pool = redis.ConnectionPool(host='localhost', port=6379, decode_responses=True)
 r = redis.Redis(connection_pool=pool)
 config = {
@@ -465,7 +467,88 @@ def match_alone_keyword_(info, d):
 
 
 # 主题 theam subject id
+def upload_many_data_java(data_list, industry_name,datacenter_id):
+    """
+    多数据插入
 
+    """
+    myredis = my_redis()
+    table_name = tables[industry_name]
+    # 查询hangyeid
+    sql_industry_id = "select id from TS_Industry where name='" + industry_name + "'"
+    industry_id = db_b.execute_query(sql_industry_id)[0][0]
+
+    tuple_data_list_ts_a = []
+    tuple_data_list_ts_a_second_data = []
+    tuple_data_list_qbb_a = []
+    post_data_list = []
+    worker = IdWorker(1, 2, 0)
+    for work_id, data in enumerate(data_list):
+        # 生成雪花id
+        # print(data['链接'])
+        """
+        datacenter_id:页数 或者 关键字id
+        work_id:第几条
+        """
+        worker = IdWorker(datacenter_id, work_id + 1, 0)
+        id = worker.get_id()
+        post_data = {
+            "id": id,
+            "industryId": industry_id  # 行业id
+        }
+        post_data_list.append(post_data)
+        # 更新redis
+        myredis.redis.sadd(industry_id, data['链接'])
+
+        tuple_data_ts_a = (
+            id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
+            data['positive_prob_number'])
+        tuple_data_qbb_a = (
+            id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
+            data['is_original'], data['area'], data['positive_prob_number'])
+
+        tuple_data_list_ts_a.append(tuple_data_ts_a)
+
+        tuple_data_list_qbb_a.append(tuple_data_qbb_a)
+
+        tuple_data_ts_a_second_data = (id, industry_id, data['ic_id'], data['keywords_id'], data['链接'])
+        tuple_data_list_ts_a_second_data.append(tuple_data_ts_a_second_data)
+
+    sql_ts_a_second_data="insert into TS_Second_Data (id,industry_id,ic_id,keywords_id,url) values (%d,%d,%s,%s,%s)"
+    sql_ts_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s)"
+    # 插入A库
+    sql_qbb_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,is_original,location,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+    print("tsa数据量为：",len(tuple_data_list_ts_a))
+    # print(tuple_data_list_ts_a)
+    db_a.execute_many(sql_ts_a, tuple_data_list_ts_a)
+    # 二级数据表
+    # print(tuple_data_list_ts_a_second_data)
+    db_a.execute_many(sql_ts_a_second_data, tuple_data_list_ts_a_second_data)
+
+    # db_net_a.execute_many(sql_ts_a, tuple_data_list_ts_a)
+    print("qbba数据量为：",len(tuple_data_list_qbb_a))
+    # print(tuple_data_list_qbb_a)
+    for d in tuple_data_list_qbb_a:
+        db_qbba.execute(sql_qbb_a,d)
+    # db_qbba.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
+    # db_net_qbba.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
+
+    # 消息队列
+    data_2_1 = {
+        'queues': 'reptile.stay.process_2.1',
+        'message': str(post_data_list)
+    }
+    data_2 = {
+        'queues': 'reptile.stay.process',
+        'message': str(post_data_list)
+    }
+
+    proxies = {'http': None, 'https': None}
+    url = 'http://localhost:8090/jms/send_array'
+    requests.get(url=url, proxies=proxies, params=data_2_1)
+    requests.get(url=url, proxies=proxies, params=data_2)
+    print("数据上传成功")
+    myredis.close()
 
 def upload_many_data(data_list, industry_name, datacenter_id, info):
     """
@@ -501,8 +584,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
             id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
             data['positive_prob_number'])
 
-        tuple_data_qbb_a = (
-            id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
+        tuple_data_qbb_a = (id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
             data['is_original'], data['area'], data['positive_prob_number'])
         tuple_data_list_ts_a.append(tuple_data_ts_a)
 
@@ -983,6 +1065,21 @@ def customer_log():
         data = (customer['customer'], date_yesterday, today_customer_num)
         db_a.execute(sql_tsa_customer, data)
 
+def record_day_datas(outfile):
+    spide_helper=SpiderHelper()
+    mycon = myconfig.redconfig()
+    project_name=mycon.getValueByDict('spider_config','project_name')
+    print(project_name)
+    for data in get_industry_keywords():
+        if data['customer'] in project_name:
+            date_now = datetime.datetime.now().strftime('%Y-%m-%d 00:00:00')
+            date_yesterday = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d 00:00:00")
+            sql_qbbb = "select count(*) from TS_DataMerge_Base where C_Id='{0}' and PublishDate_Std " \
+                       "between '{2}' and '{1}'".format(data['id'], date_now, date_yesterday)
+            sql_num_B=db_qbbb.execute_query(sql_qbbb)[0][0]
+            # 舆情通数量待定
+            spide_helper.all_project_save_record_day(outfile,1,sql_num_B,data['customer'],data['industry_name'])
+
 
 if __name__ == '__main__':
     # for d in merger_industry_data(get_industry_keywords()):
@@ -1013,3 +1110,6 @@ if __name__ == '__main__':
     #         break
     # if flag==0:
     #     print("匹配成功")
+    file_name=os.path.join(  os.path.dirname(os.path.abspath(__file__)),f"记录\\" ,f"{datetime.date.today()}.xlsx")
+    print(file_name)
+    # record_day_datas(file_name)

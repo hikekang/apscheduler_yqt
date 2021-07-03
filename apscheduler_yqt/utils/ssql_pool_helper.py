@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
    File Name：     ssql_pool_helper
-   Description :
+   Description :sqlserver使用数据库池
    Author :       hike
    time：          2021/5/7 10:31
 """

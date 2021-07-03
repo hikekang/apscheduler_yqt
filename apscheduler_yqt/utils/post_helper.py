@@ -104,9 +104,9 @@ d2 = {"searchCondition": {
 # 分词
 d3 = {"searchCondition": {"keywordId": 2720405, "accurateSwitch": 1, "bloggerAuthenticationStatusMultiple": "0",
                           "blogPostsStatus": 0, "comblineflg": 2, "dataView": 0, "displayIcon": 1, "involveWay": 0,
-                          "keywordProvince": "全部", "matchType": 3, "ocrContentType": 0, "searchRootWbMultiple": "0",
+                          "keywordProvince": "全部", "matchType": 3, "ocrContentType": 2, "searchRootWbMultiple": "0",
                           "searchType": '', "timeDomain": "1", "weiboTypeMultiple": "0", "firstOrigin": '',
-                          "sencondOrigin": '', "secondKeywordMatchType": 1, "searchSecondKeyword": "google|联想|华硕|华为",
+                          "sencondOrigin": '', "secondKeywordMatchType": 1, "searchSecondKeyword": "((兄弟|brother)+(打印机|复印机|扫描仪|一体机|标签机|缝纫机|绣花机))",
                           "webSiteId": "0", "order": 2, "monitorType": 1, "isRoot": 1, "origins": "1",
                           "presentResult": "1", "options": "1", "attributeCheck": "1", "informationContentType": 1,
                           "duplicateShowMultiple": "0", "attribute": "1", "chartStart": "2021-06-24 12:59:59",
@@ -236,16 +236,82 @@ class SecondData():
             return content
         else:
             return None
+    def google_get_content(self):
+        headers = {
+            'content-type': "application/x-www-form-urlencoded; charset=UTF-8",
+            'Host': 'yuqing.sina.com',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'zh-CN,zh;q=0.9',
+            'Accept-Encoding': 'gzip, deflate',
+            'Origin': 'http://yuqing.sina.com',
+            'Connection': 'keep-alive',
+            'Cookie': self.cookie,
+        }
+        # mh = MultipartFormData.format(data=self.payload, headers=headers)
+        res = requests.request("POST", data=self.payload, headers=headers,
+                               url='http://yuqing.sina.com/newEdition/getKeywordSearchList.action')
+        # print(res.text)
+        content = json.loads(res.text)
+        # print(content)
+        if content['icclist']:
+            return content
+        else:
+            return None
+        pass
+
 if __name__ == '__main__':
     # mh = MultipartFormData.format(data=data, boundary="----WebKitFormBoundary7MA4YWxkTrZu0gW")
     mh = MultipartFormData.format(data=d3, headers=headers)
     print(mh)
     # print(mh)
-    se=SecondData('www=userSId_yqt365_lsyousu_827857_40091;WS_KEY=79791d0d71403fbab7fafe2f60cf7747;JSESSIONID=3DB6F1761877CC7027A21BE112DCEE69;',d3)
+
+    google_data={
+        'view.keywordId':'2720405',
+        'view.secondKeyword':'三联' ,
+        'view.userSearchSetId':'749212',
+        'view.timeDomain':'1',
+        'view.startTime':'2021-07-02 15:00:00',
+        'monitorType':'1',
+        'view.endTime': '2021-07-02 16:00:00',
+        'view.origin': '2',
+        'view.matchType': '3',
+        'view.resultPresent': '1',
+        'view.paixu': '2',
+        'view.exportType': '',
+        'view.weiboType': '0',
+        'view.options': '1',
+        'view.involveWay': '0',
+        'view.comblineflg': '2',
+        'view.isRoot': '0',
+        'page': '1',
+        'pagesize': '50',
+        'view.viewMode': '1',
+        'kw.keywordId': '2720405',
+        'view.secondKeywordMatchType': '1',
+        'view.duplicateShow': '0',
+        'view.keywordProvince': '全部',
+        'view.duplicateShowMultiple': '0',
+        'view.toolbarSwitch': '0',
+        'view.bloggerAuthenticationStatus': '0',
+        'view.blogPostsStatus': '0',
+        'view.ocrContentType': '2',
+        'view.isRootMultiple': '0,1,2',
+        'view.dataView': '0',
+        'view.bloggerAuthenticationStatusMultiple': '0,5,1,2,3,4',
+        'view.weiboTypeMultiple': '0,1,2,3,4',
+        'view.accurateSwitch': '1',
+        'view.attributeCheck': '1',
+        'view.informationContentType': '1',
+    }
+    se=SecondData('www=userSId_yqt365_lsyousu_827857_16520; WS_KEY=aee73de27e04210ebccd2043f41630cd; JSESSIONID=B1A68A3FEEACDC6706B3E1B83074102F',google_data)
 
     # print(se.get_content())
-    keywords_content=se.get_content_by_keywords()
+    keywords_content=se.google_get_content()
     print("hike")
+
+
+
     # res = requests.request("POST", data=mh.encode('utf-8'), headers=headers,
     #                        url='http://yuqing.sina.com/gateway/monitor/api/data/search/auth/keyword/getSearchList')
     # print(res.text)

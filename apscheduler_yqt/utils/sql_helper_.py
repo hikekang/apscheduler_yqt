@@ -1,6 +1,8 @@
 from os import getenv
 import pymssql
-
+"""
+mysql_helper
+"""
 server = getenv("PYMSSQL_TEST_SERVER")
 user = getenv("PYMSSQL_TEST_USERNAME")
 password = getenv("PYMSSQL_TEST_PASSWORD")

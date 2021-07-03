@@ -46,6 +46,7 @@ from multiprocessing import Process
 from lxml import etree
 from utils.post_helper import SecondData
 from concurrent.futures import ThreadPoolExecutor
+import json
 # 教程
 class YQTSpider(object):
 
@@ -170,11 +171,6 @@ class YQTSpider(object):
 
     # 解析页面进行数据抓取和保存
     def _parse(self, payload):
-        positive_dict = {
-            "惊奇": 0.1,
-            "喜悦": 0.9,
-            "中性": 0.5
-        }
         data_list = []
         # 带有二层数据的数据
         secod_content = SecondData(self.cookie, payload).get_content()
@@ -208,17 +204,20 @@ class YQTSpider(object):
                     data['转发内容'] += ex(item['content'])
                     # print(data['转发内容'])
                     # print('content')
-                if item['forwarderContent']!=None:
-                    data['转发内容']+=ex(item['forwarderContent'])
+                if 'forwarderContent' in item['forwarderContent']:
+                    if item['forwarderContent']!=None:
+                        data['转发内容']+=ex(item['forwarderContent'])
                     # print('forwarderContent')
-                if item['ocrContents'] != None:
-                    data['转发内容'] += ex(item['ocrContents'])
-                    # print('ocrContents')
+
+                if 'ocrContents' in item['ocrContents']:
+                    if item['ocrContents'] != None:
+                        data['转发内容'] += ex(item['ocrContents'])
+                        # print('ocrContents')
 
 
-                if item['forwarderImages']:
-                    for item_pic in item['forwarderImages']:
-                        data['images']+=item_pic['bmiddlePic']
+                # if item['forwarderImages']:
+                #     for item_pic in item['forwarderImages']:
+                #         data['images']+=item_pic['bmiddlePic']
                 # if data['sort'] == '原创':
                 #     data['转发内容'] = data['描述']
 
@@ -246,6 +245,79 @@ class YQTSpider(object):
             return None
     # more placeholders in sql than params available
 
+    def google_parse(self, payload):
+        data_list = []
+        # 带有二层数据的数据
+        secod_content = SecondData(self.cookie, payload).google_get_content()['icclist']
+        if secod_content!=None:
+            for item in secod_content:
+                data = {
+                    # '时间': item['captureTime'].replace("T"," ").replace(".000+0000",""),
+                    '时间': item['publishedMinute'],
+                    '标题': ex(item['title']) if item['title']!=None else item['title'],
+                    '描述': ex(item['summary']) if item['summary']!=None else item['summary'],  # 微博原创
+                    '链接': item['webpageUrl'],
+                    '转发内容': '',
+                    '发布人': item.get('author'),
+                    'ic_id': item['id'],
+                    'keywords_id': item['keywordId'],
+                    # attitude:item['distrution']
+                    'attitude': item['emotion'],
+                    'images':"" ,
+                    # 'reposts_count': item['forwardNumber'],
+                    'reposts_count': 0,
+                    'comments_count': 0,
+                    'sort': '转发' if int(item['repostsFlg'])==1 else '原创',
+                    'industry': ",".join(item['secondTradeList']),
+                    'related_words': item['referenceKeyword'],
+                    'site_name': item['captureWebsiteName'],
+                    # 'area': item['contentAddress'],
+                    'area': item['province'],
+                    'C_Id':self.info['id']# 客户id
+                }
+
+                if item['content'] != None:
+                    data['转发内容'] += ex(item['content'])
+                    # print(data['转发内容'])
+                    # print('content')
+                if 'forwarderContent' in item['forwarderContent']:
+                    if item['forwarderContent']!=None:
+                        data['转发内容']+=ex(item['forwarderContent'])
+                        # print('forwarderContent')
+
+                # if item['forwarderImages']:
+                #     for item_pic in item['forwarderImages']:
+                #         data['images']+=item_pic['bmiddlePic']
+                # if data['sort'] == '原创':
+                #     data['转发内容'] = data['描述']
+
+                # if len(data['标题']) > 20:
+                #     data['标题'] = data['标题'][0:20]
+                if data['发布人']:
+                    if '：' in data['发布人'] or ":" in data['发布人']:
+                        publish_man = re.sub(':|：', '', data['发布人'])
+                        # publish_man=data['发布人'].split(":")[0]
+                        data['发布人'] = publish_man
+                    else:
+                        if (len(data['发布人']) > 10):
+                            data['发布人'] = ''
+                    if (len(data['发布人']) > 15):
+                        data['发布人'] = ''
+                if 'distribution' in item.keys():
+                    emotion_dict = json.loads(item['distribution'])
+                    result = max(emotion_dict, key=emotion_dict.get)
+                else:
+                    result='中性'
+                if result=='中性':
+                    data['positive_prob_number'] = 0.5
+                elif result=='敏感':
+                    data['positive_prob_number'] = 0.1
+                else:
+                    data['positive_prob_number']=0.9
+                data_list.append(data)
+            return data_list
+        else:
+            return None
     # 数据处理
     def clear_data(self, data_list):
         logger.info("数据处理")
@@ -374,20 +446,6 @@ class YQTSpider(object):
             print('再次判断')
             return self._is_page_loaded(count=count + 1)
 
-    def _reload(self):
-        """
-        刷新页面
-        :return:
-        """
-        self.spider_driver.refresh()
-        if not self._is_page_loaded():
-            return False
-        return True
-
-    def _save_process(self):
-        with open(self.process_file_path, "w", encoding="utf-8") as f:
-            f.write(f"{self.interval[0]}至{self.interval[1]}|"
-                    f"{self.last_end_time}_{self.next_end_time}_{self.next_page_num}_{self.data_file_path}")
 
     def _turn_page(self, time_sleep):
         # 资源上锁
@@ -429,16 +487,55 @@ class YQTSpider(object):
                 "pageSize": 100
             }}
 
-            payload_all['searchCondition']['page'] = i
+            google_payload = {
+                'view.keywordId': str(self.keyword_id),
+                'view.secondKeyword': '',
+                'view.userSearchSetId': str(self.usersearchsetid),
+                'view.timeDomain': '1',
+                'view.startTime': str(self.last_end_time),
+                'monitorType': '1',
+                'view.endTime': str(self.last_end_time),
+                'view.origin': '2',
+                'view.matchType': '3',
+                'view.resultPresent': '1',
+                'view.paixu': '2',
+                'view.exportType': '',
+                'view.weiboType': '0',
+                'view.options': '1',
+                'view.involveWay': '0',
+                'view.comblineflg': '2',
+                'view.isRoot': '0',
+                'page': '1',
+                'pagesize': '100',
+                'view.viewMode': '1',
+                'kw.keywordId': str(self.keyword_id),
+                'view.secondKeywordMatchType': '1',
+                'view.duplicateShow': '0',
+                'view.keywordProvince': '全部',
+                'view.duplicateShowMultiple': '0',
+                'view.toolbarSwitch': '0',
+                'view.bloggerAuthenticationStatus': '0',
+                'view.blogPostsStatus': '0',
+                'view.ocrContentType': '2',
+                'view.isRootMultiple': '0,1,2',
+                'view.dataView': '0',
+                'view.bloggerAuthenticationStatusMultiple': '0,5,1,2,3,4',
+                'view.weiboTypeMultiple': '0,1,2,3,4',
+                'view.accurateSwitch': '1',
+                'view.attributeCheck': '1',
+                'view.informationContentType': '1',
+            }
+            google_payload['page']=str(i)
             # 数据进行处理
-            raw_data=self._parse(payload_all)
+            raw_data=self.google_parse(google_payload)
             data_list = self.clear_data(raw_data)
             logger.info('数据抓取完毕')
             # 插入到数据库，返回一个成功插入的值
             # 上传数据
             if data_list:
                 # 数据上传
-                ssql_helper.upload_many_data(data_list, self.industry_name,i,self.info)
+                # ssql_helper.upload_many_data(data_list, self.industry_name,i,self.info)
+                ssql_helper.upload_many_data_java(data_list, self.industry_name,i)
                 logger.info(f"正在抓取第{i}页数据")
                 logger.info(f"解析到{len(data_list)}条数据")
                 self.post_number += len(data_list)
@@ -449,29 +546,52 @@ class YQTSpider(object):
                 time.sleep(time_sleep)
         def thread_part(keyword,datacenter_id):
             logger.info(f"本次抓取的关键词为：{keyword}")
-            payload_part = {"searchCondition": {"keywordId": int(self.keyword_id), "accurateSwitch": 1,
-                                                "bloggerAuthenticationStatusMultiple": "0",
-                                                "blogPostsStatus": 0, "comblineflg": 2, "dataView": 0, "displayIcon": 1,
-                                                "involveWay": 0,
-                                                "keywordProvince": "全部", "matchType": 3, "ocrContentType": 0,
-                                                "searchRootWbMultiple": "0",
-                                                "searchType": '', "timeDomain": "1", "weiboTypeMultiple": "0",
-                                                "firstOrigin": '',
-                                                "sencondOrigin": '', "secondKeywordMatchType": 1,
-                                                "searchSecondKeyword": '',
-                                                "webSiteId": "0", "order": 2, "monitorType": 1, "isRoot": 1,
-                                                "origins": "1",
-                                                "presentResult": "1", "options": "1", "attributeCheck": "1",
-                                                "informationContentType": 1,
-                                                "duplicateShowMultiple": "0", "attribute": "1",
-                                                "chartStart": str(self.last_end_time),
-                                                "chartEnd": str(self.next_end_time), "page": 1, "pageSize": 100}}
+            google_payload = {
+                'view.keywordId': int(self.keyword_id),
+                'view.secondKeyword': str(keyword),
+                'view.userSearchSetId': str(self.usersearchsetid),
+                'view.timeDomain': '1',
+                'view.startTime': str(self.last_end_time),
+                'monitorType': '1',
+                'view.endTime': str(self.last_end_time),
+                'view.origin': '2',
+                'view.matchType': '3',
+                'view.resultPresent': '1',
+                'view.paixu': '2',
+                'view.exportType': '',
+                'view.weiboType': '0',
+                'view.options': '1',
+                'view.involveWay': '0',
+                'view.comblineflg': '2',
+                'view.isRoot': '0',
+                'page': '1',
+                'pagesize': '100',
+                'view.viewMode': '1',
+                'kw.keywordId': '2720405',
+                'view.secondKeywordMatchType': '1',
+                'view.duplicateShow': '0',
+                'view.keywordProvince': '全部',
+                'view.duplicateShowMultiple': '0',
+                'view.toolbarSwitch': '0',
+                'view.bloggerAuthenticationStatus': '0',
+                'view.blogPostsStatus': '0',
+                'view.ocrContentType': '2',
+                'view.isRootMultiple': '0,1,2',
+                'view.dataView': '0',
+                'view.bloggerAuthenticationStatusMultiple': '0,5,1,2,3,4',
+                'view.weiboTypeMultiple': '0,1,2,3,4',
+                'view.accurateSwitch': '1',
+                'view.attributeCheck': '1',
+                'view.informationContentType': '1',
+            }
             # payload_part['searchCondition']['searchSecondKeyword'] = "({0})+({1})".format(keyword, self.SimultaneousWord)
-            payload_part['searchCondition']['searchSecondKeyword'] = keyword
+            # google_payload['view.secondKeyword'] = keyword
             # print(payload_part)
-            content_all = SecondData(self.cookie, payload_part).get_content_by_keywords()
+            # content_all = SecondData(self.cookie, payload_part).get_content_by_keywords()
+            content_all = SecondData(self.cookie, google_payload).google_get_content()
+
             if content_all != None:
-                maxpage = int(content_all['data']['maxpage'])
+                maxpage = int(content_all['maxpage'])
                 print("最大页数为%d",maxpage)
                 if maxpage != 0:
                     if maxpage>50:
@@ -479,14 +599,16 @@ class YQTSpider(object):
                         maxpage_info = int(self.myconfig.getValueByDict('spider_config', 'maxpage'))
 
                     for i in range(1, 31):
-                        payload_part['searchCondition']['page'] = i
-                        logger.info(f"抓取的关键字为{payload_part['searchCondition']['searchSecondKeyword']}，抓取到第{i}页")
-                        content = SecondData(self.cookie, payload_part).get_content_by_keywords()
+                        google_payload['page'] = i
+                        logger.info(f"抓取的关键字为{google_payload['searchSecondKeyword']}，抓取到第{i}页")
+                        content = SecondData(self.cookie, google_payload).google_get_content()
                         if content != None:
+                            content=self.google_parse(content)
                             data_list = self.clear_data(content)
                             if data_list:
                                 # datacenter_id  词的id
-                                ssql_helper.upload_many_data(data_list,self.industry_name,datacenter_id,self.info)
+                                # ssql_helper.upload_many_data(data_list,self.industry_name,datacenter_id,self.info)
+                                ssql_helper.upload_many_data_java(data_list,self.industry_name,datacenter_id)
                                 logger.info(f"解析到{len(data_list)}条数据")
                                 self.post_number += len(data_list)
                                 # SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path,sheet_name=self.info['sheet_name'])
@@ -535,71 +657,68 @@ class YQTSpider(object):
             "page": 1,
             "pageSize": 100
         }}
-        content_all = SecondData(self.cookie, payload_all).get_content()
+        google_payload = {
+            'view.keywordId': int(self.keyword_id),
+            'view.secondKeyword': '',
+            'view.userSearchSetId': str(self.usersearchsetid),
+            'view.timeDomain': '1',
+            'view.startTime': str(self.last_end_time),
+            'monitorType': '1',
+            'view.endTime': str(self.last_end_time),
+            'view.origin': '2',
+            'view.matchType': '3',
+            'view.resultPresent': '1',
+            'view.paixu': '2',
+            'view.exportType': '',
+            'view.weiboType': '0',
+            'view.options': '1',
+            'view.involveWay': '0',
+            'view.comblineflg': '2',
+            'view.isRoot': '0',
+            'page': '1',
+            'pagesize': '100',
+            'view.viewMode': '1',
+            'kw.keywordId': int(self.keyword_id),
+            'view.secondKeywordMatchType': '1',
+            'view.duplicateShow': '0',
+            'view.keywordProvince': '全部',
+            'view.duplicateShowMultiple': '0',
+            'view.toolbarSwitch': '0',
+            'view.bloggerAuthenticationStatus': '0',
+            'view.blogPostsStatus': '0',
+            'view.ocrContentType': '2',
+            'view.isRootMultiple': '0,1,2',
+            'view.dataView': '0',
+            'view.bloggerAuthenticationStatusMultiple': '0,5,1,2,3,4',
+            'view.weiboTypeMultiple': '0,1,2,3,4',
+            'view.accurateSwitch': '1',
+            'view.attributeCheck': '1',
+            'view.informationContentType': '1',
+        }
+        content_all = SecondData(self.cookie, google_payload).google_get_content()
         self.post_number = 0
         # 返回内容不为空
         if content_all!=None:
-            total_count=content_all['data']['totalCount']
+            total_count=content_all['total']
             self.yqt_total_number = total_count
-            maxpage=content_all['data']['maxpage']
+            maxpage=content_all['maxpage']
             logger.info(f'数据总量为{total_count}')
             logger.info(f'总页数为{maxpage}')
             if total_count>5000:
                 logger.info("数据量太大需要分词抓取")
-                ret = self.keyword.split("|")
-                keywords = []
-                for i in range(0, len(ret), 3):
-                    key = ''
-                    for j in ret[i:i + 3]:
-                        key += j + '|'
-                    keywords.append(key)
-                # 分词查询
-                crawlerThreads = []
-                # for datacenter_id,keyword in enumerate(keywords):
-                #     thread=threading.Thread(target=thread_part,kwargs={'keyword':keyword,"datacenter_id":datacenter_id+1})
-                #     crawlerThreads.append(thread)
-                # for thread in crawlerThreads:
-                #     thread.start()
-                # for thread in crawlerThreads:
-                #     thread.join()
-
-
-
-                # pool = ThreadPool()
-                # pool.map(thread_part, keywords)
-                # pool.close()
-                # pool.join()
-
                 # update on 2021-05-25 11:20:57
                 with ThreadPoolExecutor(10) as pool:
                     for datacenter_id,item in enumerate(self.info['project_words']):
                         pool.submit(thread_part,item['keywords'],datacenter_id+1)
                     logger.info("分词抓取完毕")
                 return True
-
             elif(total_count<5000 and maxpage>0 ):
-                # crawlerThreads=[]
-                # for i in range(1,maxpage+1):
-                #     thread=threading.Thread(target=thread_all,kwargs={'i':i})
-                #     crawlerThreads.append(thread)
-                # for thread in crawlerThreads:
-                #     thread.start()
-                # for thread in crawlerThreads:
-                #     thread.join()
-
                 #update on 2021-05-25 11:22:06
-                with ThreadPoolExecutor(10) as pool:
-                    for i in range(1,maxpage+1):
-                        pool.submit(thread_all, i)
-
-                # for i in range(1,maxpage+1):
-                #     thread_all(i)
-
-
-                    # pool = ThreadPool()
-                # pool.map(thread_part, range(0,maxpage+1))
-                # pool.close()
-                # pool.join()
+                # with ThreadPoolExecutor(10) as pool:
+                #     for i in range(1,maxpage+1):
+                #         pool.submit(thread_all, i)
+                for i in range(1,maxpage+1):
+                    thread_all(i)
                 return True
         else:
             return False
@@ -669,6 +788,7 @@ class YQTSpider(object):
     def modifi_keywords_new(self):
         #     yqt_tree_li act ng-star-inserted
         driver = self.spider_driver
+        time.sleep(1)
         logger.info("点击")
         span = driver.find_element_by_xpath('//span[@class="yqt_tree_li act ng-star-inserted"]')
         span.click()
@@ -717,7 +837,11 @@ class YQTSpider(object):
 
         # 设置完关键词之后获取cookie
         self.cookie = ck
+        driver.get('http://yuqing.sina.com/yqMonitor')
+        time.sleep(1)
 
+        self.usersearchsetid = driver.find_element_by_xpath('//input[@id="view.userSearchSetId"]').get_attribute(
+            "value")
     def start(self, start_time, end_time, time_sleep, info, is_one_day):
         try:
             # 1.登录

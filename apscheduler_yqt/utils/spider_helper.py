@@ -1,4 +1,8 @@
-
+"""
+爬虫帮助
+    1.验证码识别
+    2.文档保存
+"""
 import requests
 import json
 import csv
@@ -6,6 +10,8 @@ import pandas as pd
 import os
 from yuqingtong.config import *
 from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
+
 
 class SpiderHelper(object):
 
@@ -233,9 +239,63 @@ class SpiderHelper(object):
             wb.save(out_file)
             wb.close()
             print("记录完成")
+    @staticmethod
+    def all_project_save_record_day(out_file, yq_number,sql_num_B,project_name,industry_name):
+        """
+        :param out_file:文件路径
+        :param yq_number:舆情通数量
+        :param sql_num_B:系统数量
+        :param project_name:项目名称
+        :param industry_name:行业名称（sheet页名称）
+        :return:
+        """
+        head_xlsx=['项目名称','舆情通数量', '天颂数量']
+        all_industry_name_list=['流通贸易','金融业','IT业','房地产','汽车业','快消品','化妆品','旅游业']
+
+
+        xlsx_dir=os.path.dirname(out_file)
+        if not os.path.exists(xlsx_dir):
+            os.makedirs(xlsx_dir)
+        if not os.path.exists(out_file):
+            wb=Workbook(out_file)
+            for index, item in enumerate(all_industry_name_list):
+                wb.create_sheet(item,index)
+
+            for sheet in wb:
+                # 自适应
+                # for col in sheet.columns:
+                #     max_length = 0
+                #     column = col[0].column_letter  # Get the column name
+                #     for cell in col:
+                #         try:  # Necessary to avoid error on empty cells
+                #             if len(str(cell.value)) > max_length:
+                #                 max_length = len(str(cell.value))
+                #         except:
+                #             pass
+                #     adjusted_width = (max_length + 2) * 1.2
+                #     sheet.column_dimensions[column].width = adjusted_width
+
+                for i in range(1,4):
+                    # 设置列的宽度
+                    sheet.column_dimensions[get_column_letter(i)].width=20
+                sheet.append(head_xlsx)
+                if sheet.title==industry_name:
+                    sheet.append([project_name,yq_number,sql_num_B])
+            wb.save(out_file)
+            wb.close()
+        else:
+            wb=load_workbook(out_file)
+            for sheet in wb:
+                if sheet.title==industry_name:
+                    sheet.append([project_name,yq_number,sql_num_B])
+            wb.save(out_file)
+            wb.close()
+
 
 if __name__ == '__main__':
-    SpiderHelper.save_csv([{"name": 12}], os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "resle.csv"))
-    with open("./image.png", "rb") as f:
-        img_bytes = f.read()
-    print(SpiderHelper.recognise_code(img_bytes))
+    # SpiderHelper.save_csv([{"name": 12}], os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "resle.csv"))
+    # with open("./image.png", "rb") as f:
+    #     img_bytes = f.read()
+    # print(SpiderHelper.recognise_code(img_bytes))
+    SpiderHelper.all_project_save_record_day("F\data\hike.xlsx",1,1,"优速","流通贸易")
+    SpiderHelper.all_project_save_record_day("F\data\hike.xlsx",1,1,"优速","IT业")
