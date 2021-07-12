@@ -974,12 +974,13 @@ def apscheduler(myconfig):
     # for key,value in cron_info.items():
     #     cron_info[key]=eval(value)
     tigger_hour = CronTrigger(**cron_info)
-    trigger2 = CronTrigger(hour='0', minute='01', second=00, jitter=5)
+    trigger2 = CronTrigger(hour='0', minute='08', second=00, jitter=5)
     sched = BlockingScheduler()
     sched.add_job(work_it_hour, trigger1, max_instances=10, id='my_job_id',kwargs={'myconfig':myconfig})
     # sched.add_job(work_it_one_day, trigger2, max_instances=10, id='my_job_id_ever',kwargs={'myconfig':myconfig})
     sched.add_job(work_it_one_day, tigger_hour, max_instances=10, id='my_job_id_ever',kwargs={'myconfig':myconfig})
     sched.add_job(ssql_helper.find_day_data_count, trigger2, max_instances=10, id='my_job_id_ever_count',kwargs={'myconfig':myconfig})
+    sched.add_job(ssql_helper.record_day_datas, trigger2, max_instances=10, id='my_job_id_ever_project_count')
     sched.start()
 
 

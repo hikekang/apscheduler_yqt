@@ -1064,28 +1064,30 @@ def customer_log():
         data = (customer['customer'], date_yesterday, today_customer_num)
         db_a.execute(sql_tsa_customer, data)
 
-def record_day_datas(outfile):
+def record_day_datas():
     spide_helper=SpiderHelper()
     mycon = myconfig.redconfig()
-    project_name=mycon.getValueByDict('spider_config','project_name')
+    project_name=eval(mycon.getValueByDict('spider_config','project_name'))
     print(project_name)
+    outfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"记录\\", f"{datetime.date.today()}.xlsx")
     date_now = datetime.datetime.now().strftime('%Y-%m-%d 00:00:00')
     date_yesterday = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d 00:00:00")
     for data in get_industry_keywords():
-        if data['customer'] in project_name:
-            print(data['customer'])
-            sql_qbbb = "select count(*) from TS_DataMerge_Base where C_Id='{0}' and PublishDate_Std " \
-                       "between '{2}' and '{1}'".format(data['id'], date_now, date_yesterday)
-            # print(sql_qbbb)
-            sql_num_B=db_qbbb.execute_query(sql_qbbb)[0][0]
-            # 舆情通数量待定
-            try:
-                sq_tsa=f"select yqt_num from record_log_table where start_time='{date_yesterday}' and end_time='{date_now}' and customer='{data['customer']}'"
-                print(sq_tsa)
-                sql_a=db_a.execute_query(sq_tsa)[0][0]
-                spide_helper.all_project_save_record_day(outfile,sql_a,sql_num_B,data['customer'],data['industry_name'])
-            except Exception as e:
-                print(e)
+        for item in project_name:
+            if data['customer'] == item:
+                print(data['customer'])
+                sql_qbbb = "select count(*) from TS_DataMerge_Base where C_Id='{0}' and PublishDate_Std " \
+                           "between '{2}' and '{1}'".format(data['id'], date_now, date_yesterday)
+                # print(sql_qbbb)
+                sql_num_B=db_qbbb.execute_query(sql_qbbb)[0][0]
+                # 舆情通数量待定
+                try:
+                    sq_tsa=f"select yqt_num from record_log_table where start_time='{date_yesterday}' and end_time='{date_now}' and customer='{data['customer']}'"
+                    print(sq_tsa)
+                    sql_a=db_a.execute_query(sq_tsa)[0][0]
+                    spide_helper.all_project_save_record_day(outfile,sql_a,sql_num_B,data['customer'],data['industry_name'])
+                except Exception as e:
+                    print(e)
 
 
 if __name__ == '__main__':
@@ -1119,7 +1121,7 @@ if __name__ == '__main__':
     #     print("匹配成功")
     file_name=os.path.join(  os.path.dirname(os.path.abspath(__file__)),f"记录\\" ,f"{datetime.date.today()}.xlsx")
     print(file_name)
-    record_day_datas(file_name)
+    record_day_datas()
     # print(contain_keywords("三联学院","""
     # 学习好难 被蚊子咬 被桌子磕
 # 合肥·安徽
