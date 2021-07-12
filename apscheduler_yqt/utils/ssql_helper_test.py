@@ -7,7 +7,6 @@
 """
 import os
 from concurrent.futures.thread import ThreadPoolExecutor
-
 from utils.snowflake import IdWorker
 import redis
 import re
@@ -947,7 +946,7 @@ def sub_class_match_data(info,d):
         info['parent_id'] = class_info['parent_id']
         # 当前id
         info['class_id'] = class_info['A_id']
-
+        # LogReaper
         # 是否匹配当前分类 进行处理 sort_num和parent_id
         curent_class_data = match_alone_keyword_(info, data)
         if len(curent_class_data['class_id'])!=0:
@@ -987,7 +986,7 @@ def get_month_data(time1, time2, industry_name):
     for d in tqdm(iterable=datas, desc="加载<%s>数据数据" % industry_name, unit='条'):
         myredis.redis.sadd(d[0], d[1])
 
-    sql = "select * from TS_MediumURl"
+    sql = "select * from  QBB_B.dbo.TS_MediumURL where id in (select min(id) as mid from QBB_B.dbo.TS_MediumURL group by (domain))"
     data = db_qbbb.execute_query(sql)
     for d in tqdm(iterable=data, desc="加载url数据", unit='条'):
         myredis.redis.hset("url", d[3], str(d))
@@ -1070,23 +1069,31 @@ def record_day_datas(outfile):
     mycon = myconfig.redconfig()
     project_name=mycon.getValueByDict('spider_config','project_name')
     print(project_name)
+    date_now = datetime.datetime.now().strftime('%Y-%m-%d 00:00:00')
+    date_yesterday = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d 00:00:00")
     for data in get_industry_keywords():
         if data['customer'] in project_name:
-            date_now = datetime.datetime.now().strftime('%Y-%m-%d 00:00:00')
-            date_yesterday = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d 00:00:00")
+            print(data['customer'])
             sql_qbbb = "select count(*) from TS_DataMerge_Base where C_Id='{0}' and PublishDate_Std " \
                        "between '{2}' and '{1}'".format(data['id'], date_now, date_yesterday)
+            # print(sql_qbbb)
             sql_num_B=db_qbbb.execute_query(sql_qbbb)[0][0]
             # 舆情通数量待定
-            spide_helper.all_project_save_record_day(outfile,1,sql_num_B,data['customer'],data['industry_name'])
+            try:
+                sq_tsa=f"select yqt_num from record_log_table where start_time='{date_yesterday}' and end_time='{date_now}' and customer='{data['customer']}'"
+                print(sq_tsa)
+                sql_a=db_a.execute_query(sq_tsa)[0][0]
+                spide_helper.all_project_save_record_day(outfile,sql_a,sql_num_B,data['customer'],data['industry_name'])
+            except Exception as e:
+                print(e)
 
 
 if __name__ == '__main__':
     # for d in merger_industry_data(get_industry_keywords()):
     #     print(d)
     #     print("***"*20)
-    for data in get_industry_keywords():
-        pprint(data)
+    # for data in get_industry_keywords():
+    #     pprint(data)
     # c_d=get_industry_keywords()
     # mao_d=[]
     # for d in c_d:
@@ -1112,4 +1119,9 @@ if __name__ == '__main__':
     #     print("匹配成功")
     file_name=os.path.join(  os.path.dirname(os.path.abspath(__file__)),f"记录\\" ,f"{datetime.date.today()}.xlsx")
     print(file_name)
-    # record_day_datas(file_name)
+    record_day_datas(file_name)
+    # print(contain_keywords("三联学院","""
+    # 学习好难 被蚊子咬 被桌子磕
+# 合肥·安徽
+# 三联学院
+# 本部"""))
