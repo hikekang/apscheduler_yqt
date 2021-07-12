@@ -539,9 +539,9 @@ class YQTSpider(object):
                 logger.info(f"正在抓取第{i}页数据")
                 logger.info(f"解析到{len(data_list)}条数据")
                 self.post_number += len(data_list)
-                lock.acquire()
-                SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path, sheet_name=self.industry_name)
-                lock.release()
+                # lock.acquire()
+                # SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path, sheet_name=self.industry_name)
+                # lock.release()
                 logger.info(f"保存完毕")
                 time.sleep(time_sleep)
         def thread_part(keyword,datacenter_id):
@@ -665,9 +665,9 @@ class YQTSpider(object):
             'view.startTime': str(self.last_end_time),
             'monitorType': '1',
             'view.endTime': str(self.last_end_time),
-            'view.origin': '2',
+            'view.origin': '1',
             'view.matchType': '3',
-            'view.resultPresent': '1',
+            'view.resultPresent': '0',#结果呈现
             'view.paixu': '2',
             'view.exportType': '',
             'view.weiboType': '0',
@@ -686,12 +686,12 @@ class YQTSpider(object):
             'view.toolbarSwitch': '0',
             'view.bloggerAuthenticationStatus': '0',
             'view.blogPostsStatus': '0',
-            'view.ocrContentType': '2',
-            'view.isRootMultiple': '0,1,2',
+            'view.ocrContentType': '0',
+            'view.isRootMultiple': '0',
             'view.dataView': '0',
-            'view.bloggerAuthenticationStatusMultiple': '0,5,1,2,3,4',
-            'view.weiboTypeMultiple': '0,1,2,3,4',
-            'view.accurateSwitch': '1',
+            'view.bloggerAuthenticationStatusMultiple': '0',
+            'view.weiboTypeMultiple': '0',
+            'view.accurateSwitch': '0',
             'view.attributeCheck': '1',
             'view.informationContentType': '1',
         }
@@ -768,7 +768,7 @@ class YQTSpider(object):
                     self.next_end_time,  # 结束时间
                     yqt_count,  # 舆情通数量
                     self.post_number,  # 上传数量
-                    self.project_name,  # 项目名称
+                    self.info['customer'],  # 项目名称
                     self.first_len,  # 第一次过滤之后的数量
                     self.redis_len,  # redis过滤之后的数量
                     sql_number_A,
@@ -1008,11 +1008,11 @@ if __name__ == '__main__':
     # print('开始运行')
 
     # p1 = Process(target=java_task, name='java程序')
-    # # p2 = Process(target=apscheduler,kwargs={'myconfig':myconfig},name='定时抓取')
+    p2 = Process(target=apscheduler,kwargs={'myconfig':myconfig},name='定时抓取')
     # p1.start()
     # # p2.start()
     # # print("运行结束")
-    work_it_hour(myconfig)
+    # work_it_hour(myconfig)
     print("抓取结束")
     # # except Exception as e:
     # #     my_e = my_Email()
