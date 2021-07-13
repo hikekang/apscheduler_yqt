@@ -825,8 +825,8 @@ def mark_java_match_data(d,theam_list):
             table_name = tables[info['industry_name']].split(".")[-1]
             post_data = {
                 "id": d['id'],
-                "cid": d['C_Id'],
-                "sn": d['SN'],
+                "cId": d['C_Id'],
+                "SN": d['SN'],
                 "emotionStatus": d['positive_prob_number'],
                 "tableName": table_name
             }
