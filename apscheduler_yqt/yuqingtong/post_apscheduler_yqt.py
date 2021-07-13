@@ -233,12 +233,34 @@ class YQTSpider(object):
                             data['发布人'] = ''
                     if (len(data['发布人']) > 15):
                         data['发布人'] = ''
-                if data['attitude']=='中性':
-                    data['positive_prob_number'] = 0.5
-                elif data['attitude']=='喜悦':
+
+                # ------------接口直接返回情感进行判断-----------
+                # if 'distribution' in item.keys():
+                #     emotion_dict = json.loads(item['distribution'])
+                #     result = max(emotion_dict, key=emotion_dict.get)
+                #     print(f"情感判断为{result}")
+                # else:
+                #     result='中性'
+                # if result=='中性':
+                #     data['positive_prob_number'] = 0.65
+                # elif result=='敏感':
+                #     data['positive_prob_number'] = 0.1
+                # else:
+                #     data['positive_prob_number']=0.9
+                # -------------------------------------------
+
+                # ------------通过customFlag1判断情感-----------
+                # 中性
+                if item['customFlag1'] == '5':
+                    data['positive_prob_number'] = 0.65
+                # 非敏感
+                elif item['customFlag1'] == '4':
+                    data['positive_prob_number'] = 0.9
+                # 敏感
+                elif item['customFlag1'] == '2':
                     data['positive_prob_number'] = 0.1
                 else:
-                    data['positive_prob_number']=0.9
+                    data['positive_prob_number'] = 0.9
                 data_list.append(data)
             return data_list
         else:
