@@ -204,12 +204,12 @@ class YQTSpider(object):
                     data['转发内容'] += ex(item['content'])
                     # print(data['转发内容'])
                     # print('content')
-                if 'forwarderContent' in item['forwarderContent']:
+                if 'forwarderContent' in item.keys():
                     if item['forwarderContent']!=None:
                         data['转发内容']+=ex(item['forwarderContent'])
                     # print('forwarderContent')
 
-                if 'ocrContents' in item['ocrContents']:
+                if 'ocrContents' in item.keys():
                     if item['ocrContents'] != None:
                         data['转发内容'] += ex(item['ocrContents'])
                         # print('ocrContents')
@@ -233,34 +233,12 @@ class YQTSpider(object):
                             data['发布人'] = ''
                     if (len(data['发布人']) > 15):
                         data['发布人'] = ''
-
-                # ------------接口直接返回情感进行判断-----------
-                # if 'distribution' in item.keys():
-                #     emotion_dict = json.loads(item['distribution'])
-                #     result = max(emotion_dict, key=emotion_dict.get)
-                #     print(f"情感判断为{result}")
-                # else:
-                #     result='中性'
-                # if result=='中性':
-                #     data['positive_prob_number'] = 0.65
-                # elif result=='敏感':
-                #     data['positive_prob_number'] = 0.1
-                # else:
-                #     data['positive_prob_number']=0.9
-                # -------------------------------------------
-
-                # ------------通过customFlag1判断情感-----------
-                # 中性
-                if item['customFlag1'] == '5':
-                    data['positive_prob_number'] = 0.65
-                # 非敏感
-                elif item['customFlag1'] == '4':
-                    data['positive_prob_number'] = 0.9
-                # 敏感
-                elif item['customFlag1'] == '2':
+                if data['attitude']=='中性':
+                    data['positive_prob_number'] = 0.5
+                elif data['attitude']=='喜悦':
                     data['positive_prob_number'] = 0.1
                 else:
-                    data['positive_prob_number'] = 0.9
+                    data['positive_prob_number']=0.9
                 data_list.append(data)
             return data_list
         else:
@@ -302,7 +280,7 @@ class YQTSpider(object):
                     data['转发内容'] += ex(item['content'])
                     # print(data['转发内容'])
                     # print('content')
-                if 'forwarderContent' in item['forwarderContent']:
+                if 'forwarderContent' in item.keys():
                     if item['forwarderContent']!=None:
                         data['转发内容']+=ex(item['forwarderContent'])
                         # print('forwarderContent')
@@ -325,17 +303,29 @@ class YQTSpider(object):
                             data['发布人'] = ''
                     if (len(data['发布人']) > 15):
                         data['发布人'] = ''
-                if 'distribution' in item.keys():
-                    emotion_dict = json.loads(item['distribution'])
-                    result = max(emotion_dict, key=emotion_dict.get)
-                else:
-                    result='中性'
-                if result=='中性':
-                    data['positive_prob_number'] = 0.5
-                elif result=='敏感':
+                # if 'distribution' in item.keys():
+                #     emotion_dict = json.loads(item['distribution'])
+                #     result = max(emotion_dict, key=emotion_dict.get)
+                #     print(f"情感判断为{result}")
+                # else:
+                #     result='中性'
+                # if result=='中性':
+                #     data['positive_prob_number'] = 0.65
+                # elif result=='敏感':
+                #     data['positive_prob_number'] = 0.1
+                # else:
+                #     data['positive_prob_number']=0.9
+                if item['customFlag1']=='5':
+                    data['positive_prob_number'] = 0.65
+                # 非敏感
+                elif item['customFlag1']=='4':
+                    data['positive_prob_number'] = 0.9
+                # 敏感
+                elif item['customFlag1']=='2':
                     data['positive_prob_number'] = 0.1
                 else:
-                    data['positive_prob_number']=0.9
+                    data['positive_prob_number'] = 0.9
+                print(f"情感系数为{data['positive_prob_number']}")
                 data_list.append(data)
             return data_list
         else:
@@ -473,53 +463,17 @@ class YQTSpider(object):
         # 资源上锁
         lock = threading.Lock()
         def thread_all(i):
-            payload_all = {"searchCondition": {
-                "keywordId": int(self.keyword_id),
-                "accurateSwitch": 1,
-                "bloggerAuthenticationStatusMultiple": "0",
-                "blogPostsStatus": 0,
-                "comblineflg": 2,
-                "dataView": 0,
-                "displayIcon": 1,
-                "involveWay": 0,
-                "keywordProvince": "全部",
-                "matchType": 3,
-                "ocrContentType": 0,
-                "searchRootWbMultiple": "0",
-                "timeDomain": "-1",
-                "weiboTypeMultiple": "0",
-                "secondKeywordMatchType": 1,
-                "searchSecondKeyword": "",
-                "webSiteId": "0",
-                "order": 2,
-                "monitorType": 1,
-                "isRoot": 1,
-                "origins": "1",
-                "presentResult": "1",
-                "options": "1",
-                "attributeCheck": "1",
-                "informationContentType": 1,
-                "duplicateShowMultiple": "0",
-                "startTime": str(self.last_end_time),
-                "endTime": str(self.next_end_time),
-                "attribute": "1",
-                "chartStart": str(self.last_end_time),
-                "chartEnd": str(self.next_end_time),
-                "page": 1,
-                "pageSize": 100
-            }}
-
             google_payload = {
                 'view.keywordId': str(self.keyword_id),
                 'view.secondKeyword': '',
                 'view.userSearchSetId': str(self.usersearchsetid),
-                'view.timeDomain': '1',
+                'view.timeDomain': '-1',
                 'view.startTime': str(self.last_end_time),
                 'monitorType': '1',
-                'view.endTime': str(self.last_end_time),
-                'view.origin': '2',
+                'view.endTime': str(self.next_end_time),
+                'view.origin': '1',
                 'view.matchType': '3',
-                'view.resultPresent': '1',
+                'view.resultPresent': '0',
                 'view.paixu': '2',
                 'view.exportType': '',
                 'view.weiboType': '0',
@@ -538,12 +492,12 @@ class YQTSpider(object):
                 'view.toolbarSwitch': '0',
                 'view.bloggerAuthenticationStatus': '0',
                 'view.blogPostsStatus': '0',
-                'view.ocrContentType': '2',
-                'view.isRootMultiple': '0,1,2',
+                'view.ocrContentType': '0',
+                'view.isRootMultiple': '0',
                 'view.dataView': '0',
-                'view.bloggerAuthenticationStatusMultiple': '0,5,1,2,3,4',
-                'view.weiboTypeMultiple': '0,1,2,3,4',
-                'view.accurateSwitch': '1',
+                'view.bloggerAuthenticationStatusMultiple': '0',
+                'view.weiboTypeMultiple': '0',
+                'view.accurateSwitch': '0',
                 'view.attributeCheck': '1',
                 'view.informationContentType': '1',
             }
@@ -556,14 +510,14 @@ class YQTSpider(object):
             # 上传数据
             if data_list:
                 # 数据上传
-                # ssql_helper.upload_many_data(data_list, self.industry_name,i,self.info)
-                ssql_helper.upload_many_data_java(data_list, self.industry_name,i)
+                ssql_helper.upload_many_data(data_list, self.industry_name,i,self.info)
+                # ssql_helper.upload_many_data_java(data_list, self.industry_name,i)
                 logger.info(f"正在抓取第{i}页数据")
                 logger.info(f"解析到{len(data_list)}条数据")
                 self.post_number += len(data_list)
-                # lock.acquire()
-                # SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path, sheet_name=self.industry_name)
-                # lock.release()
+                lock.acquire()
+                SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path, sheet_name=self.industry_name)
+                lock.release()
                 logger.info(f"保存完毕")
                 time.sleep(time_sleep)
         def thread_part(keyword,datacenter_id):
@@ -575,10 +529,10 @@ class YQTSpider(object):
                 'view.timeDomain': '1',
                 'view.startTime': str(self.last_end_time),
                 'monitorType': '1',
-                'view.endTime': str(self.last_end_time),
+                'view.endTime': str(self.next_end_time),
                 'view.origin': '2',
                 'view.matchType': '3',
-                'view.resultPresent': '1',
+                'view.resultPresent': '0',
                 'view.paixu': '2',
                 'view.exportType': '',
                 'view.weiboType': '0',
@@ -614,7 +568,7 @@ class YQTSpider(object):
 
             if content_all != None:
                 maxpage = int(content_all['maxpage'])
-                print("最大页数为%d",maxpage)
+                print("最大页数为",maxpage)
                 if maxpage != 0:
                     if maxpage>50:
                         # maxpage=50
@@ -622,74 +576,28 @@ class YQTSpider(object):
 
                     for i in range(1, 31):
                         google_payload['page'] = i
-                        logger.info(f"抓取的关键字为{google_payload['searchSecondKeyword']}，抓取到第{i}页")
-                        content = SecondData(self.cookie, google_payload).google_get_content()
+                        logger.info(f"抓取的关键字为{google_payload['view.secondKeyword']}，抓取到第{i}页")
+                        content = self.google_parse(google_payload)
                         if content != None:
-                            content=self.google_parse(content)
                             data_list = self.clear_data(content)
                             if data_list:
-                                # datacenter_id  词的id
-                                # ssql_helper.upload_many_data(data_list,self.industry_name,datacenter_id,self.info)
-                                ssql_helper.upload_many_data_java(data_list,self.industry_name,datacenter_id)
+                                # ssql_helper.upload_many_data_java(data_list,self.industry_name,datacenter_id)
+                                ssql_helper.upload_many_data(data_list, self.industry_name, i, self.info)
                                 logger.info(f"解析到{len(data_list)}条数据")
                                 self.post_number += len(data_list)
-                                # SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path,sheet_name=self.info['sheet_name'])
-                                # lock.acquire()
-                                # SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path,
-                                #                        sheet_name=self.industry_name)
-                                # lock.release()
                                 logger.info(f"保存完毕")
-        """
-        翻页
-        :return:
-        """
-        # 首先查询全部
-        payload_all = {"searchCondition": {
-            "keywordId": int(self.keyword_id),
-            "accurateSwitch": 1,
-            "bloggerAuthenticationStatusMultiple": "0",
-            "blogPostsStatus": 0,
-            "comblineflg": 2,
-            "dataView": 0,
-            "displayIcon": 1,
-            "involveWay": 0,
-            "keywordProvince": "全部",
-            "matchType": 3,
-            "ocrContentType": 0,
-            "searchRootWbMultiple": "0",
-            "timeDomain": "-1",
-            "weiboTypeMultiple": "0",
-            "secondKeywordMatchType": 1,
-            "searchSecondKeyword": "",
-            "webSiteId": "0",
-            "order": 2,
-            "monitorType": 1,
-            "isRoot": 1,
-            "origins": "1",
-            "presentResult": "1",
-            "options": "1",
-            "attributeCheck": "1",
-            "informationContentType": 1,
-            "duplicateShowMultiple": "0",
-            "startTime": str(self.last_end_time),
-            "endTime": str(self.next_end_time),
-            "attribute": "1",
-            "chartStart": str(self.last_end_time),
-            "chartEnd": str(self.next_end_time),
-            "page": 1,
-            "pageSize": 100
-        }}
+
         google_payload = {
-            'view.keywordId': int(self.keyword_id),
+            'view.keywordId': str(self.keyword_id),
             'view.secondKeyword': '',
-            'view.userSearchSetId': str(self.usersearchsetid),
-            'view.timeDomain': '1',
+            'view.userSearchSetId': '',
+            'view.timeDomain': '-1',
             'view.startTime': str(self.last_end_time),
             'monitorType': '1',
-            'view.endTime': str(self.last_end_time),
+            'view.endTime': str(self.next_end_time),
             'view.origin': '1',
             'view.matchType': '3',
-            'view.resultPresent': '0',#结果呈现
+            'view.resultPresent': '0',
             'view.paixu': '2',
             'view.exportType': '',
             'view.weiboType': '0',
@@ -700,7 +608,7 @@ class YQTSpider(object):
             'page': '1',
             'pagesize': '100',
             'view.viewMode': '1',
-            'kw.keywordId': int(self.keyword_id),
+            'kw.keywordId': str(self.keyword_id),
             'view.secondKeywordMatchType': '1',
             'view.duplicateShow': '0',
             'view.keywordProvince': '全部',
@@ -726,21 +634,26 @@ class YQTSpider(object):
             maxpage=content_all['maxpage']
             logger.info(f'数据总量为{total_count}')
             logger.info(f'总页数为{maxpage}')
-            if total_count>5000:
-                logger.info("数据量太大需要分词抓取")
-                # update on 2021-05-25 11:20:57
-                with ThreadPoolExecutor(10) as pool:
-                    for datacenter_id,item in enumerate(self.info['project_words']):
-                        pool.submit(thread_part,item['keywords'],datacenter_id+1)
-                    logger.info("分词抓取完毕")
-                return True
-            elif(total_count<5000 and maxpage>0 ):
-                #update on 2021-05-25 11:22:06
-                # with ThreadPoolExecutor(10) as pool:
-                #     for i in range(1,maxpage+1):
-                #         pool.submit(thread_all, i)
-                for i in range(1,maxpage+1):
-                    thread_all(i)
+            with ThreadPoolExecutor(10) as pool:
+                for i in range(1,50):
+                    pool.submit(thread_all, i)
+            # if total_count>5000:
+            #     logger.info("数据量太大需要分词抓取")
+            #     # update on 2021-05-25 11:20:57
+            #     # with ThreadPoolExecutor(10) as pool:
+            #     #     for datacenter_id,item in enumerate(self.info['project_words']):
+            #     #         pool.submit(thread_part,item['keywords'],datacenter_id+1)
+            #     #     logger.info("分词抓取完毕")
+            #     for datacenter_id, item in enumerate(self.info['project_words']):
+            #        thread_part(item['keywords'], datacenter_id + 1)
+            #     return True
+            # elif(total_count<5000 and maxpage>0 ):
+            #     #update on 2021-05-25 11:22:06
+            #     # with ThreadPoolExecutor(10) as pool:
+            #     #     for i in range(1,maxpage+1):
+            #     #         pool.submit(thread_all, i)
+            #     for i in range(1,maxpage+1):
+            #         thread_all(i)
                 return True
         else:
             return False
@@ -774,8 +687,8 @@ class YQTSpider(object):
                 data_list = [self.project_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                              self.last_end_time, self.next_end_time]
                 # 本地记录文件保存
-                SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number_A,sql_number_B,
-                                              data_list=data_list)
+                # SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number_A,sql_number_B,
+                #                               data_list=data_list)
                 record_day_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                                 f"record\{self.project_name}", f"{self}_{self.project_name}记录.xlsx")
                 # SpiderHelper.save_record_day_data(record_day_file_path, yqt_count, sql_number_B)
@@ -865,7 +778,7 @@ class YQTSpider(object):
         self.usersearchsetid = driver.find_element_by_xpath('//input[@id="view.userSearchSetId"]').get_attribute(
             "value")
     def start(self, start_time, end_time, time_sleep, info, is_one_day):
-        try:
+        # try:
             # 1.登录
             if not self._login():
                 raise Exception("登录环节出现问题")
@@ -883,7 +796,7 @@ class YQTSpider(object):
 
             self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                                f"data\{self.project_name}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
-                                               f"{self}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
+                                               f"{self}_{self.info['customer']}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
                                                    ':', '_'))
             logger.info(self.data_file_path)
             # 设置关键词
@@ -894,8 +807,8 @@ class YQTSpider(object):
             if resp:
                 logger.info("全部抓取完毕，结束")
                     # pyautogui.alert("抓取完成...")
-        except Exception as e:
-            logger.warning(e)
+        # except Exception as e:
+        #     logger.warning(e)
         # finally:
         #     print("进入finally")
         #     if self.spider_driver.service.is_connectable():
@@ -932,9 +845,11 @@ def work_it(myconfig, start_time, end_time):
     # 根据项目进行抓取，方便统计
     industry_keywords=myconfig.getValueByDict('industry_info','industry_keywords')
     customer_name=myconfig.getValueByDict('industry_info','project_name')
+    print(customer_name)
     for d in customer_list_data:
+        print(d)
         if d['industry_name'] in industry_keywords:
-            if d['customer']==customer_name:
+            if d['customer'] in customer_name:
                 if d['keywords']!='':
                     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=d, is_one_day=False)
                     print("完成一轮")
@@ -955,6 +870,7 @@ def work_it_hour(myconfig):
         start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
         end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+        print(start_time, end_time)
         work_it(myconfig, start_time, end_time)
     elif list(time_info.keys())[0] == 'hours':
         end_time = datetime.datetime.now().strftime('%Y-%m-%d %H') + ":00:00"
@@ -991,18 +907,17 @@ def work_it_one_day(myconfig):
 
 
 def apscheduler(myconfig):
-    trigger1 = CronTrigger(hour='0-23', minute='01', second=00, jitter=5)
+    trigger1 = CronTrigger(minute='*/20', second=00, jitter=5)
     cron_info = myconfig.getDictBySection('cron_info')
     # for key,value in cron_info.items():
     #     cron_info[key]=eval(value)
     tigger_hour = CronTrigger(**cron_info)
-    trigger2 = CronTrigger(hour='0', minute='08', second=00, jitter=5)
+    trigger2 = CronTrigger(hour='0', minute='01', second=00, jitter=5)
     sched = BlockingScheduler()
     sched.add_job(work_it_hour, trigger1, max_instances=10, id='my_job_id',kwargs={'myconfig':myconfig})
     # sched.add_job(work_it_one_day, trigger2, max_instances=10, id='my_job_id_ever',kwargs={'myconfig':myconfig})
     sched.add_job(work_it_one_day, tigger_hour, max_instances=10, id='my_job_id_ever',kwargs={'myconfig':myconfig})
     sched.add_job(ssql_helper.find_day_data_count, trigger2, max_instances=10, id='my_job_id_ever_count',kwargs={'myconfig':myconfig})
-    sched.add_job(ssql_helper.record_day_datas, trigger2, max_instances=10, id='my_job_id_ever_project_count')
     sched.start()
 
 
@@ -1019,24 +934,20 @@ def java_task():
 if __name__ == '__main__':
     # try:
     today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    # time1 = (datetime.datetime.now() - datetime.timedelta(days=3)).strftime('%Y-%m-%d')
     time1 = (datetime.datetime.now() - datetime.timedelta(days=3)).strftime('%Y-%m-%d')
     myconfig = config.redconfig()
-    print("加载数据")
-    industry_name=myconfig.getValueByDict('industry_info', 'industry_name')
-    ssql_helper.get_month_data(time1, today,industry_name)
-    # print("加载完毕")
-    # xlsx_work()
-    # work_it_2()
-    # work_it_one_day()
-    # print('开始运行')
+    # print("加载数据")
+    industry_name = myconfig.getValueByDict('industry_info', 'industry_name')
+    ssql_helper.get_month_data(time1, today, industry_name)
 
     # p1 = Process(target=java_task, name='java程序')
-    p2 = Process(target=apscheduler,kwargs={'myconfig':myconfig},name='定时抓取')
+    p2 = Process(target=apscheduler, kwargs={'myconfig': myconfig}, name='定时抓取')
     # p1.start()
-    # # p2.start()
+    p2.start()
     # # print("运行结束")
-    # work_it_hour(myconfig)
-    print("抓取结束")
+    work_it_hour(myconfig)
+    # print("抓取结束")
     # # except Exception as e:
     # #     my_e = my_Email()
     # #     my_e.send_message(str(e), "程序预警")
