@@ -93,6 +93,7 @@ class YQTSpider(object):
             datetime.datetime.min.time())
         default_end_time = datetime.datetime.combine(datetime.datetime.now().date(), datetime.datetime.min.time())
         self.interval = [default_start_time, default_end_time]
+        self.next_page_num = 1
         self.crawl_page_count = 0  # 计数用，重启浏览器使用
 
     def __str__(self):
@@ -170,170 +171,155 @@ class YQTSpider(object):
             return self._login(count=count + 1)
 
     # 解析页面进行数据抓取和保存
-    def _parse(self, payload):
+    def parse_data(self):
+        """
+        解析页面生成数据
+        :return: 数据已字典形式存在list中
+        """
+        driver = self.spider_driver
+        page_source = driver.page_source
+        return self._parse(page_source)
+    def _parse(self, page_source):
+        p = re.compile("r'\s*|\t|\r|\n'")
+        doc = etree.HTML(page_source)
+        item_trs = doc.xpath('.//tr[@class="ng-scope"]')
+        time.sleep(0.2)
         data_list = []
-        # 带有二层数据的数据
-        secod_content = SecondData(self.cookie, payload).get_content()
-        if secod_content!=None:
-            for item in secod_content['data']['icontentCommonNetList']:
-                data = {
-                    # '时间': item['captureTime'].replace("T"," ").replace(".000+0000",""),
-                    '时间': item['publishedMinute'],
-                    '标题': ex(item['title']) if item['title']!=None else item['title'],
-                    '描述': ex(item['summary']) if item['summary']!=None else item['summary'],  # 微博原创
-                    '链接': item['webpageUrl'],
-                    '转发内容': '',
-                    '发布人': item.get('author'),
-                    'ic_id': item['id'],
-                    'keywords_id': item['keywordId'],
-                    # attitude:item['distrution']
-                    'attitude': item['emotion'],
-                    'images':"" ,
-                    'reposts_count': item['forwardNumber'],
-                    'comments_count': 0,
-                    'sort': '转发' if int(item['repostsFlg'])==1 else '原创',
-                    'industry': ",".join(item['secondTradeList']),
-                    'related_words': item['referenceKeyword'],
-                    'site_name': item['captureWebsiteName'],
-                    # 'area': item['contentAddress'],
-                    'area': item['province'],
-                    'C_Id':self.info['id']# 客户id
-                }
+        for tr in item_trs[1:]:
+            tds = tr.xpath('.//td')
+            print(len(tds))
+            # 内容
+            td_title = tds[1]
+            # 来源
+            td_orgin = tds[3]
+            # 文章站点
+            site_name = td_orgin.xpath('span')[0].text
 
-                if item['content'] != None:
-                    data['转发内容'] += ex(item['content'])
-                    # print(data['转发内容'])
-                    # print('content')
-                if 'forwarderContent' in item.keys():
-                    if item['forwarderContent']!=None:
-                        data['转发内容']+=ex(item['forwarderContent'])
-                    # print('forwarderContent')
+            # 文章时间
+            td_time = tds[4].xpath('.//span[@class="date"]/text()')
 
-                if 'ocrContents' in item.keys():
-                    if item['ocrContents'] != None:
-                        data['转发内容'] += ex(item['ocrContents'])
-                        # print('ocrContents')
-
-
-                # if item['forwarderImages']:
-                #     for item_pic in item['forwarderImages']:
-                #         data['images']+=item_pic['bmiddlePic']
-                # if data['sort'] == '原创':
-                #     data['转发内容'] = data['描述']
-
-                # if len(data['标题']) > 20:
-                #     data['标题'] = data['标题'][0:20]
-                if data['发布人']:
-                    if '：' in data['发布人'] or ":" in data['发布人']:
-                        publish_man = re.sub(':|：', '', data['发布人'])
-                        # publish_man=data['发布人'].split(":")[0]
-                        data['发布人'] = publish_man
+            def parse_time(td_time):
+                from datetime import datetime
+                ymd_1 = p.sub("", td_time[0])
+                # ymd_2 = td_time.find('span:last-child').text()
+                ymd_2 = p.sub("", td_time[1])
+                try:
+                    if "年" in ymd_1:  # 不是今年的数据
+                        ymd = "".join([ymd_1, ymd_2])
+                    elif "今天" in ymd_2:  # 今天的数据
+                        ymd = " ".join([f"{str(datetime.now().date())}", ymd_1])
+                        return datetime.strptime(ymd, "%Y-%m-%d %H:%M").strftime("%Y-%m-%d %H:%M:%S")
                     else:
-                        if (len(data['发布人']) > 10):
-                            data['发布人'] = ''
-                    if (len(data['发布人']) > 15):
-                        data['发布人'] = ''
-                if data['attitude']=='中性':
-                    data['positive_prob_number'] = 0.5
-                elif data['attitude']=='喜悦':
-                    data['positive_prob_number'] = 0.1
+                        ymd = " ".join([f"{datetime.now().year}年" + ymd_2, ymd_1])
+                    return datetime.strptime(ymd, "%Y年%m月%d日 %H:%M").strftime("%Y-%m-%d %H:%M:%S")
+                except Exception as e:
+                    logger.warning(e)
+                    logger.warning(td_time)
+
+            # 转发类型  原创 有一部分是没有的 在这里只进行微博的判断
+            if site_name=="新浪微博":
+                sort_1 = td_title.xpath('.//span[contains(@ng,"icc.repostsFlg!=0")]/text()')
+                if len(sort_1) > 0:
+                    sort = p.sub("", sort_1[0])
                 else:
-                    data['positive_prob_number']=0.9
-                data_list.append(data)
-            return data_list
-        else:
-            return None
-    # more placeholders in sql than params available
+                    sort = "原创"
+            else:
+                sort="原创"
 
-    def google_parse(self, payload):
-        data_list = []
-        # 带有二层数据的数据
-        secod_content = SecondData(self.cookie, payload).google_get_content()['icclist']
-        if secod_content!=None:
-            for item in secod_content:
-                data = {
-                    # '时间': item['captureTime'].replace("T"," ").replace(".000+0000",""),
-                    '时间': item['publishedMinute'],
-                    '标题': ex(item['title']) if item['title']!=None else item['title'],
-                    '描述': ex(item['summary']) if item['summary']!=None else item['summary'],  # 微博原创
-                    '链接': item['webpageUrl'],
-                    '转发内容': '',
-                    '发布人': item.get('author'),
-                    'ic_id': item['id'],
-                    'keywords_id': item['keywordId'],
-                    # attitude:item['distrution']
-                    'attitude': item['emotion'],
-                    'images':"" ,
-                    # 'reposts_count': item['forwardNumber'],
-                    'reposts_count': 0,
-                    'comments_count': 0,
-                    'sort': '转发' if int(item['repostsFlg'])==1 else '原创',
-                    'industry': ",".join(item['secondTradeList']),
-                    'related_words': item['referenceKeyword'],
-                    'site_name': item['captureWebsiteName'],
-                    # 'area': item['contentAddress'],
-                    'area': item['province'],
-                    'C_Id':self.info['id']# 客户id
-                }
-
-                if item['content'] != None:
-                    data['转发内容'] += ex(item['content'])
-                    # print(data['转发内容'])
-                    # print('content')
-                if 'forwarderContent' in item.keys():
-                    if item['forwarderContent']!=None:
-                        data['转发内容']+=ex(item['forwarderContent'])
-                        # print('forwarderContent')
-
-                # if item['forwarderImages']:
-                #     for item_pic in item['forwarderImages']:
-                #         data['images']+=item_pic['bmiddlePic']
-                # if data['sort'] == '原创':
-                #     data['转发内容'] = data['描述']
-
-                # if len(data['标题']) > 20:
-                #     data['标题'] = data['标题'][0:20]
-                if data['发布人']:
-                    if '：' in data['发布人'] or ":" in data['发布人']:
-                        publish_man = re.sub(':|：', '', data['发布人'])
-                        # publish_man=data['发布人'].split(":")[0]
-                        data['发布人'] = publish_man
+            # 获取内容所有文本
+            content = p.sub("", td_title.xpath('.//div[contains(@class,"item-title news-item-title contenttext ng-binding")]')[0].xpath(
+                'string(.)'))
+            # 获取转发内容的所有文本
+            spread = td_title.xpath('.//div[contains(@class,"should-spread-area")]')
+            spread_content=''
+            if spread:
+                spread_content = p.sub("", spread[0].xpath('string(.)'))
+            else:
+                spread_content = ''
+            # 针对于文章是标题  针对于微博是作者
+            author = td_title.xpath('.//div[contains(@class,"profile-title inline-block")]/a')[0].xpath('string(.)')
+            author_or_title = p.sub("", author)
+            if site_name == '新浪微博':
+                author = author_or_title
+                title=content
+            else:
+                result_a_t = author_or_title.split(":")
+                if len(result_a_t) > 2:
+                    author = author_or_title.split(":")[0]
+                    title = author_or_title.split(":")[1]
+                else:
+                    if len(author_or_title) > 15:
+                        author = site_name
+                        title = author_or_title
                     else:
-                        if (len(data['发布人']) > 10):
-                            data['发布人'] = ''
-                    if (len(data['发布人']) > 15):
-                        data['发布人'] = ''
-                # if 'distribution' in item.keys():
-                #     emotion_dict = json.loads(item['distribution'])
-                #     result = max(emotion_dict, key=emotion_dict.get)
-                #     print(f"情感判断为{result}")
-                # else:
-                #     result='中性'
-                # if result=='中性':
-                #     data['positive_prob_number'] = 0.65
-                # elif result=='敏感':
-                #     data['positive_prob_number'] = 0.1
-                # else:
-                #     data['positive_prob_number']=0.9
-                if item['customFlag1']=='5':
-                    data['positive_prob_number'] = 0.65
-                # 非敏感
-                elif item['customFlag1']=='4':
-                    data['positive_prob_number'] = 0.9
-                # 敏感
-                elif item['customFlag1']=='2':
-                    data['positive_prob_number'] = 0.1
+                        author = author_or_title
+                        title = author_or_title
+            # 行业
+            # industry = p.sub("", td_title.xpath('.//div[@class="profile-tip inline-block"]/nz-tag[2]/span/text()')[0])
+            # 关键词
+            relate_words = p.sub("", td_title.xpath('.//span[@ng-bind="icc.referenceKeyword"]')[0].xpath('string(.)'))
+            # 转发数量
+            # forwarding_span = td_title.xpath(
+            #     './/i[contains(@class,"anticon font-size-16 mr5")]/following-sibling::span')
+            # if forwarding_span:
+            #     forwarding_num = p.sub("", td_title.xpath(
+            #         './/i[contains(@class,"anticon font-size-16 mr5")]/following-sibling::span')[0].text)
+            # else:
+            #     forwarding_num = 0
+            # # 评论数量
+            # comment_num_span = td_title.xpath(
+            #     './/i[contains(@iconfont,"fa-pinglunshu")]/following-sibling::span/text()')
+            # if comment_num_span:
+            #     comment_num = comment_num_span[0]
+            # else:
+            #     comment_num = 0
+            # img_src = ",".join([img.attrib['src'] for img in td_title.xpath('//img')])
+            # attitude = p.sub("", td_title.xpath('.//div[@class="sensitive-status-content fmg"]')[0].text)
+            attitude = p.sub("", td_title.xpath('.//div[@class="sensitive-status-content fmg"]/span/text()')[0])
+            source_url=td_title.xpath('.//div[@class="btn-group inline-block"]/ul/li[4]/a/@href')[0]
+            data = {
+                '时间': parse_time(td_time),
+                '标题': content,
+                '描述': content,  # 微博原创
+                '链接': source_url,
+                '转发内容': spread_content+content+relate_words,
+                '发布人': author,
+                'attitude': attitude,
+                'sort': sort,
+                'related_words': relate_words,
+                'site_name': site_name,
+                'area': p.sub("", td_orgin.xpath('.//div[contains(@ng-if,"icc.province!")]')[0].text),
+                'C_Id': self.info['id']  # 客户id
+            }
+            # if item['forwarderImages']:
+            #     for item_pic in item['forwarderImages']:
+            #         data['images']+=item_pic['bmiddlePic']
+            # if data['sort'] == '原创':
+            #     data['转发内容'] = spread+content+relate_words
+            if len(data['标题']) > 20:
+                data['标题'] = data['标题'][0:20]
+            if data['发布人']:
+                if '：' in data['发布人'] or ":" in data['发布人']:
+                    publish_man = re.sub(':|：', '', data['发布人'])
+                    # publish_man=data['发布人'].split(":")[0]
+                    data['发布人'] = publish_man
                 else:
-                    data['positive_prob_number'] = 0.9
-                print(f"情感系数为{data['positive_prob_number']}")
-                data_list.append(data)
-            return data_list
-        else:
-            return None
+                    if (len(data['发布人']) > 10):
+                        data['发布人'] = ''
+                if (len(data['发布人']) > 15):
+                    data['发布人'] = ''
+            positive_dict = {
+                "敏感": 0.1,
+                "非敏感": 0.9,
+                "中性": 0.65
+            }
+            data['positive_prob_number'] = positive_dict[attitude.split()[0]]
+            data_list.append(data)
+        return data_list
+
     # 数据处理
     def clear_data(self, data_list):
         logger.info("数据处理")
-        t1 = time.time()
         new_data_list = self.quchong(data_list, "链接")
 
         # 第二次滤重
@@ -399,7 +385,6 @@ class YQTSpider(object):
             else:
                 data['is_original'] = 2
             sec_list.append(data)
-        t2 = time.time()
         # logger.info("数据处理花费时间:", t2 - t1)
         # logger.info("数据处理完毕之后的数量", len(sec_list))
         return sec_list
@@ -433,7 +418,7 @@ class YQTSpider(object):
             # 新版
             wait_loading_disappear = self.wait.until(
                 EC.invisibility_of_element_located(
-                    (By.XPATH, '//span[@class="ant-spin-dot ant-spin-dot-spin ng-star-inserted"]')))
+                    (By.XPATH, '//div[@class="spinner large"]')))
             if wait_loading_disappear:
                 try:
                     wait_tr_appear = self.wait.until(
@@ -459,288 +444,389 @@ class YQTSpider(object):
             return self._is_page_loaded(count=count + 1)
 
 
-    def _turn_page(self, time_sleep):
-        # 资源上锁
-        lock = threading.Lock()
-        def thread_all(i):
-            google_payload = {
-                'view.keywordId': str(self.keyword_id),
-                'view.secondKeyword': '',
-                'view.userSearchSetId': str(self.usersearchsetid),
-                'view.timeDomain': '-1',
-                'view.startTime': str(self.last_end_time),
-                'monitorType': '1',
-                'view.endTime': str(self.next_end_time),
-                'view.origin': '1',
-                'view.matchType': '3',
-                'view.resultPresent': '0',
-                'view.paixu': '2',
-                'view.exportType': '',
-                'view.weiboType': '0',
-                'view.options': '1',
-                'view.involveWay': '0',
-                'view.comblineflg': '2',
-                'view.isRoot': '0',
-                'page': '1',
-                'pagesize': '100',
-                'view.viewMode': '1',
-                'kw.keywordId': str(self.keyword_id),
-                'view.secondKeywordMatchType': '1',
-                'view.duplicateShow': '0',
-                'view.keywordProvince': '全部',
-                'view.duplicateShowMultiple': '0',
-                'view.toolbarSwitch': '0',
-                'view.bloggerAuthenticationStatus': '0',
-                'view.blogPostsStatus': '0',
-                'view.ocrContentType': '0',
-                'view.isRootMultiple': '0',
-                'view.dataView': '0',
-                'view.bloggerAuthenticationStatusMultiple': '0',
-                'view.weiboTypeMultiple': '0',
-                'view.accurateSwitch': '0',
-                'view.attributeCheck': '1',
-                'view.informationContentType': '1',
-            }
-            google_payload['page']=str(i)
-            # 数据进行处理
-            raw_data=self.google_parse(google_payload)
-            data_list = self.clear_data(raw_data)
+    def _turn_page(self, max_page_num, time_sleep):
+        self.post_number = 0
+        i=0
+        while 1:
+            i=i+1
+            if self.crawl_page_count > config.MAX_CRAWL_PAGE_COUNT:
+                self.crawl_page_count = 0
+                return "restart_browser"
+            if self.next_page_num > 1:
+                if not self._is_page_loaded():
+                    return False
+            # print("页面加载完成")
+
+            logger.info(f"当前第【{self.next_page_num}】页,共{max_page_num}页")
+            data_list = self.parse_data()
             logger.info('数据抓取完毕')
+            # 数据进行处理
+            data_list = self.clear_data(data_list)
+
             # 插入到数据库，返回一个成功插入的值
             # 上传数据
             if data_list:
-                # 数据上传
-                ssql_helper.upload_many_data(data_list, self.industry_name,i,self.info)
-                # ssql_helper.upload_many_data_java(data_list, self.industry_name,i)
-                logger.info(f"正在抓取第{i}页数据")
+                ssql_helper.upload_many_data(data_list, self.industry_name, i, self.info)
                 logger.info(f"解析到{len(data_list)}条数据")
                 self.post_number += len(data_list)
-                lock.acquire()
-                SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path, sheet_name=self.industry_name)
-                lock.release()
+                logger.info(f"保存完毕")
+                # SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path, sheet_name=self.industry_name)
                 logger.info(f"保存完毕")
                 time.sleep(time_sleep)
-        def thread_part(keyword,datacenter_id):
-            logger.info(f"本次抓取的关键词为：{keyword}")
-            google_payload = {
-                'view.keywordId': int(self.keyword_id),
-                'view.secondKeyword': str(keyword),
-                'view.userSearchSetId': str(self.usersearchsetid),
-                'view.timeDomain': '1',
-                'view.startTime': str(self.last_end_time),
-                'monitorType': '1',
-                'view.endTime': str(self.next_end_time),
-                'view.origin': '2',
-                'view.matchType': '3',
-                'view.resultPresent': '0',
-                'view.paixu': '2',
-                'view.exportType': '',
-                'view.weiboType': '0',
-                'view.options': '1',
-                'view.involveWay': '0',
-                'view.comblineflg': '2',
-                'view.isRoot': '0',
-                'page': '1',
-                'pagesize': '100',
-                'view.viewMode': '1',
-                'kw.keywordId': '2720405',
-                'view.secondKeywordMatchType': '1',
-                'view.duplicateShow': '0',
-                'view.keywordProvince': '全部',
-                'view.duplicateShowMultiple': '0',
-                'view.toolbarSwitch': '0',
-                'view.bloggerAuthenticationStatus': '0',
-                'view.blogPostsStatus': '0',
-                'view.ocrContentType': '2',
-                'view.isRootMultiple': '0,1,2',
-                'view.dataView': '0',
-                'view.bloggerAuthenticationStatusMultiple': '0,5,1,2,3,4',
-                'view.weiboTypeMultiple': '0,1,2,3,4',
-                'view.accurateSwitch': '1',
-                'view.attributeCheck': '1',
-                'view.informationContentType': '1',
-            }
-            # payload_part['searchCondition']['searchSecondKeyword'] = "({0})+({1})".format(keyword, self.SimultaneousWord)
-            # google_payload['view.secondKeyword'] = keyword
-            # print(payload_part)
-            # content_all = SecondData(self.cookie, payload_part).get_content_by_keywords()
-            content_all = SecondData(self.cookie, google_payload).google_get_content()
+            # 想要抓取的最大页数，可以修改
+            if self.next_page_num >= 50:
+                logger.info("抓取到最大页，停止")
+                data_count = int(self.spider_driver.find_element_by_css_selector(
+                    'span[ng-bind="originStat.total"]').text)
+                break
+            self.next_page_num += 1
+            logger.info(f"点击下一页.....")
+            try:
+                self.spider_driver.find_element_by_xpath('//i[contains(@class,"gotoPage2(page + 1);")').click()
+            except NoSuchElementException:
+                logger.info("没有找到下一页的按钮")
+                break
+            self.crawl_page_count += 1
 
-            if content_all != None:
-                maxpage = int(content_all['maxpage'])
-                print("最大页数为",maxpage)
-                if maxpage != 0:
-                    if maxpage>50:
-                        # maxpage=50
-                        maxpage_info = int(self.myconfig.getValueByDict('spider_config', 'maxpage'))
+        time.sleep(time_sleep)
+        return True
 
-                    for i in range(1, 31):
-                        google_payload['page'] = i
-                        logger.info(f"抓取的关键字为{google_payload['view.secondKeyword']}，抓取到第{i}页")
-                        content = self.google_parse(google_payload)
-                        if content != None:
-                            data_list = self.clear_data(content)
-                            if data_list:
-                                # ssql_helper.upload_many_data_java(data_list,self.industry_name,datacenter_id)
-                                ssql_helper.upload_many_data(data_list, self.industry_name, i, self.info)
-                                logger.info(f"解析到{len(data_list)}条数据")
-                                self.post_number += len(data_list)
-                                logger.info(f"保存完毕")
+    def _set_conditions(self, start_time, end_time):
+        """
+        设置筛选条件
+        :param start_time: 起始时间
+        :param end_time: 终止时间
+        :return: True or Flase
+        """
+        driver = self.spider_driver
+        start_time_str = start_time.strftime(config.DATETIME_FORMAT)
+        end_time_str = end_time.strftime(config.DATETIME_FORMAT)
+        # driver.find_element_by_css_selector('div.inline-block.custom-time-period').click()
+        print("选择时间")
+        driver.find_element_by_xpath('//span[contains(text(),"自定义")]/parent::div').click()
+        time.sleep(0.1)
+        start_input = driver.find_element_by_xpath('//input[@id="startTimeInput1"]')
+        # ant-calendar-picker-input ant-input ng-star-inserted
+        time.sleep(0.2)
+        start_input.clear()
+        time.sleep(0.2)
+        start_input.send_keys(start_time_str)
+        time.sleep(0.2)
+        end_input=driver.find_element_by_xpath('//input[@id="endTimeInput1"]')
+        time.sleep(0.1)
+        end_input.clear()
+        time.sleep(0.2)
+        end_input.send_keys(end_time_str)
+        time.sleep(0.2)
+        driver.find_element_by_xpath('//span[contains(@ng-click,"confirmTime(1)")]').click()
+        time.sleep(0.2)
+        print("点击查询")
+        driver.find_element_by_xpath("//a[@id='searchListButton']").click()
+        return True
+    def _adapt_time_interval(self):
+        """
+        改变时间的区间
+        :param start_time:
+        :param end_time:
+        :return: 截止时间
+        """
+        # end_time = datetime.datetime.now()
+        # start_time = end_time + datetime.timedelta(days=-30)
 
-        google_payload = {
-            'view.keywordId': str(self.keyword_id),
-            'view.secondKeyword': '',
-            'view.userSearchSetId': '',
-            'view.timeDomain': '-1',
-            'view.startTime': str(self.last_end_time),
-            'monitorType': '1',
-            'view.endTime': str(self.next_end_time),
-            'view.origin': '1',
-            'view.matchType': '3',
-            'view.resultPresent': '0',
-            'view.paixu': '2',
-            'view.exportType': '',
-            'view.weiboType': '0',
-            'view.options': '1',
-            'view.involveWay': '0',
-            'view.comblineflg': '2',
-            'view.isRoot': '0',
-            'page': '1',
-            'pagesize': '100',
-            'view.viewMode': '1',
-            'kw.keywordId': str(self.keyword_id),
-            'view.secondKeywordMatchType': '1',
-            'view.duplicateShow': '0',
-            'view.keywordProvince': '全部',
-            'view.duplicateShowMultiple': '0',
-            'view.toolbarSwitch': '0',
-            'view.bloggerAuthenticationStatus': '0',
-            'view.blogPostsStatus': '0',
-            'view.ocrContentType': '0',
-            'view.isRootMultiple': '0',
-            'view.dataView': '0',
-            'view.bloggerAuthenticationStatusMultiple': '0',
-            'view.weiboTypeMultiple': '0',
-            'view.accurateSwitch': '0',
-            'view.attributeCheck': '1',
-            'view.informationContentType': '1',
-        }
-        content_all = SecondData(self.cookie, google_payload).google_get_content()
-        self.post_number = 0
-        # 返回内容不为空
-        if content_all!=None:
-            total_count=content_all['total']
-            self.yqt_total_number = total_count
-            maxpage=content_all['maxpage']
-            logger.info(f'数据总量为{total_count}')
-            logger.info(f'总页数为{maxpage}')
-            with ThreadPoolExecutor(10) as pool:
-                for i in range(1,50):
-                    pool.submit(thread_all, i)
-            # if total_count>5000:
-            #     logger.info("数据量太大需要分词抓取")
-            #     # update on 2021-05-25 11:20:57
-            #     # with ThreadPoolExecutor(10) as pool:
-            #     #     for datacenter_id,item in enumerate(self.info['project_words']):
-            #     #         pool.submit(thread_part,item['keywords'],datacenter_id+1)
-            #     #     logger.info("分词抓取完毕")
-            #     for datacenter_id, item in enumerate(self.info['project_words']):
-            #        thread_part(item['keywords'], datacenter_id + 1)
-            #     return True
-            # elif(total_count<5000 and maxpage>0 ):
-            #     #update on 2021-05-25 11:22:06
-            #     # with ThreadPoolExecutor(10) as pool:
-            #     #     for i in range(1,maxpage+1):
-            #     #         pool.submit(thread_all, i)
-            #     for i in range(1,maxpage+1):
-            #         thread_all(i)
-                return True
-        else:
+        while 1:
+            self.spider_driver.scroll_to_top()
+            logger.info("设置时间区间...")
+            """
+            重新获取时间设置时间
+            """
+            # 设置时间
+            self._set_conditions(self.last_end_time, self.next_end_time)
+
+            if not self._is_page_loaded():
+                logger.info("设置时间时页面加载出现问题")
+                return False
+            if not self._is_data_count_outside():  # 没有超过5000条，不用调整
+                logger.info(f"小于{config.MAX_DATA_COUNT}条,符合条件")
+                break
+            logger.info(f"页面数据大于{config.MAX_DATA_COUNT}条，调整时间区段")
+            # 超出5000条进行分词抓取
+            # return False
+            self.devide_keywords = True
+            break
+        logger.info(
+            f"当前时间区间:{self.last_end_time.strftime(config.DATETIME_FORMAT)}  --"
+            f" {self.next_end_time.strftime(config.DATETIME_FORMAT)}")
+
+
+    def _switch_data_count_perpage(self):
+        #
+        """
+        点击每页100条按钮
+        :return:
+        """
+        self.spider_driver.get("http://yuqing.sina.com/yqmonitor")
+        if not self._is_page_loaded():
+            logger.info("更改100条数据/每页前，页面加载有问题")
             return False
+        print("页面加载完全")
+        time.sleep(2)
+        self.spider_driver.scroll_to_bottom(10000)
+        time.sleep(2)
+        self.spider_driver.scroll_to_bottom(10000)
+        if not self._is_page_loaded():
+            logger.info("更改100条数据/每页前，页面加载有问题")
+            return False
+        self.spider_driver.find_element_by_xpath('//button[@title="50条/页"]').click()
+        time.sleep(1)
+        self.spider_driver.find_element_by_xpath('//span[contains(text(),"100条/页")]').click()
+        print('选择100')
+        if not self._is_page_loaded():
+            logger.info("更改100条数据/每页后，页面加载有问题")
+            return False
+        logger.info("更改100条数据/每页")
+        return True
+    def _go_page_num_by_conditions(self, is_reload=False):
+        """
+        根据条件和页数进入某一特定页面
+        如：2020-01-01 00:00:00 至2020-01-02 00:00:00 第10页
+        :return:
+        """
 
+        if is_reload:
+            logger.info(f'重新进入此页面：{self.last_end_time.strftime(config.DATETIME_FORMAT)} '
+                        f'- {self.next_end_time.strftime(config.DATETIME_FORMAT)} '
+                        f'第{self.next_page_num}页')
+            self._reload()
+        # else:
+        # logger.info(f'进入此页面：{self.condition.get("start_time").strftime(config.DATETIME_FORMAT)} '
+        #             f'- {self.condition.get("end_time").strftime(config.DATETIME_FORMAT)} ')
+
+        # 设置时间
+        self._adapt_time_interval()
+
+        if self.next_page_num > 1:
+            logger.info(f"直接进入第{self.next_page_num}页")
+            self.spider_driver.find_element_by_xpath(
+                '//input[@class="ant-input ng-untouched ng-pristine ng-valid"]').send_keys(
+                self.next_page_num)
+            time.sleep(0.5)
+            self.spider_driver.find_element_by_xpath('//span[contains(text(),"确定")]').click()
+        if not self._is_page_loaded():
+            logger.info("直接进入第多少页时页面加载出现问题")
+            return False
+        page_num = int(self.spider_driver.find_element_by_xpath('//span[@ng-bind="page"]').text)
+        if int(page_num) != self.next_page_num:
+            logger.warning("页面上当前页面和应该进入的页面不一样，请检查")
+            return False
+        logger.info("进入成功")
+        return True
+
+    @property
+    def _maxpage(self):
+        # 获取最大页数
+        page_max_num = int(self.spider_driver.find_element_by_xpath('//span[@ng-bind="maxpage"]').text)
+        print(page_max_num)
+        return page_max_num
+
+    @property
+    def _count_number(self):
+        return int(self.spider_driver.find_element_by_xpath('//span[@ng-bind="originStat.total"]').text)
+    def _is_data_count_outside(self):
+        """
+        数据量是否超出5000
+        超出返回True
+        :return:
+        """
+        try:
+            logger.info(f"当前数据量:{self._count_number}")
+            if self._count_number > config.MAX_DATA_COUNT:
+                return True
+        except Exception as e:
+            logger.warning(e)
+            return True
     def _crawl2(self, time_sleep):
         """
 
         :param time_sleep:
         :return:
         """
-        # 翻页并抓取数据
-        resp = self._turn_page(time_sleep)
-        if resp:
-            # 设置下次抓取条件
-            if self.next_end_time >= self.interval[1]:
-                logger.info("全部抓取完毕上传数据，并进行记录")
-                # 舆情通数量
-                yqt_count = self.yqt_total_number
-                # 记录文件的路径
-                record_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                                f"record\{self.project_name}", f"{self}_记录.xlsx")
-                # 本次抓取TS_A库和QBBB_B库、中的数量
-                sql_number_A,sql_number_B = ssql_helper.find_curent_num(self.interval[0],
-                                                                        self.interval[1],
-                                                                        self.myconfig,
-                                                                        self.info,
-                                                                        yqt_count)
-                time.sleep(1)
-                # myconfig=config.redconfig()
-                # 需要增加一个B库中的数量
-                data_list = [self.project_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                             self.last_end_time, self.next_end_time]
-                # 本地记录文件保存
-                # SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number_A,sql_number_B,
-                #                               data_list=data_list)
-                record_day_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                                f"record\{self.project_name}", f"{self}_{self.project_name}记录.xlsx")
-                # SpiderHelper.save_record_day_data(record_day_file_path, yqt_count, sql_number_B)
-                # my_Email().send_xlsx(record_file_path)
-                # record_dict = (self.industry_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
-                # self.next_end_time, yqt_count, self.post_number, self.project_name)
+        # 首先更改为每页100条
+        self._switch_data_count_perpage()
 
-                record_dict = (
-                    self.industry_name,  # 行业名称
-                    datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # 抓取时间
-                    self.last_end_time,  # 开始时间
-                    self.next_end_time,  # 结束时间
-                    yqt_count,  # 舆情通数量
-                    self.post_number,  # 上传数量
-                    self.info['customer'],  # 项目名称
-                    self.first_len,  # 第一次过滤之后的数量
-                    self.redis_len,  # redis过滤之后的数量
-                    sql_number_A,
-                    sql_number_B
-                )
+        is_reload = False
+        set_conditions_reload_count = 0
+        turn_page_reload_count = 0
+        while 1:
+            # 设置时间区间
+            if not self._go_page_num_by_conditions(is_reload):
+                if set_conditions_reload_count >= 3:
+                    logger.warning("设置时间区间时，连续出现问题3次，退出")
+                    return False
+                set_conditions_reload_count += 1
+                is_reload = True
+                continue
+            set_conditions_reload_count = 0
+            max_page_num = self._maxpage
+            print(f"最大页数：{max_page_num}")
 
-                # 数据统计记录
-                ssql_helper.record_log(record_dict)
-                # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,
-                # post_info['number'],post_info2['number'],sql_number,data_list=data_list)
-                print("结束返回")
-                return True
+            ret = self.keyword.split("|")
+            keywords = []
+            for i in range(0, len(ret), 3):
+                key = ''
+                for j in ret[i:i + 3]:
+                    key += j + '|'
+                keywords.append(key)
+            # 多关键词抓取
+            self.yqt_total_number=self._count_number
+            if self._count_number > 5000:
+                for keyword in keywords:
+                    input_keywords = self.spider_driver.find_element_by_xpath(
+                        '//input[@class="ant-input ng-untouched ng-pristine ng-valid ng-star-inserted"]')
+                    input_keywords.clear()
+                    input_keywords.send_keys(keyword)
+                    time.sleep(1)
+                    self.spider_driver.find_element_by_xpath(
+                        '//i[@class="anticon anticon-search ng-star-inserted"]').click()
+                    if self._is_page_loaded():
+                        max_page_num = self._maxpage
+                        # 翻页并抓取数据
+                        resp = self._turn_page(max_page_num, time_sleep)
+                        if resp == "restart_browser":
+                            return resp
+                        elif not resp:
+                            self._turn_page(max_page_num, time_sleep)
+                            if turn_page_reload_count >= 3:
+                                logger.warning("翻页时，连续出现问题3次，退出")
+                                return False
+                            turn_page_reload_count += 1
+                            is_reload = True
+                            continue
+                        turn_page_reload_count = 0
+                        # 翻页结束
+
+                        # 设置下次抓取条件
+                        self.next_page_num = 1
+                        if self.next_end_time >= self.interval[1]:
+                            logger.info("解析到终止时间，抓取完成")
+                            logger.info("全部抓取完毕上传数据")
+                            logger.info("开始记录")
+                            # 舆情通数量
+                            yqt_count = self._count_number
+                            record_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                                            f"record\{self.project_name}", f"{self}_记录.xlsx")
+                            sql_number = ssql_helper.find_info_count(self.interval[0], self.interval[1],
+                                                                     self.industry_name)
+                            data_list = [self.project_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                         self.last_end_time, self.next_end_time]
+                            SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number,
+                                                          data_list=data_list)
+                            # record_dict = (self.industry_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
+                            # self.next_end_time, yqt_count, self.post_number, self.project_name)
+
+                            record_dict = (
+                                self.industry_name,  # 行业名称
+                                datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # 抓取时间
+                                self.last_end_time,  # 开始时间
+                                self.next_end_time,  # 结束时间
+                                yqt_count,  # 舆情通数量
+                                self.post_number,  # 上传数量
+                                self.project_name,  # 项目名称
+                                self.first_len,  # 第一次过滤之后的数量
+                                self.redis_len  # redis过滤之后的数量
+                            )
+
+                            # 数据统计记录
+                            ssql_helper.record_log(record_dict)
+                            # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
+                            return True
+                        else:
+                            self.last_end_time = self.next_end_time  # 上次终止时间就是下次起始时间
+                            self.next_end_time = self.interval[1]
+
             else:
-                return False
-        else:
-            return False
+                if self._is_page_loaded():
+                    max_page_num = self._maxpage
+                    # 翻页并抓取数据
+                    resp = self._turn_page(max_page_num, time_sleep)
+                    if resp == "restart_browser":
+                        return resp
+                    elif not resp:
+                        self._turn_page(max_page_num, time_sleep)
+                        if turn_page_reload_count >= 3:
+                            logger.warning("翻页时，连续出现问题3次，退出")
+                            return False
+                        turn_page_reload_count += 1
+                        is_reload = True
+                        continue
+                    # 翻页并抓取数据
+                    if resp:
+                        # 设置下次抓取条件
+                        if self.next_end_time >= self.interval[1]:
+                            logger.info("全部抓取完毕上传数据，并进行记录")
+                            # 舆情通数量
+                            yqt_count = self.yqt_total_number
+                            # 记录文件的路径
+                            record_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                                            f"record\{self.project_name}", f"{self}_记录.xlsx")
+                            # 本次抓取TS_A库和QBBB_B库、中的数量
+                            sql_number_A,sql_number_B = ssql_helper.find_curent_num(self.interval[0],
+                                                                                    self.interval[1],
+                                                                                    self.myconfig,
+                                                                                    self.info,
+                                                                                    yqt_count)
+                            time.sleep(1)
+                            # myconfig=config.redconfig()
+                            # 需要增加一个B库中的数量
+                            data_list = [self.project_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                         self.last_end_time, self.next_end_time]
+                            # 本地记录文件保存
+                            # SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number_A,sql_number_B,
+                            #                               data_list=data_list)
+                            record_day_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                                            f"record\{self.project_name}", f"{self}_{self.project_name}记录.xlsx")
+                            # SpiderHelper.save_record_day_data(record_day_file_path, yqt_count, sql_number_B)
+                            # my_Email().send_xlsx(record_file_path)
+                            # record_dict = (self.industry_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
+                            # self.next_end_time, yqt_count, self.post_number, self.project_name)
+
+                            record_dict = (
+                                self.industry_name,  # 行业名称
+                                datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # 抓取时间
+                                self.last_end_time,  # 开始时间
+                                self.next_end_time,  # 结束时间
+                                yqt_count,  # 舆情通数量
+                                self.post_number,  # 上传数量
+                                self.info['customer'],  # 项目名称
+                                self.first_len,  # 第一次过滤之后的数量
+                                self.redis_len,  # redis过滤之后的数量
+                                sql_number_A,
+                                sql_number_B
+                            )
+
+                            # 数据统计记录
+                            ssql_helper.record_log(record_dict)
+                            # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,
+                            # post_info['number'],post_info2['number'],sql_number,data_list=data_list)
+                            print("结束返回")
+                            return True
+                        else:
+                            return False
+                    else:
+                        return False
     def modifi_keywords_new(self):
-        #     yqt_tree_li act ng-star-inserted
+        """
+        关键词修改
+        :return:
+        """
         driver = self.spider_driver
-        time.sleep(1)
-        logger.info("点击")
         span = driver.find_element_by_xpath('//span[@class="yqt_tree_li act ng-star-inserted"]')
-        span.click()
-        driver.switch_to.window(driver.window_handles[1])
-        # 获取keywords_id
-        keyword_id = driver.current_url.split("=")[-1]
-        self.keyword_id = keyword_id
-        doc = etree.HTML(driver.page_source)
-        # self.userSearchSetId=doc.xpath('//input[@id="view.userSearchSetId"]')[0].text
-        driver.close()
-        driver.switch_to.window(driver.window_handles[0])
-        banzi = span.find_element_by_xpath('.//i[@class="anticon ant-dropdown-trigger"]')
+
         action = ActionChains(driver)
         time.sleep(1)
         # 移动到该元素
         action.move_to_element(span).perform()
         time.sleep(3)
+        banzi = span.find_element_by_xpath('.//i[@class="anticon ant-dropdown-trigger"]')
         banzi.click()
         time.sleep(2)
         driver.find_element_by_xpath('//li[@class="ant-dropdown-menu-item ng-star-inserted"]').click()
@@ -765,18 +851,6 @@ class YQTSpider(object):
         driver.find_element_by_xpath("//button[@class='mr20 ant-btn ant-btn-primary']").click()
         time.sleep(1)
 
-        web_cookies = self.spider_driver.get_cookies()
-        ck = ''
-        for cookie in web_cookies:
-            ck = ck + cookie['name'] + "=" + cookie['value'] + ";"
-
-        # 设置完关键词之后获取cookie
-        self.cookie = ck
-        driver.get('http://yuqing.sina.com/yqMonitor')
-        time.sleep(1)
-
-        self.usersearchsetid = driver.find_element_by_xpath('//input[@id="view.userSearchSetId"]').get_attribute(
-            "value")
     def start(self, start_time, end_time, time_sleep, info, is_one_day):
         # try:
             # 1.登录
@@ -816,15 +890,20 @@ class YQTSpider(object):
         #         self.spider_driver.quit()
         #         self.spider_driver.close()
         #         print("关闭")
+    def _reload(self):
+        """
+        刷新页面
+        :return:
+        """
+        self.spider_driver.refresh()
+        self.spider_driver.refresh()
+        if not self._is_page_loaded():
+            return False
+        return True
 
 
 # 自定义时间抓取任务
 def work_it(myconfig, start_time, end_time):
-    # 获取项目信息
-    # from xlsx
-    # infos = config.row_list
-    # from config.ini
-    # myconfig = config.redconfig()
     # 获取驱动文件路径
     chromedriver_path = myconfig.getValueByDict('chromerdriver', 'path')
     chrome_service = Service(chromedriver_path)
@@ -942,9 +1021,9 @@ if __name__ == '__main__':
     ssql_helper.get_month_data(time1, today, industry_name)
 
     # p1 = Process(target=java_task, name='java程序')
-    p2 = Process(target=apscheduler, kwargs={'myconfig': myconfig}, name='定时抓取')
+    # p2 = Process(target=apscheduler, kwargs={'myconfig': myconfig}, name='定时抓取')
     # p1.start()
-    p2.start()
+    # p2.start()
     # # print("运行结束")
     work_it_hour(myconfig)
     # print("抓取结束")
