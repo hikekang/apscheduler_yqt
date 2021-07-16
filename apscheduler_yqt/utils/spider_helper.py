@@ -240,7 +240,7 @@ class SpiderHelper(object):
             wb.close()
             print("记录完成")
     @staticmethod
-    def all_project_save_record_day(out_file, yq_number,sql_num_B,project_name,industry_name):
+    def all_project_save_record_day(out_file, yq_number,sql_num_B,project_name,industry_name,source_type_list):
         """
         :param out_file:文件路径
         :param yq_number:舆情通数量
@@ -249,7 +249,7 @@ class SpiderHelper(object):
         :param industry_name:行业名称（sheet页名称）
         :return:
         """
-        head_xlsx=['项目名称','舆情通数量', '天颂数量']
+        head_xlsx=['项目名称','舆情通数量', '天颂数量',"网媒","问答","贴吧","微信","博客","客户端","论坛","电子报","微博","全网"]
         all_industry_name_list=['流通贸易','金融业','IT业','房地产','汽车业','快消品','化妆品','旅游业']
 
 
@@ -280,14 +280,14 @@ class SpiderHelper(object):
                     sheet.column_dimensions[get_column_letter(i)].width=20
                 sheet.append(head_xlsx)
                 if sheet.title==industry_name:
-                    sheet.append([project_name,yq_number,sql_num_B])
+                    sheet.append([project_name,yq_number,sql_num_B]+source_type_list)
             wb.save(out_file)
             wb.close()
         else:
             wb=load_workbook(out_file)
             for sheet in wb:
                 if sheet.title==industry_name:
-                    sheet.append([project_name,yq_number,sql_num_B])
+                    sheet.append([project_name,yq_number,sql_num_B]+source_type_list)
             wb.save(out_file)
             wb.close()
 

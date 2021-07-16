@@ -21,7 +21,7 @@ from utils import domain
 # from datetime import datetime
 import datetime
 from urllib import parse
-from utils import post_mq
+# from utils import post_mq
 from pprint import pprint
 from utils.spider_helper import SpiderHelper
 from yuqingtong import config as myconfig
@@ -695,9 +695,11 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         mark_java_match_data(d, thream_info_list)
         print("完成")
 
-    with ThreadPoolExecutor(4) as pool:
-        for index,d in enumerate(data_list):
-            pool.submit(load_data,index,d)
+    # with ThreadPoolExecutor(4) as pool:
+    #     for index,d in enumerate(data_list):
+    #         pool.submit(load_data,index,d)
+    for index, d in enumerate(data_list):
+        load_data(index, d)
     myredis.close()
     # post_mq.close_mq()
 
@@ -1069,33 +1071,66 @@ def record_day_datas():
     mycon = myconfig.redconfig()
     project_name=eval(mycon.getValueByDict('spider_config','project_name'))
     print(project_name)
-    outfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"记录\\", f"{datetime.date.today()}.xlsx")
-    date_now = datetime.datetime.now().strftime('%Y-%m-%d 00:00:00')
-    date_yesterday = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d 00:00:00")
-    for data in get_industry_keywords():
-        for item in project_name:
-            if data['customer'] == item:
-                print(data['customer'])
-                sql_qbbb = "select count(*) from TS_DataMerge_Base where C_Id='{0}' and PublishDate_Std " \
-                           "between '{2}' and '{1}'".format(data['id'], date_now, date_yesterday)
-                # print(sql_qbbb)
-                sql_num_B=db_qbbb.execute_query(sql_qbbb)[0][0]
-                # 舆情通数量待定
-                try:
-                    sq_tsa=f"select yqt_num from record_log_table where start_time='{date_yesterday}' and end_time='{date_now}' and customer='{data['customer']}'"
-                    print(sq_tsa)
-                    sql_a=db_a.execute_query(sq_tsa)[0][0]
-                    spide_helper.all_project_save_record_day(outfile,sql_a,sql_num_B,data['customer'],data['industry_name'])
-                except Exception as e:
-                    print(e)
+    # outfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"记录\\", f"{datetime.date.today()}.xlsx")
+    for i in range(10,13):
+        date_now = (datetime.datetime.now()- datetime.timedelta(days=i)).strftime('%Y-%m-%d 00:00:00')
+        date_yesterday = (datetime.datetime.now() - datetime.timedelta(days=i+1)).strftime("%Y-%m-%d 00:00:00")
+        record_time=(datetime.datetime.now() - datetime.timedelta(days=i+1)).strftime("%Y-%m-%d")
+        outfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"记录\\", f"{record_time}.xlsx")
+        print(date_now)
+        print(date_yesterday)
+        for data in get_industry_keywords():
+            for item in project_name:
+                if data['customer'] == item:
+                    print(data['customer'])
+                    sql_qbbb = "select count(*) from TS_DataMerge_Base where C_Id='{0}' and PublishDate_Std " \
+                               "between '{2}' and '{1}'".format(data['id'], date_now, date_yesterday)
+                    # print(sql_qbbb)
+                    sql_num_B=db_qbbb.execute_query(sql_qbbb)[0][0]
+                    sql_qbbb_source_type="select source_type,count(*) from QBB_B.dbo.TS_DataMerge_Base  where C_Id='{0}'  and " \
+                                         "PublishDate_Std between '{2}' and '{1}' group by source_type".format(data['id'], date_now, date_yesterday)
+                    source_type=db_qbbb.execute_query(sql_qbbb_source_type)
+                    count_source_type={
+                        '网媒':0,
+                        '问答':0,
+                        '贴吧':0,
+                        '微信':0,
+                        '博客':0,
+                        '客户端':0,
+                        '论坛':0,
+                        '电子报':0,
+                        '微博':0,
+                        "全网":0
+                    }
+                    for item in source_type:
+                        # print(item)
+                        item_ssql=f"select source_type from QBB_B.dbo.TS_MediumURL where {item[0]}=id"
+                        item_type=db_qbbb.execute_query(item_ssql)
+                        if item_type:
+                            count_source_type[item_type[0][0]]+=item[-1]
+                    print(count_source_type)
+                    # 舆情通数量待定
+                    try:
+                        # sq_tsa=f"select yqt_num from record_log_table where start_time='{date_yesterday}' and end_time='{date_now}' and customer='{data['customer']}'"
+                        # print(sq_tsa)
+                        # if sq_tsa:
+                        #     sql_a=db_a.execute_query(sq_tsa)[0][0]
+                        # else:
+                        #     sql_a=0
+                        sql_a=0
+                        source_type_list=list(count_source_type.values())
+                        print(source_type_list)
+                        spide_helper.all_project_save_record_day(outfile,sql_a,sql_num_B,data['customer'],data['industry_name'],source_type_list)
+                    except Exception as e:
+                        print(e)
 
 
 if __name__ == '__main__':
     # for d in merger_industry_data(get_industry_keywords()):
     #     print(d)
     #     print("***"*20)
-    # for data in get_industry_keywords():
-    #     pprint(data)
+    for data in get_industry_keywords():
+        pprint(data)
     # c_d=get_industry_keywords()
     # mao_d=[]
     # for d in c_d:
@@ -1119,9 +1154,9 @@ if __name__ == '__main__':
     #         break
     # if flag==0:
     #     print("匹配成功")
-    file_name=os.path.join(  os.path.dirname(os.path.abspath(__file__)),f"记录\\" ,f"{datetime.date.today()}.xlsx")
-    print(file_name)
-    record_day_datas()
+    # file_name=os.path.join(  os.path.dirname(os.path.abspath(__file__)),f"记录\\" ,f"{datetime.date.today()}.xlsx")
+    # print(file_name)
+    # record_day_datas()
     # print(contain_keywords("三联学院","""
     # 学习好难 被蚊子咬 被桌子磕
 # 合肥·安徽
