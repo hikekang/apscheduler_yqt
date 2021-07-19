@@ -2,14 +2,7 @@
 <project version="4">
   <component name="PublishConfigData" remoteFilesAllowedToDisappearOnAutoupload="false">
     <serverData>
-      <paths name="featurize@ssh.featurize.cn:29191">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="root@60.187.215.246:32224">
+      <paths name="featurize@ssh.featurize.cn:33086">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />

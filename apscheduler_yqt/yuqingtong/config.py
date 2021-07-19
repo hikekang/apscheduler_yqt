@@ -12,20 +12,20 @@ from openpyxl import load_workbook
 # print(config_xlsx_path)
 # wb=load_workbook(config_xlsx_path,data_only=True)
 # wb=load_workbook('../config.xlsx',data_only=True)
-dir_path=os.path.dirname(os.getcwd())
-config_xlsx_path = os.path.join(dir_path, r'config.xlsx')
-wb = load_workbook(config_xlsx_path, data_only=True)
-sheet=wb['info']
-
-# 获取用户名信息
-row_list=[]
-pinyin=['yuqingtong_username','yuqingtong_password','dama_username','dama_password','softid','project_name','sheet_name','keywords']
-for row in sheet.iter_rows(min_row=2,max_col=8):
-    row_info = []
-    for cell in row:
-        row_info.append(cell.value)
-    info = dict(list(zip(pinyin, row_info)))
-    row_list.append(info)
+# dir_path=os.path.dirname(os.getcwd())
+# config_xlsx_path = os.path.join(dir_path, r'config.xlsx')
+# wb = load_workbook(config_xlsx_path, data_only=True)
+# sheet=wb['info']
+#
+# # 获取用户名信息
+# row_list=[]
+# pinyin=['yuqingtong_username','yuqingtong_password','dama_username','dama_password','softid','project_name','sheet_name','keywords']
+# for row in sheet.iter_rows(min_row=2,max_col=8):
+#     row_info = []
+#     for cell in row:
+#         row_info.append(cell.value)
+#     info = dict(list(zip(pinyin, row_info)))
+#     row_list.append(info)
 
 
 # for data in sheet[2:5]:
@@ -61,7 +61,6 @@ def get_time_list():
                 time['time_delay']=cell.value
         times.append(time)
     return times
-get_time_list()
 
 # USERNAME = info['yuqingtong_username']
 # PASSWORD = info['yuqingtong_password']
@@ -75,7 +74,7 @@ WAIT_TIME = 20
 MAX_DATA_COUNT = 5000
 
 # 抓取多少页后重启浏览器
-MAX_CRAWL_PAGE_COUNT = 60
+MAX_CRAWL_PAGE_COUNT = 50
 
 # 时间格式format
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"

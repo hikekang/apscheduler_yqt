@@ -9,39 +9,39 @@ import importlib
 from dbutils.pooled_db import PooledDB
 import pymssql
 config_A = {
-    'host': '223.223.180.9',
-    'user': 'user1',
-    'password': '123456',
+    'host': '223.223.180.10',
+    'user': 'sa',
+    'password': 'amtfamtf@123',
     'database': 'TS_A',
-    'port': '39999',
+    'port': '1433',
     'charset': 'utf8',
     'autocommit': True
 }
 
 config_B = {
-    'host': '223.223.180.9',
-    'user': 'user1',
-    'password': '123456',
+    'host': '223.223.180.10',
+    'user': 'sa',
+    'password': 'amtfamtf@123',
     'database': 'TS_B2.0',
-    'port': '39999',
+    'port': '1433',
     'charset': 'utf8',
     'autocommit': True
 }
 config_QBBA = {
-    'host': '223.223.180.9',
-    'user': 'user1',
-    'password': '123456',
+    'host': '223.223.180.10',
+    'user': 'sa',
+    'password': 'amtfamtf@123',
     'database': 'QBB_A',
-    'port': '39999',
+    'port': '1433',
     'charset': 'utf8',
     'autocommit': True
 }
 config_QBBB = {
-    'host': '223.223.180.9',
-    'user': 'user1',
-    'password': '123456',
+    'host': '223.223.180.10',
+    'user': 'sa',
+    'password': 'amtfamtf@123',
     'database': 'QBB_B',
-    'port': '39999',
+    'port': '1433',
     'charset': 'utf8',
     'autocommit': True
 }
@@ -109,7 +109,7 @@ class DataBase(object):
             return rst
         except Exception as e:
             print('sql:[{}]meet error'.format(sql))
-            print(e.args[-1])
+            print(e.args[-1][1].decode())
         finally:
             if conn:
                 conn.close()
@@ -171,7 +171,11 @@ class DataBase(object):
                 cur.close()
 
 if __name__ == '__main__':
-    db=DataBase('sqlserver',config_A)
-    db.execute_query("select * from crawler_word")
-    # str=b"\xe7\x94\xa8\xe6\x88\xb7 'user1' \xe7\x99\xbb\xe5\xbd\x95\xe5\xa4\xb1\xe8\xb4\xa5\xe3\x80\x82DB-Lib error message 20018, severity 14:\nGeneral SQL Server error: Check messages from the SQL Server\nDB-Lib error message 20002, severity 9:\nAdaptive Server connection failed (223.223.180.9)\nDB-Lib error message 20002, severity 9:\nAdaptive Server connection failed (223.223.180.9)\n"
+    db=DataBase('sqlserver',config_QBBA)
+    db.execute_query("select * from Ip")
+    # str=b"\xe7\x94\xa8\xe6\x88\xb7
+    # 'sa' \xe7\x99\xbb\xe5\xbd\x95\xe5\xa4\xb1\xe8\xb4\xa5\xe3\x80\x82DB-Lib error message 20018,
+    # severity 14:\nGeneral SQL Server error: Check messages from the SQL Server\nDB-Lib error message 20002,
+    # severity 9:\nAdaptive Server connection failed (223.223.180.10)\nDB-Lib error message 20002,
+    # severity 9:\nAdaptive Server connection failed (223.223.180.10)\n"
     # print(str.decode('utf-8'))

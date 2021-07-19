@@ -693,7 +693,6 @@ class YQTSpider(object):
         :return:
         """
         self.spider_driver.refresh()
-        self.spider_driver.refresh()
         if not self._is_page_loaded():
             return False
         return True
@@ -1100,7 +1099,7 @@ def xlsx_work():
 def work_it(myconfig, start_time, end_time):
     # 获取项目信息
     # from xlsx
-    infos = config.row_list
+    # infos = config.row_list
     # from config.ini
     # myconfig = config.redconfig()
 
@@ -1196,12 +1195,12 @@ if __name__ == '__main__':
         # work_it_one_day()
         # print('开始运行')
 
-        p1 = Process(target=java_task, name='java程序')
-        p2 = Process(target=work_it_hour, name='定时抓取')
-        p1.start()
-        p2.start()
-        print("运行结束")
-        # work_it_hour()
+        # p1 = Process(target=java_task, name='java程序')
+        # p2 = Process(target=work_it_hour, name='定时抓取')
+        # p1.start()
+        # p2.start()
+        # print("运行结束")
+        work_it_hour()
     except Exception as e:
         my_e = my_Email()
         my_e.send_message(str(e), "程序预警")

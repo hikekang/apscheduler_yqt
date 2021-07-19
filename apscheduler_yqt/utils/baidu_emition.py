@@ -30,3 +30,5 @@ def re_emojis(text):
            u"\U0001F1E0-\U0001F1FF"
            "]+", flags=re.UNICODE)
     return emoji_pattern.sub(r' ', text)
+if __name__ == '__main__':
+    print(emotion("低成本柯尼卡美能达C226广东6510元"))

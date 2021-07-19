@@ -6,7 +6,7 @@
    time：          2021/5/7 11:03
 """
 import os
-from concurrent.futures.thread import ThreadPoolExecutor
+# from concurrent.futures.thread import ThreadPoolExecutor
 from utils.snowflake import IdWorker
 import redis
 import re
@@ -17,7 +17,7 @@ from utils.ssql_pool_helper import DataBase, config_A, config_B, config_QBBA, co
 from utils.redis_helper import my_redis
 from tqdm import tqdm
 import uuid
-from utils import domain
+# from utils import domain
 # from datetime import datetime
 import datetime
 from urllib import parse
@@ -34,8 +34,8 @@ config = {
     'database': 'TS_A',
     'port': '39999'
 }
-db_a = DataBase('sqlserver', config_A)
-db_b = DataBase('sqlserver', config_B)
+# db_a = DataBase('sqlserver', config_A)
+# db_b = DataBase('sqlserver', config_B)
 db_qbba = DataBase('sqlserver', config_QBBA)
 db_qbbb = DataBase('sqlserver', config_QBBB)
 db_net_a = DataBase('sqlserver', config_net_TS_A)
@@ -98,16 +98,16 @@ def find_curent_num(start_time, end_time, myconfig,info,yqt_count):
     sql_A = "select count(*) from {table_name} where publish_time between '{start_time}' and '{end_time}' ".format(
         table_name=table_name, start_time=start_time, end_time=end_time)
 
-    count_A = db_a.execute_query(sql_A)[0][0]
+    count_A = db_qbba.execute_query(sql_A)[0][0]
     sql_B = "select count(*) from TS_DataMerge_Base where " \
             "C_Id={C_Id} and PublishDate_Std between '{start_time}' and '{end_time}' ".format(
         C_Id=info['id'], start_time=start_time, end_time=end_time)
 
     count_B = db_qbbb.execute_query(sql_B)[0][0]
 
-    sql_record_log_customer="insert into record_log_customer (customer,record_time,yqt_num,TS_A_num,QBB_B_num) " \
-                            "values (%s,%s,%d,%d,%d)"
-    db_a.execute(sql_record_log_customer,(info['customer'],end_time,yqt_count,count_A,count_B))
+    # sql_record_log_customer="insert into record_log_customer (customer,record_time,yqt_num,TS_A_num,QBB_B_num) " \
+    #                         "values (%s,%s,%d,%d,%d)"
+    # db_qbba.execute(sql_record_log_customer,(info['customer'],end_time,yqt_count,count_A,count_B))
 
     return count_A,count_B
 
@@ -139,7 +139,7 @@ def find_day_data_count(myconfig):
     sql_A = "select count(*) from {} where publish_time between '{start_time}' and '{end_time}' ".format(
         industry_table_name, start_time=start_time, end_time=end_time)
     # 流通贸易这个行业在A库中的数据量
-    count_A = db_a.execute_query(sql_A)[0][0]
+    count_A = db_qbba.execute_query(sql_A)[0][0]
 
     count_B=0
     # 根据C_Id查询B库中的数据量
@@ -153,7 +153,7 @@ def find_day_data_count(myconfig):
 
     sql_insert_a = "insert into record_log_industry (industry,record_time,TS_A_num,QBB_B_num) values (%s,%s,%d,%d)"
 
-    db_a.execute(sql_insert_a, (industry_name, end_time, count_A, count_B))
+    db_qbba.execute(sql_insert_a, (industry_name, end_time, count_A, count_B))
 
     # 插入记录
 
@@ -366,7 +366,7 @@ def post_data(data_list, industry_name):
     sql_industry_id = "select id from TS_Industry where name='" + table_name + "'"
     # print(sql_industry_id)
     # sql_industry_id="select id from TS_Industry wh"
-    industry_id = db_b.execute_query(sql_industry_id)[0][0]
+    industry_id = db_qbbb.execute_query(sql_industry_id)[0][0]
     print(len(data_list))
     for data in data_list:
         worker = IdWorker(1, 2, 0)
@@ -383,7 +383,7 @@ def post_data(data_list, industry_name):
                         data['时间'], data['is_original'], data['area'], data['positive_prob_number'], data['ic_id'],
                         data['keywords_id'])
         # 插入A库
-        db_a.execute(sql_ts_a)
+        # db_a.execute(sql_ts_a)
         datas = {
             "id": id,
             "industryId": industry_id
@@ -475,7 +475,7 @@ def upload_many_data_java(data_list, industry_name,datacenter_id):
     table_name = tables[industry_name]
     # 查询hangyeid
     sql_industry_id = "select id from TS_Industry where name='" + industry_name + "'"
-    industry_id = db_b.execute_query(sql_industry_id)[0][0]
+    industry_id = db_qbbb.execute_query(sql_industry_id)[0][0]
 
     tuple_data_list_ts_a = []
     tuple_data_list_ts_a_second_data = []
@@ -519,10 +519,10 @@ def upload_many_data_java(data_list, industry_name,datacenter_id):
     sql_qbb_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,is_original,location,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
     print("tsa数据量为：",len(tuple_data_list_ts_a))
     # print(tuple_data_list_ts_a)
-    db_a.execute_many(sql_ts_a, tuple_data_list_ts_a)
+    # db_a.execute_many(sql_ts_a, tuple_data_list_ts_a)
     # 二级数据表
     # print(tuple_data_list_ts_a_second_data)
-    db_a.execute_many(sql_ts_a_second_data, tuple_data_list_ts_a_second_data)
+    # db_a.execute_many(sql_ts_a_second_data, tuple_data_list_ts_a_second_data)
 
     # db_net_a.execute_many(sql_ts_a, tuple_data_list_ts_a)
     print("qbba数据量为：",len(tuple_data_list_qbb_a))
@@ -558,7 +558,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     table_name = tables[industry_name]
     # 查询行业id
     sql_industry_id = "select id from TS_Industry where name='" + industry_name + "'"
-    industry_id = db_b.execute_query(sql_industry_id)[0][0]
+    industry_id = db_qbbb.execute_query(sql_industry_id)[0][0]
 
     tuple_data_list_ts_a = []
     tuple_data_list_qbb_a = []
@@ -607,7 +607,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
 
     #
     # 插入A库
-    db_a.execute_many(sql_ts_a, tuple_data_list_ts_a)
+    # db_a.execute_many(sql_ts_a, tuple_data_list_ts_a)
     # 插入qbba库
     db_qbba.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
 
@@ -1005,7 +1005,7 @@ def filter_by_url(datalist, industry_name):
     :return:
     """
     sql_industry_id = "select id from TS_Industry where name='" + industry_name + "'"
-    industry_id = db_b.execute_query(sql_industry_id)[0][0]
+    industry_id = db_qbbb.execute_query(sql_industry_id)[0][0]
     new_data_list = []
     # redis滤重
     for data in datalist:
@@ -1023,7 +1023,7 @@ def record_log(data):
     # A库 每一次抓取的记录
     sql_record = "insert into record_log_table values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
     # data=('3', '2021-4-26 00:00:00','2021-4-26 00:00:00', '2021-4-26 00:00:00', '4', '5', '6', '1')
-    db_a.execute(sql_record, data)
+    db_qbba.execute(sql_record, data)
     my_e = my_Email()
     if data[4] != 0 and data[5] != 0:
         if (data[5] / data[4]) < 0.7:
@@ -1064,7 +1064,7 @@ def customer_log():
         # 记录项目的数据量
         sql_tsa_customer = "insert into record_log_customer (customer,record_time,upload_num) values(%s,%s,%s)"
         data = (customer['customer'], date_yesterday, today_customer_num)
-        db_a.execute(sql_tsa_customer, data)
+        # db_a.execute(sql_tsa_customer, data)
 
 def record_day_datas():
     spide_helper=SpiderHelper()
@@ -1111,13 +1111,13 @@ def record_day_datas():
                     print(count_source_type)
                     # 舆情通数量待定
                     try:
-                        # sq_tsa=f"select yqt_num from record_log_table where start_time='{date_yesterday}' and end_time='{date_now}' and customer='{data['customer']}'"
-                        # print(sq_tsa)
-                        # if sq_tsa:
-                        #     sql_a=db_a.execute_query(sq_tsa)[0][0]
-                        # else:
-                        #     sql_a=0
-                        sql_a=0
+                        sq_tsa=f"select yqt_num from record_log_table where start_time='{date_yesterday}' and end_time='{date_now}' and customer='{data['customer']}'"
+                        print(sq_tsa)
+                        if sq_tsa:
+                            sql_a=db_qbba.execute_query(sq_tsa)[0][0]
+                        else:
+                            sql_a=0
+                        # sql_a=0
                         source_type_list=list(count_source_type.values())
                         print(source_type_list)
                         spide_helper.all_project_save_record_day(outfile,sql_a,sql_num_B,data['customer'],data['industry_name'],source_type_list)
@@ -1156,7 +1156,7 @@ if __name__ == '__main__':
     #     print("匹配成功")
     # file_name=os.path.join(  os.path.dirname(os.path.abspath(__file__)),f"记录\\" ,f"{datetime.date.today()}.xlsx")
     # print(file_name)
-    # record_day_datas()
+    record_day_datas()
     # print(contain_keywords("三联学院","""
     # 学习好难 被蚊子咬 被桌子磕
 # 合肥·安徽

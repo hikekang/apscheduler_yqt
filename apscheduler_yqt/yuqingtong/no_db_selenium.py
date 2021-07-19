@@ -1,11 +1,11 @@
 #!/usr/bin/python3.x
 # -*- coding=utf-8 -*-
 """
- Time       : 2021/7/15 9:59
+ Time       : 2021/7/15 13:55
  Author     : hike
  Email      : hikehaidong@gmail.com
- File Name  : selenium_web_yqt.py
- Description:使用浏览器模拟人工操作进行数据抓取
+ File Name  : no_db_selenium.py
+ Description:
  Software   : PyCharm
 """
 
@@ -93,7 +93,6 @@ class YQTSpider(object):
             datetime.datetime.min.time())
         default_end_time = datetime.datetime.combine(datetime.datetime.now().date(), datetime.datetime.min.time())
         self.interval = [default_start_time, default_end_time]
-        self.next_page_num = 1
         self.crawl_page_count = 0  # 计数用，重启浏览器使用
 
     def __str__(self):
@@ -187,7 +186,7 @@ class YQTSpider(object):
         data_list = []
         for tr in item_trs[1:]:
             tds = tr.xpath('.//td')
-            # print(len(tds))
+            print(len(tds))
             # 内容
             td_title = tds[1]
             # 来源
@@ -196,7 +195,7 @@ class YQTSpider(object):
             site_name = td_orgin.xpath('span')[0].text
 
             # 文章时间
-            td_time = tds[4].xpath('.//span[@class="date"]/text()')
+            td_time = tds[4].xpath('.//sapn[@ng-if="icc.commentPojo==null && icc.published!=null"]/text()')
 
             def parse_time(td_time):
                 from datetime import datetime
@@ -231,7 +230,7 @@ class YQTSpider(object):
                 'string(.)'))
             # 获取转发内容的所有文本
             spread = td_title.xpath('.//div[contains(@class,"should-spread-area")]')
-            spread_content=''
+
             if spread:
                 spread_content = p.sub("", spread[0].xpath('string(.)'))
             else:
@@ -259,40 +258,35 @@ class YQTSpider(object):
             # 关键词
             relate_words = p.sub("", td_title.xpath('.//span[@ng-bind="icc.referenceKeyword"]')[0].xpath('string(.)'))
             # 转发数量
-            # forwarding_span = td_title.xpath(
-            #     './/i[contains(@class,"anticon font-size-16 mr5")]/following-sibling::span')
-            # if forwarding_span:
-            #     forwarding_num = p.sub("", td_title.xpath(
-            #         './/i[contains(@class,"anticon font-size-16 mr5")]/following-sibling::span')[0].text)
-            # else:
-            #     forwarding_num = 0
-            # # 评论数量
-            # comment_num_span = td_title.xpath(
-            #     './/i[contains(@iconfont,"fa-pinglunshu")]/following-sibling::span/text()')
-            # if comment_num_span:
-            #     comment_num = comment_num_span[0]
-            # else:
-            #     comment_num = 0
+            forwarding_span = td_title.xpath(
+                './/i[contains(@class,"anticon font-size-16 mr5")]/following-sibling::span')
+            if forwarding_span:
+                forwarding_num = p.sub("", td_title.xpath(
+                    './/i[contains(@class,"anticon font-size-16 mr5")]/following-sibling::span')[0].text)
+            else:
+                forwarding_num = 0
+            # 评论数量
+            comment_num_span = td_title.xpath(
+                './/i[contains(@iconfont,"fa-pinglunshu")]/following-sibling::span/text()')
+            if comment_num_span:
+                comment_num = comment_num_span[0]
+            else:
+                comment_num = 0
             # img_src = ",".join([img.attrib['src'] for img in td_title.xpath('//img')])
-            # attitude = p.sub("", td_title.xpath('.//div[@class="sensitive-status-content fmg"]')[0].text)
-            attitude = p.sub("", td_title.xpath('.//div[contains(@class,"sensitive-status-content fmg")]/span/text()')[0])
-            title_time = parse_time(td_time)
-            print(author,attitude,title_time)
-
+            attitude = p.sub("", td_title.xpath('.//div[@class="sensitive-status-content fmg"]')[0].text)
             source_url=td_title.xpath('.//div[@class="btn-group inline-block"]/ul/li[4]/a/@href')[0]
             data = {
-                '时间': title_time,
+                '时间': parse_time(td_time),
                 '标题': content,
                 '描述': content,  # 微博原创
                 '链接': source_url,
-                '转发内容': spread_content+content+relate_words,
+                '转发内容': spread+content+relate_words,
                 '发布人': author,
                 'attitude': attitude,
                 'sort': sort,
                 'related_words': relate_words,
-                'site_name': site_name,
-                'area': p.sub("", td_orgin.xpath('.//div[contains(@ng-if,"icc.province!")]')[0].text),
-                'C_Id': self.info['id']  # 客户id
+                # 'site_name': site_name,
+                'area': p.sub("", td_orgin.xpath('.//div[@ng-if="icc.province!=null&&icc.province!=''"]/text()')[0]),
             }
             # if item['forwarderImages']:
             #     for item_pic in item['forwarderImages']:
@@ -448,10 +442,7 @@ class YQTSpider(object):
 
 
     def _turn_page(self, max_page_num, time_sleep):
-        self.post_number = 0
-        i=0
         while 1:
-            i=i+1
             if self.crawl_page_count > config.MAX_CRAWL_PAGE_COUNT:
                 self.crawl_page_count = 0
                 return "restart_browser"
@@ -467,25 +458,26 @@ class YQTSpider(object):
             data_list = self.clear_data(data_list)
 
             # 插入到数据库，返回一个成功插入的值
-            # 上传数据,每页抓取
+            # 上传数据
             if data_list:
-                ssql_helper.upload_many_data(data_list, self.industry_name, i, self.info)
-                logger.info(f"解析到{len(data_list)}条数据")
-                self.post_number += len(data_list)
-                logger.info(f"保存完毕")
-                # SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path, sheet_name=self.industry_name)
-                logger.info(f"保存完毕")
-                time.sleep(time_sleep)
+                ssql_helper.upload_many_data(data_list, self.industry_name)
+            logger.info(f"解析到{len(data_list)}条数据")
+            self.post_number += len(data_list)
+            # SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path,sheet_name=self.info['sheet_name'])
+            SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path, sheet_name=self.industry_name)
+            logger.info(f"保存完毕")
+
             # 想要抓取的最大页数，可以修改
             if self.next_page_num >= 50:
                 logger.info("抓取到最大页，停止")
                 data_count = int(self.spider_driver.find_element_by_css_selector(
                     'span[ng-bind="originStat.total"]').text)
+
                 break
             self.next_page_num += 1
             logger.info(f"点击下一页.....")
             try:
-                self.spider_driver.find_element_by_xpath('//i[contains(@ng-click,"gotoPage2(page + 1)")]').click()
+                self.spider_driver.find_element_by_xpath('//i[@class="fa-page-arrow-right ng-scope"]').click()
             except NoSuchElementException:
                 logger.info("没有找到下一页的按钮")
                 break
@@ -493,7 +485,10 @@ class YQTSpider(object):
 
         time.sleep(time_sleep)
         return True
-
+        ssql_helper.upload_many_data(data_list, self.industry_name, i, self.info)
+        logger.info(f"解析到{len(data_list)}条数据")
+        self.post_number += len(data_list)
+        logger.info(f"保存完毕")
     def _set_conditions(self, start_time, end_time):
         """
         设置筛选条件
@@ -506,25 +501,45 @@ class YQTSpider(object):
         end_time_str = end_time.strftime(config.DATETIME_FORMAT)
         # driver.find_element_by_css_selector('div.inline-block.custom-time-period').click()
         print("选择时间")
-        driver.find_element_by_xpath('//span[contains(text(),"自定义")]/parent::div').click()
+        driver.find_element_by_xpath('//span[contains(text(),"自定义")]').click()
         time.sleep(0.1)
-        start_input = driver.find_element_by_xpath('//input[@id="startTimeInput1"]')
+        start_input = driver.find_element_by_xpath(
+            '//input[@class="ant-calendar-picker-input ant-input ng-star-inserted" and @placeholder="开始时间"]')
         # ant-calendar-picker-input ant-input ng-star-inserted
         time.sleep(0.2)
-        start_input.clear()
-        time.sleep(0.2)
-        start_input.send_keys(start_time_str)
-        time.sleep(0.2)
-        end_input=driver.find_element_by_xpath('//input[@id="endTimeInput1"]')
+        start_input.click()
+        start_input_time = driver.find_element_by_xpath(
+            '//input[@placeholder="开始时间" and contains(@class,"ant-calendar-input")]')
         time.sleep(0.1)
-        end_input.clear()
+        start_input_time.clear()
+        start_input_time.send_keys(start_time_str)
+        # //a[@class="ant-calendar-ok-btn"]
+        driver.find_element_by_xpath('//a[contains(@class,"ant-calendar-ok-btn")]').click()
         time.sleep(0.2)
-        end_input.send_keys(end_time_str)
+        end_input = driver.find_element_by_xpath(
+            '//input[@class="ant-calendar-picker-input ant-input ng-star-inserted" and @placeholder="结束时间"]')
+        end_input.click()
+        end_input_time = driver.find_element_by_xpath(
+            '//input[@placeholder="结束时间" and contains(@class,"ant-calendar-input")]')
+        time.sleep(0.1)
+        end_input_time.clear()
+        end_input_time.send_keys(end_time_str)
         time.sleep(0.2)
-        driver.find_element_by_xpath('//span[contains(@ng-click,"confirmTime(1)")]').click()
+        driver.find_element_by_xpath('//a[contains(@class,"ant-calendar-ok-btn")]').click()
         time.sleep(0.2)
+        # -----------点击全部------------------
+        # driver.find_element_by_css_selector('#informationContentType0').click()
+        # time.sleep(0.2)
+        # driver.find_element_by_css_selector('#select0').click()
+        # time.sleep(0.2)
+        # ------------------------------------
+        driver.find_element_by_xpath("//button[@class='ml10 ant-btn ant-btn-primary']").click()
+        # ---------时间设置完毕————————————————————————
+        time.sleep(1)
         print("点击查询")
-        driver.find_element_by_xpath("//a[@id='searchListButton']").click()
+        driver.find_element_by_xpath('//button[@class="btnW4 ant-btn ant-btn-primary"]').click()
+        print("时间设置完毕")
+        # time.sleep(2)
         return True
     def _adapt_time_interval(self):
         """
@@ -567,21 +582,20 @@ class YQTSpider(object):
         点击每页100条按钮
         :return:
         """
-        self.spider_driver.get("http://yuqing.sina.com/yqmonitor")
         if not self._is_page_loaded():
             logger.info("更改100条数据/每页前，页面加载有问题")
             return False
         print("页面加载完全")
-        time.sleep(2)
+
         self.spider_driver.scroll_to_bottom(10000)
         time.sleep(2)
-        self.spider_driver.scroll_to_bottom(10000)
+
         if not self._is_page_loaded():
             logger.info("更改100条数据/每页前，页面加载有问题")
             return False
         self.spider_driver.find_element_by_xpath('//button[@title="50条/页"]').click()
         time.sleep(1)
-        self.spider_driver.find_element_by_xpath('//span[contains(text(),"100条/页")]').click()
+        self.spider_driver.find_element_by_xpath('//span[contains(text()," 100 条/页")]').click()
         print('选择100')
         if not self._is_page_loaded():
             logger.info("更改100条数据/每页后，页面加载有问题")
@@ -600,7 +614,11 @@ class YQTSpider(object):
                         f'- {self.next_end_time.strftime(config.DATETIME_FORMAT)} '
                         f'第{self.next_page_num}页')
             self._reload()
-        # 设置时间
+        # else:
+        # logger.info(f'进入此页面：{self.condition.get("start_time").strftime(config.DATETIME_FORMAT)} '
+        #             f'- {self.condition.get("end_time").strftime(config.DATETIME_FORMAT)} ')
+
+        # 调整时间
         self._adapt_time_interval()
 
         if self.next_page_num > 1:
@@ -613,8 +631,9 @@ class YQTSpider(object):
         if not self._is_page_loaded():
             logger.info("直接进入第多少页时页面加载出现问题")
             return False
-        page_num = int(self.spider_driver.find_element_by_xpath('//span[@ng-bind="page"]').text)
-        if int(page_num) != self.next_page_num:
+        page_num = self.spider_driver.find_element_by_xpath(
+            '//li[@class="ant-pagination-simple-pager ng-star-inserted"]').get_attribute('title')
+        if int(page_num.split('/')[0]) != self.next_page_num:
             logger.warning("页面上当前页面和应该进入的页面不一样，请检查")
             return False
         logger.info("进入成功")
@@ -623,26 +642,15 @@ class YQTSpider(object):
     @property
     def _maxpage(self):
         # 获取最大页数
-        page_max_num = int(self.spider_driver.find_element_by_xpath('//span[@ng-bind="maxpage"]').text)
+        page_max_num = int(self.spider_driver.find_element_by_xpath(
+            '//li[@class="ant-pagination-simple-pager ng-star-inserted"]').get_attribute('title').split('/')[-1])
         print(page_max_num)
         return page_max_num
 
     @property
     def _count_number(self):
-        return int(self.spider_driver.find_element_by_xpath('//span[@ng-bind="originStat.total"]').text)
-    def _is_data_count_outside(self):
-        """
-        数据量是否超出5000
-        超出返回True
-        :return:
-        """
-        try:
-            logger.info(f"当前数据量:{self._count_number}")
-            if self._count_number > config.MAX_DATA_COUNT:
-                return True
-        except Exception as e:
-            logger.warning(e)
-            return True
+        return int(
+            self.spider_driver.find_element_by_xpath('//div[@class="monitor-info-origin rel"]/ul/li[1]/div').text)
     def _crawl2(self, time_sleep):
         """
 
@@ -676,138 +684,182 @@ class YQTSpider(object):
                     key += j + '|'
                 keywords.append(key)
             # 多关键词抓取
-            self.yqt_total_number=self._count_number
-            # if self._count_number > 5000:
-            #     for keyword in keywords:
-            #         input_keywords = self.spider_driver.find_element_by_xpath(
-            #             '//input[@class="ant-input ng-untouched ng-pristine ng-valid ng-star-inserted"]')
-            #         input_keywords.clear()
-            #         input_keywords.send_keys(keyword)
-            #         time.sleep(1)
-            #         self.spider_driver.find_element_by_xpath(
-            #             '//i[@class="anticon anticon-search ng-star-inserted"]').click()
-            #         if self._is_page_loaded():
-            #             max_page_num = self._maxpage
-            #             # 翻页并抓取数据
-            #             resp = self._turn_page(max_page_num, time_sleep)
-            #             if resp == "restart_browser":
-            #                 return resp
-            #             elif not resp:
-            #                 self._turn_page(max_page_num, time_sleep)
-            #                 if turn_page_reload_count >= 3:
-            #                     logger.warning("翻页时，连续出现问题3次，退出")
-            #                     return False
-            #                 turn_page_reload_count += 1
-            #                 is_reload = True
-            #                 continue
-            #             turn_page_reload_count = 0
-            #             # 翻页结束
-            #
-            #             # 设置下次抓取条件
-            #             self.next_page_num = 1
-            #             if self.next_end_time >= self.interval[1]:
-            #                 logger.info("解析到终止时间，抓取完成")
-            #                 logger.info("全部抓取完毕上传数据")
-            #                 logger.info("开始记录")
-            #                 # 舆情通数量
-            #                 yqt_count = self._count_number
-            #                 record_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            #                                                 f"record\{self.project_name}", f"{self}_记录.xlsx")
-            #                 sql_number = ssql_helper.find_info_count(self.interval[0], self.interval[1],
-            #                                                          self.industry_name)
-            #                 data_list = [self.project_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            #                              self.last_end_time, self.next_end_time]
-            #                 SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number,
-            #                                               data_list=data_list)
-            #                 # record_dict = (self.industry_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
-            #                 # self.next_end_time, yqt_count, self.post_number, self.project_name)
-            #
-            #                 record_dict = (
-            #                     self.industry_name,  # 行业名称
-            #                     datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # 抓取时间
-            #                     self.last_end_time,  # 开始时间
-            #                     self.next_end_time,  # 结束时间
-            #                     yqt_count,  # 舆情通数量
-            #                     self.post_number,  # 上传数量
-            #                     self.project_name,  # 项目名称
-            #                     self.first_len,  # 第一次过滤之后的数量
-            #                     self.redis_len  # redis过滤之后的数量
-            #                 )
-            #
-            #                 # 数据统计记录
-            #                 ssql_helper.record_log(record_dict)
-            #                 # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
-            #                 return True
-            #             else:
-            #                 self.last_end_time = self.next_end_time  # 上次终止时间就是下次起始时间
-            #                 self.next_end_time = self.interval[1]
-
-            # else:
-            if self._is_page_loaded():
-                max_page_num = self._maxpage
-                # 翻页并抓取数据
-                resp = self._turn_page(max_page_num, time_sleep)
-                if resp == "restart_browser":
-                    return resp
-                elif not resp:
-                    self._turn_page(max_page_num, time_sleep)
-                    if turn_page_reload_count >= 3:
-                        logger.warning("翻页时，连续出现问题3次，退出")
-                        return False
-                    turn_page_reload_count += 1
-                    is_reload = True
-                    continue
-                # 翻页并抓取数据
-                if resp:
-                    logger.info("全部抓取完毕上传数据，并进行记录")
-                    # 舆情通数量
-                    yqt_count = self.yqt_total_number
-                    # 记录文件的路径
-                    record_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                                    f"record\{self.project_name}", f"{self}_记录.xlsx")
-                    # 本次抓取TS_A库和QBBB_B库、中的数量
-                    sql_number_A,sql_number_B = ssql_helper.find_curent_num(self.interval[0],
-                                                                            self.interval[1],
-                                                                            self.myconfig,
-                                                                            self.info,
-                                                                            yqt_count)
+            if self._count_number > 5000:
+                for keyword in keywords:
+                    input_keywords = self.spider_driver.find_element_by_xpath(
+                        '//input[@class="ant-input ng-untouched ng-pristine ng-valid ng-star-inserted"]')
+                    input_keywords.clear()
+                    input_keywords.send_keys(keyword)
                     time.sleep(1)
-                    # myconfig=config.redconfig()
-                    # 需要增加一个B库中的数量
-                    data_list = [self.project_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                 self.last_end_time, self.next_end_time]
-                    # 本地记录文件保存
-                    # SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number_A,sql_number_B,
-                    #                               data_list=data_list)
-                    record_day_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                                    f"record\{self.project_name}", f"{self}_{self.project_name}记录.xlsx")
-                    # SpiderHelper.save_record_day_data(record_day_file_path, yqt_count, sql_number_B)
-                    # my_Email().send_xlsx(record_file_path)
-                    # record_dict = (self.industry_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
-                    # self.next_end_time, yqt_count, self.post_number, self.project_name)
+                    self.spider_driver.find_element_by_xpath(
+                        '//i[@class="anticon anticon-search ng-star-inserted"]').click()
+                    if self._is_page_loaded():
+                        max_page_num = self._maxpage
+                        # 翻页并抓取数据
+                        resp = self._turn_page(max_page_num, time_sleep)
+                        if resp == "restart_browser":
+                            return resp
+                        elif not resp:
+                            self._turn_page(max_page_num, time_sleep)
+                            if turn_page_reload_count >= 3:
+                                logger.warning("翻页时，连续出现问题3次，退出")
+                                return False
+                            turn_page_reload_count += 1
+                            is_reload = True
+                            continue
+                        turn_page_reload_count = 0
+                        # 翻页结束
 
-                    record_dict = (
-                        self.industry_name,  # 行业名称
-                        datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # 抓取时间
-                        self.last_end_time,  # 开始时间
-                        self.next_end_time,  # 结束时间
-                        yqt_count,  # 舆情通数量
-                        self.post_number,  # 上传数量
-                        self.info['customer'],  # 项目名称
-                        self.first_len,  # 第一次过滤之后的数量
-                        self.redis_len,  # redis过滤之后的数量
-                        sql_number_A,
-                        sql_number_B
-                    )
+                        # 设置下次抓取条件
+                        self.next_page_num = 1
+                        if self.next_end_time >= self.interval[1]:
+                            logger.info("解析到终止时间，抓取完成")
+                            logger.info("全部抓取完毕上传数据")
+                            logger.info("开始记录")
+                            # 舆情通数量
+                            yqt_count = self._count_number
+                            record_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                                            f"record\{self.project_name}", f"{self}_记录.xlsx")
+                            sql_number = ssql_helper.find_info_count(self.interval[0], self.interval[1],
+                                                                     self.industry_name)
+                            data_list = [self.project_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                         self.last_end_time, self.next_end_time]
+                            SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number,
+                                                          data_list=data_list)
+                            # record_dict = (self.industry_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
+                            # self.next_end_time, yqt_count, self.post_number, self.project_name)
 
-                    # 数据统计记录
-                    ssql_helper.record_log(record_dict)
-                    # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,
-                    # post_info['number'],post_info2['number'],sql_number,data_list=data_list)
-                    print("结束返回")
-                    return True
+                            record_dict = (
+                                self.industry_name,  # 行业名称
+                                datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # 抓取时间
+                                self.last_end_time,  # 开始时间
+                                self.next_end_time,  # 结束时间
+                                yqt_count,  # 舆情通数量
+                                self.post_number,  # 上传数量
+                                self.project_name,  # 项目名称
+                                self.first_len,  # 第一次过滤之后的数量
+                                self.redis_len  # redis过滤之后的数量
+                            )
+
+                            # 数据统计记录
+                            ssql_helper.record_log(record_dict)
+                            # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
+                            return True
+                        else:
+                            self.last_end_time = self.next_end_time  # 上次终止时间就是下次起始时间
+                            self.next_end_time = self.interval[1]
+
+            else:
+                if self._is_page_loaded():
+                    max_page_num = self._maxpage
+                    # 翻页并抓取数据
+                    resp = self._turn_page(max_page_num, time_sleep)
+                    if resp == "restart_browser":
+                        return resp
+                    elif not resp:
+                        self._turn_page(max_page_num, time_sleep)
+                        if turn_page_reload_count >= 3:
+                            logger.warning("翻页时，连续出现问题3次，退出")
+                            return False
+                        turn_page_reload_count += 1
+                        is_reload = True
+                        continue
+                    turn_page_reload_count = 0
+                    # 翻页结束
+
+                    # 设置下次抓取条件
+                    self.next_page_num = 1
+                    if self.next_end_time >= self.interval[1]:
+                        logger.info("解析到终止时间，抓取完成")
+                        logger.info("全部抓取完毕上传数据")
+                        logger.info("开始记录")
+                        # 舆情通数量
+                        yqt_count = self._count_number
+                        record_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                                        f"record\{self.project_name}", f"{self}_记录.xlsx")
+                        sql_number = ssql_helper.find_info_count(self.interval[0], self.interval[1], self.industry_name)
+                        data_list = [self.project_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                     self.last_end_time, self.next_end_time]
+                        SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number,
+                                                      data_list=data_list)
+                        # record_dict = (self.industry_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
+                        # self.next_end_time, yqt_count, self.post_number, self.project_name)
+
+                        record_dict = (
+                            self.industry_name,  # 行业名称
+                            datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # 抓取时间
+                            self.last_end_time,  # 开始时间
+                            self.next_end_time,  # 结束时间
+                            yqt_count,  # 舆情通数量
+                            self.post_number,  # 上传数量
+                            self.project_name,  # 项目名称
+                            self.first_len,  # 第一次过滤之后的数量
+                            self.redis_len  # redis过滤之后的数量
+                        )
+
+                        # 数据统计记录
+                        ssql_helper.record_log(record_dict)
+                        # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
+                        return True
+                    else:
+                        self.last_end_time = self.next_end_time  # 上次终止时间就是下次起始时间
+                        self.next_end_time = self.interval[1]
+        # 翻页并抓取数据
+        resp = self._turn_page(time_sleep)
+        if resp:
+            # 设置下次抓取条件
+            if self.next_end_time >= self.interval[1]:
+                logger.info("全部抓取完毕上传数据，并进行记录")
+                # 舆情通数量
+                yqt_count = self.yqt_total_number
+                # 记录文件的路径
+                record_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                                f"record\{self.project_name}", f"{self}_记录.xlsx")
+                # 本次抓取TS_A库和QBBB_B库、中的数量
+                sql_number_A,sql_number_B = ssql_helper.find_curent_num(self.interval[0],
+                                                                        self.interval[1],
+                                                                        self.myconfig,
+                                                                        self.info,
+                                                                        yqt_count)
+                time.sleep(1)
+                # myconfig=config.redconfig()
+                # 需要增加一个B库中的数量
+                data_list = [self.project_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                             self.last_end_time, self.next_end_time]
+                # 本地记录文件保存
+                # SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number_A,sql_number_B,
+                #                               data_list=data_list)
+                record_day_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                                f"record\{self.project_name}", f"{self}_{self.project_name}记录.xlsx")
+                # SpiderHelper.save_record_day_data(record_day_file_path, yqt_count, sql_number_B)
+                # my_Email().send_xlsx(record_file_path)
+                # record_dict = (self.industry_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
+                # self.next_end_time, yqt_count, self.post_number, self.project_name)
+
+                record_dict = (
+                    self.industry_name,  # 行业名称
+                    datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # 抓取时间
+                    self.last_end_time,  # 开始时间
+                    self.next_end_time,  # 结束时间
+                    yqt_count,  # 舆情通数量
+                    self.post_number,  # 上传数量
+                    self.info['customer'],  # 项目名称
+                    self.first_len,  # 第一次过滤之后的数量
+                    self.redis_len,  # redis过滤之后的数量
+                    sql_number_A,
+                    sql_number_B
+                )
+
+                # 数据统计记录
+                ssql_helper.record_log(record_dict)
+                # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,
+                # post_info['number'],post_info2['number'],sql_number,data_list=data_list)
+                print("结束返回")
+                return True
             else:
                 return False
+        else:
+            return False
     def modifi_keywords_new(self):
         """
         关键词修改
@@ -885,20 +937,16 @@ class YQTSpider(object):
         #         self.spider_driver.quit()
         #         self.spider_driver.close()
         #         print("关闭")
-    def _reload(self):
-        """
-        刷新页面
-        :return:
-        """
-        self.spider_driver.refresh()
-        self.spider_driver.refresh()
-        if not self._is_page_loaded():
-            return False
-        return True
+
 
 
 # 自定义时间抓取任务
 def work_it(myconfig, start_time, end_time):
+    # 获取项目信息
+    # from xlsx
+    # infos = config.row_list
+    # from config.ini
+    # myconfig = config.redconfig()
     # 获取驱动文件路径
     chromedriver_path = myconfig.getValueByDict('chromerdriver', 'path')
     chrome_service = Service(chromedriver_path)
@@ -961,14 +1009,6 @@ def work_it_hour(myconfig):
         start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
         end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
         work_it(myconfig, start_time, end_time)
-    elif list(time_info.keys())[0] == 'myself_days':
-        t_1=myconfig.getValueByDict('time_info','start_days')
-        t_2=myconfig.getValueByDict('time_info','end_days')
-        print(t_1)
-        print(t_2)
-        start_time = datetime.datetime.strptime(t_1, "%Y-%m-%d %H:%M:%S")
-        end_time = datetime.datetime.strptime(t_2, "%Y-%m-%d %H:%M:%S")
-        work_it(myconfig, start_time, end_time)
 
 
 def work_it_one_day(myconfig):
@@ -1017,16 +1057,16 @@ if __name__ == '__main__':
     # try:
     today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     # time1 = (datetime.datetime.now() - datetime.timedelta(days=3)).strftime('%Y-%m-%d')
-    time1 = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d')
+    time1 = (datetime.datetime.now() - datetime.timedelta(days=3)).strftime('%Y-%m-%d')
     myconfig = config.redconfig()
     # print("加载数据")
     industry_name = myconfig.getValueByDict('industry_info', 'industry_name')
     ssql_helper.get_month_data(time1, today, industry_name)
 
-    p1 = Process(target=java_task, name='java程序')
-    # p2 = Process(target=apscheduler, kwargs={'myconfig': myconfig}, name='定时抓取')
+    # p1 = Process(target=java_task, name='java程序')
+    p2 = Process(target=apscheduler, kwargs={'myconfig': myconfig}, name='定时抓取')
     # p1.start()
-    # p2.start()
+    p2.start()
     # # print("运行结束")
     work_it_hour(myconfig)
     # print("抓取结束")
