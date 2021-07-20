@@ -237,11 +237,10 @@ class YQTSpider(object):
             else:
                 spread_content = ''
             # 针对于文章是标题  针对于微博是作者
-            author = td_title.xpath('.//div[contains(@class,"profile-title inline-block")]/a')[0].xpath('string(.)')
+            author = td_title.xpath('.//div[contains(@class,"profile-title inline-block")]/a')[0].xpath('string(.)').replace("\n","")
             author_or_title = p.sub("", author)
             if site_name == '新浪微博':
                 author = author_or_title
-                title=content
             else:
                 result_a_t = author_or_title.split(":")
                 result_a_t_1 = author_or_title.split("：")
@@ -473,6 +472,7 @@ class YQTSpider(object):
             # 上传数据,每页抓取
             if data_list:
                 ssql_helper.upload_many_data(data_list, self.industry_name, i, self.info)
+                # ssql_helper.upload_many_data_java(data_list, self.industry_name, i)
                 logger.info(f"解析到{len(data_list)}条数据")
                 self.post_number += len(data_list)
                 logger.info(f"保存完毕")
@@ -493,7 +493,27 @@ class YQTSpider(object):
                 logger.info("没有找到下一页的按钮")
                 break
             self.crawl_page_count += 1
+        def craw(i):
+            data_list = self.parse_data()
+            logger.info('数据抓取完毕')
+            # 数据进行处理
+            data_list = self.clear_data(data_list)
 
+            # 插入到数据库，返回一个成功插入的值
+            # 上传数据,每页抓取
+            if data_list:
+                ssql_helper.upload_many_data(data_list, self.industry_name, i, self.info)
+                logger.info(f"解析到{len(data_list)}条数据")
+                self.post_number += len(data_list)
+                logger.info(f"保存完毕")
+                # SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path, sheet_name=self.industry_name)
+                logger.info(f"保存完毕")
+                time.sleep(time_sleep)
+            self.spider_driver.find_element_by_xpath('//i[contains(@ng-click,"gotoPage2(page + 1)")]').click()
+        # 
+        # with ThreadPoolExecutor(3) as pool:
+        #     for i in range(1,max_page_num+1):
+        #         pool.submit(craw,i+1)
         time.sleep(time_sleep)
         return True
 
@@ -505,8 +525,8 @@ class YQTSpider(object):
         :return: True or Flase
         """
         driver = self.spider_driver
-        start_time_str = start_time.strftime(config.DATETIME_FORMAT)
-        end_time_str = end_time.strftime(config.DATETIME_FORMAT)
+        # start_time_str = start_time.strftime(config.DATETIME_FORMAT)
+        # end_time_str = end_time.strftime(config.DATETIME_FORMAT)
         # driver.find_element_by_css_selector('div.inline-block.custom-time-period').click()
         print("选择时间")
         driver.find_element_by_xpath('//span[contains(text(),"自定义")]/parent::div').click()
@@ -516,16 +536,24 @@ class YQTSpider(object):
         time.sleep(0.2)
         start_input.clear()
         time.sleep(0.2)
-        start_input.send_keys(start_time_str)
+        start_input.send_keys(start_time)
         time.sleep(0.2)
         end_input=driver.find_element_by_xpath('//input[@id="endTimeInput1"]')
         time.sleep(0.1)
         end_input.clear()
         time.sleep(0.2)
-        end_input.send_keys(end_time_str)
+        end_input.send_keys(end_time)
         time.sleep(0.2)
         driver.find_element_by_xpath('//span[contains(@ng-click,"confirmTime(1)")]').click()
         time.sleep(0.2)
+        self.spider_driver.find_element_by_xpath("//input[@id='wb']").click()
+        time.sleep(0.5)
+        self.spider_driver.find_element_by_xpath("//input[@id='wx']").click()
+        time.sleep(0.5)
+        self.spider_driver.find_element_by_xpath("//input[@id='sp']").click()
+        time.sleep(0.5)
+        self.spider_driver.find_element_by_xpath("//input[@id='lt']").click()
+        time.sleep(0.5)
         print("点击查询")
         driver.find_element_by_xpath("//a[@id='searchListButton']").click()
         return True
@@ -559,9 +587,9 @@ class YQTSpider(object):
             # return False
             self.devide_keywords = True
             break
-        logger.info(
-            f"当前时间区间:{self.last_end_time.strftime(config.DATETIME_FORMAT)}  --"
-            f" {self.next_end_time.strftime(config.DATETIME_FORMAT)}")
+        # logger.info(
+        #     f"当前时间区间:{self.last_end_time.strftime(config.DATETIME_FORMAT)}  --"
+        #     f" {self.next_end_time.strftime(config.DATETIME_FORMAT)}")
 
 
     def _switch_data_count_perpage(self):
@@ -969,9 +997,17 @@ def work_it_hour(myconfig):
         t_2=myconfig.getValueByDict('time_info','end_days')
         print(t_1)
         print(t_2)
-        start_time = datetime.datetime.strptime(t_1, "%Y-%m-%d %H:%M:%S")
-        end_time = datetime.datetime.strptime(t_2, "%Y-%m-%d %H:%M:%S")
-        work_it(myconfig, start_time, end_time)
+        # 2021-07-15 00:00:00   1626278400
+        #                       1626321600
+        #                           43200
+        for i in range(1626278400,1626796800,21600):
+            # start_time = datetime.datetime.strptime(t_1, "%Y-%m-%d %H:%M:%S")
+            start_time_pre = i
+            end_time_pre=i+43200
+            start_time=time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time_pre))
+            end_time=time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time_pre))
+            print(start_time,end_time)
+            work_it(myconfig, start_time, end_time)
 
 
 def work_it_one_day(myconfig):
@@ -1024,7 +1060,7 @@ if __name__ == '__main__':
     myconfig = config.redconfig()
     # print("加载数据")
     industry_name = myconfig.getValueByDict('industry_info', 'industry_name')
-    # ssql_helper.get_month_data(time1, today, industry_name)
+    ssql_helper.get_month_data(time1, today, industry_name)
 
     p1 = Process(target=java_task, name='java程序')
     # p2 = Process(target=apscheduler, kwargs={'myconfig': myconfig}, name='定时抓取')

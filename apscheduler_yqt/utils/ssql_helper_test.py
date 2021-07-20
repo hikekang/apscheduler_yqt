@@ -6,14 +6,13 @@
    time：          2021/5/7 11:03
 """
 import os
-# from concurrent.futures.thread import ThreadPoolExecutor
+from concurrent.futures.thread import ThreadPoolExecutor
 from utils.snowflake import IdWorker
 import redis
 import re
 import requests
 from utils.email_helper import my_Email
-from utils.ssql_pool_helper import DataBase, config_A, config_B, config_QBBA, config_QBBB, config_net_TS_A, \
-    config_net_QBBA
+from utils.ssql_pool_helper import DataBase, config_QBBA, config_QBBB, config_net_TS_A, config_net_QBBA
 from utils.redis_helper import my_redis
 from tqdm import tqdm
 import uuid
@@ -84,6 +83,7 @@ db_net_qbba = DataBase('sqlserver', config_net_QBBA)
 优速 流通贸易
 一嗨  汽车业
 '''
+# task.msg.similar_2.1
 
 def find_curent_num(start_time, end_time, myconfig,info,yqt_count):
     """
@@ -510,11 +510,11 @@ def upload_many_data_java(data_list, industry_name,datacenter_id):
 
         tuple_data_list_qbb_a.append(tuple_data_qbb_a)
 
-        tuple_data_ts_a_second_data = (id, industry_id, data['ic_id'], data['keywords_id'], data['链接'])
-        tuple_data_list_ts_a_second_data.append(tuple_data_ts_a_second_data)
+        # tuple_data_ts_a_second_data = (id, industry_id, data['ic_id'], data['keywords_id'], data['链接'])
+        # tuple_data_list_ts_a_second_data.append(tuple_data_ts_a_second_data)
 
-    sql_ts_a_second_data="insert into TS_Second_Data (id,industry_id,ic_id,keywords_id,url) values (%d,%d,%s,%s,%s)"
-    sql_ts_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s)"
+    # sql_ts_a_second_data="insert into TS_Second_Data (id,industry_id,ic_id,keywords_id,url) values (%d,%d,%s,%s,%s)"
+    # sql_ts_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s)"
     # 插入A库
     sql_qbb_a = "insert into " + table_name + " (id,industry_id,title,summary,content,url,author,publish_time,is_original,location,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
     print("tsa数据量为：",len(tuple_data_list_ts_a))
@@ -695,11 +695,11 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         mark_java_match_data(d, thream_info_list)
         print("完成")
 
-    # with ThreadPoolExecutor(4) as pool:
-    #     for index,d in enumerate(data_list):
-    #         pool.submit(load_data,index,d)
-    for index, d in enumerate(data_list):
-        load_data(index, d)
+    with ThreadPoolExecutor(10) as pool:
+        for index,d in enumerate(data_list):
+            pool.submit(load_data,index,d)
+    # for index, d in enumerate(data_list):
+    #     load_data(index, d)
     myredis.close()
     # post_mq.close_mq()
 
@@ -718,9 +718,9 @@ def match_insert_alone_data(data,info,T_id):
             "cid": info['id'],
             "sn": data['SN'],
             # "msld": d['subject_id'],
-            "msld": T_id,
+            "msid": T_id,
             "title": data['标题'],
-            "msNodeld": data['subject_id'],
+            "msNodeid": data['subject_id'],
             "publishDate": data['时间']
         }
         proxies = {'http': None, 'https': None}
@@ -740,9 +740,9 @@ def match_insert_alone_data(data,info,T_id):
         post_data = {
             "cid": info['id'],
             "sn": data['SN'],
-            "msld": data['subject_id'],
+            "msid": data['subject_id'],
             "title": data['标题'],
-            "msNodeld": data['class_id'][0],  # 对应分类的id多分类时只发送⼀次即可，分类ID取not_first_sort=0时的数据
+            "msNodeid": data['class_id'][0],  # 对应分类的id多分类时只发送⼀次即可，分类ID取not_first_sort=0时的数据
             "publishDate": data['时间']
         }
         proxies = {'http': None, 'https': None}
@@ -1024,13 +1024,13 @@ def record_log(data):
     sql_record = "insert into record_log_table values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
     # data=('3', '2021-4-26 00:00:00','2021-4-26 00:00:00', '2021-4-26 00:00:00', '4', '5', '6', '1')
     db_qbba.execute(sql_record, data)
-    my_e = my_Email()
-    if data[4] != 0 and data[5] != 0:
-        if (data[5] / data[4]) < 0.7:
-            my_e.send_message('数据量异常', data[6])
-    elif data[4] == 0 or data[5] == 0:
-        my_e.send_message('数据量异常', data[6])
-    today = data[2].date()
+    # my_e = my_Email()
+    # if data[4] != 0 and data[5] != 0:
+    #     if (data[5] / data[4]) < 0.7:
+    #         my_e.send_message('数据量异常', data[6])
+    # elif data[4] == 0 or data[5] == 0:
+    #     my_e.send_message('数据量异常', data[6])
+    # today = data[2].date()
     # sql_industry_num = """
     #         if not exists (select * from record_log_industry  where industry = '{0}' and record_time='{1}')
     #                 INSERT INTO record_log_industry (industry,record_time,upload_num) VALUES ('{0}','{1}',{2})
