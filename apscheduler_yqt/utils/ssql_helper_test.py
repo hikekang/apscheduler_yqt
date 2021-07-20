@@ -1156,7 +1156,7 @@ if __name__ == '__main__':
     #     print("匹配成功")
     # file_name=os.path.join(  os.path.dirname(os.path.abspath(__file__)),f"记录\\" ,f"{datetime.date.today()}.xlsx")
     # print(file_name)
-    record_day_datas()
+    # record_day_datas()
     # print(contain_keywords("三联学院","""
     # 学习好难 被蚊子咬 被桌子磕
 # 合肥·安徽

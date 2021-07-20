@@ -244,16 +244,14 @@ class YQTSpider(object):
                 title=content
             else:
                 result_a_t = author_or_title.split(":")
-                if len(result_a_t) > 2:
+                result_a_t_1 = author_or_title.split("：")
+
+                if len(result_a_t) >= 2 :
                     author = author_or_title.split(":")[0]
-                    title = author_or_title.split(":")[1]
+                elif len(result_a_t_1)>=2:
+                    author = result_a_t_1[0]
                 else:
-                    if len(author_or_title) > 15:
-                        author = site_name
-                        title = author_or_title
-                    else:
-                        author = author_or_title
-                        title = author_or_title
+                    author=''
             # 行业
             # industry = p.sub("", td_title.xpath('.//div[@class="profile-tip inline-block"]/nz-tag[2]/span/text()')[0])
             # 关键词
@@ -275,7 +273,12 @@ class YQTSpider(object):
             #     comment_num = 0
             # img_src = ",".join([img.attrib['src'] for img in td_title.xpath('//img')])
             # attitude = p.sub("", td_title.xpath('.//div[@class="sensitive-status-content fmg"]')[0].text)
-            attitude = p.sub("", td_title.xpath('.//div[contains(@class,"sensitive-status-content fmg")]/span/text()')[0])
+            # ]/div/div[2]/div[1]/div[2]/nz-tag
+            # attitude = p.sub("", td_title.xpath('./div[contains(@class,"sensitive-status-content fmg")]/span/text()')[0])
+            # //*[@id="news-content_316266263107310667912626"]/div[3]/div[1]/div[1]/div/div[2]
+            # //*[@id="news-content_316266263107310667912626"]/div[3]/div[1]/div[1]/div/div[2]
+            # attitude = p.sub("", td_title.xpath('./div/div[3]/div[1]/div[1]/div/div[2]/span')[0].xpath("string(.)"))
+            attitude = p.sub("", td_title.xpath('.//div[contains(@class,"sensitive-status-content") and not(contains(@class,"ng-hide"))]')[0].xpath(".//span")[0].text)
             title_time = parse_time(td_time)
             print(author,attitude,title_time)
 
@@ -1021,7 +1024,7 @@ if __name__ == '__main__':
     myconfig = config.redconfig()
     # print("加载数据")
     industry_name = myconfig.getValueByDict('industry_info', 'industry_name')
-    ssql_helper.get_month_data(time1, today, industry_name)
+    # ssql_helper.get_month_data(time1, today, industry_name)
 
     p1 = Process(target=java_task, name='java程序')
     # p2 = Process(target=apscheduler, kwargs={'myconfig': myconfig}, name='定时抓取')
