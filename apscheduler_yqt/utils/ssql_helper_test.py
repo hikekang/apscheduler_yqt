@@ -654,11 +654,14 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         # print(domain_search)
         flag = 0
         for i in range(0, len(rx) - 1):
-            if r.hexists("url", '.'.join(rx[i:])):
-                ret = eval(r.hget("url", '.'.join(rx[i:])))
-                d['S_Id'] = ret[-2]  # medium_type
+            url_sql=f"select * from TS_MediumURL where domain={'.'.join(rx[i:])}"
+            result=db_qbbb.execute_query(url_sql)
+            if result:
+            # if r.hexists("url", '.'.join(rx[i:])):
+            #     ret = eval(r.hget("url", '.'.join(rx[i:])))
+                d['S_Id'] = result[0][-2]  # medium_type
                 # source_type:TS_MediumURL 的 id 自动增长
-                d['source_type'] = ret[0]
+                d['source_type'] = result[0][2]
                 flag = 1
                 break
         # 没有domain匹配成功插入
@@ -672,7 +675,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
             SQL_SELECT = "SELECT top 1 * FROM TS_MediumURL ORDER BY id DESC"
             URL_DATA = db_qbbb.execute_query(SQL_SELECT)[0]
             # 更新redis
-            r.hset("url", domain_search, str(URL_DATA))
+            # r.hset("url", domain_search, str(URL_DATA))
             # 更改数据
             d['S_Id'] = 8
             d['source_type'] = URL_DATA[0]
@@ -695,7 +698,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         mark_java_match_data(d, thream_info_list)
         print("完成")
 
-    with ThreadPoolExecutor(10) as pool:
+    with ThreadPoolExecutor(4) as pool:
         for index,d in enumerate(data_list):
             pool.submit(load_data,index,d)
     # for index, d in enumerate(data_list):
@@ -1072,7 +1075,7 @@ def record_day_datas():
     project_name=eval(mycon.getValueByDict('spider_config','project_name'))
     print(project_name)
     # outfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"记录\\", f"{datetime.date.today()}.xlsx")
-    for i in range(10,13):
+    for i in range(0,1):
         date_now = (datetime.datetime.now()- datetime.timedelta(days=i)).strftime('%Y-%m-%d 00:00:00')
         date_yesterday = (datetime.datetime.now() - datetime.timedelta(days=i+1)).strftime("%Y-%m-%d 00:00:00")
         record_time=(datetime.datetime.now() - datetime.timedelta(days=i+1)).strftime("%Y-%m-%d")
@@ -1104,20 +1107,33 @@ def record_day_datas():
                     }
                     for item in source_type:
                         # print(item)
-                        item_ssql=f"select source_type from QBB_B.dbo.TS_MediumURL where {item[0]}=id"
+                        # item_ssql=f"select source_type from QBB_B.dbo.TS_MediumURL where {item[0]}=id"
+                        item_ssql=f"select medium_type from QBB_B.dbo.TS_MediumURL where {item[0]}=id"
                         item_type=db_qbbb.execute_query(item_ssql)
+                        sourc_dict={
+                            "1":"网媒",
+                            "2":"贴吧",
+                            "3":"微信",
+                            "4":"博客",
+                            "5":"论坛",
+                            "6":"电子报",
+                            "7":"微博",
+                            "8":"全网",
+                            "9":"问答",
+                            "10":"客户端",
+                        }
                         if item_type:
-                            count_source_type[item_type[0][0]]+=item[-1]
+                            count_source_type[sourc_dict[str(item_type[0][0])]]+=item[-1]
                     print(count_source_type)
                     # 舆情通数量待定
                     try:
-                        sq_tsa=f"select yqt_num from record_log_table where start_time='{date_yesterday}' and end_time='{date_now}' and customer='{data['customer']}'"
-                        print(sq_tsa)
-                        if sq_tsa:
-                            sql_a=db_qbba.execute_query(sq_tsa)[0][0]
-                        else:
-                            sql_a=0
-                        # sql_a=0
+                        # sq_tsa=f"select yqt_num from record_log_table where start_time='{date_yesterday}' and end_time='{date_now}' and customer='{data['customer']}'"
+                        # print(sq_tsa)
+                        # if sq_tsa:
+                        #     sql_a=db_qbba.execute_query(sq_tsa)[0][0]
+                        # else:
+                        #     sql_a=0
+                        sql_a=0
                         source_type_list=list(count_source_type.values())
                         print(source_type_list)
                         spide_helper.all_project_save_record_day(outfile,sql_a,sql_num_B,data['customer'],data['industry_name'],source_type_list)
@@ -1126,11 +1142,16 @@ def record_day_datas():
 
 
 if __name__ == '__main__':
+    url_sql = f"select * from TS_MediumURL where domain='mp.weixin.qq.com'"
+    result=db_qbbb.execute_query(url_sql)
+    print(result)
+    print(result[0][-2])
+
     # for d in merger_industry_data(get_industry_keywords()):
     #     print(d)
     #     print("***"*20)
-    for data in get_industry_keywords():
-        pprint(data)
+    # for data in get_industry_keywords():
+    #     pprint(data)
     # c_d=get_industry_keywords()
     # mao_d=[]
     # for d in c_d:
