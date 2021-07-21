@@ -654,14 +654,14 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         # print(domain_search)
         flag = 0
         for i in range(0, len(rx) - 1):
-            url_sql=f"select * from TS_MediumURL where domain={'.'.join(rx[i:])}"
+            url_sql=f"select * from TS_MediumURL where domain='{'.'.join(rx[i:])}'"
             result=db_qbbb.execute_query(url_sql)
             if result:
             # if r.hexists("url", '.'.join(rx[i:])):
             #     ret = eval(r.hget("url", '.'.join(rx[i:])))
                 d['S_Id'] = result[0][-2]  # medium_type
                 # source_type:TS_MediumURL 的 id 自动增长
-                d['source_type'] = result[0][2]
+                d['source_type'] = result[0][0]
                 flag = 1
                 break
         # 没有domain匹配成功插入
@@ -1142,16 +1142,17 @@ def record_day_datas():
 
 
 if __name__ == '__main__':
-    url_sql = f"select * from TS_MediumURL where domain='mp.weixin.qq.com'"
-    result=db_qbbb.execute_query(url_sql)
-    print(result)
-    print(result[0][-2])
+    # url_sql = f"select * from TS_MediumURL where domain='weibo.com'"
+    # result=db_qbbb.execute_query(url_sql)
+    # print(result)
+    # if result:
+    #     print(result[0][-2])
 
     # for d in merger_industry_data(get_industry_keywords()):
     #     print(d)
     #     print("***"*20)
-    # for data in get_industry_keywords():
-    #     pprint(data)
+    for data in get_industry_keywords():
+        pprint(data)
     # c_d=get_industry_keywords()
     # mao_d=[]
     # for d in c_d:

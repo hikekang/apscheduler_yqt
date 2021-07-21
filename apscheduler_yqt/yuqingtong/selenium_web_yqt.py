@@ -21,7 +21,8 @@ from multiprocessing.dummy import Pool as ThreadPool
 # path_utils=os.path.join(ab,'utils')
 # sys.path.append(path_utils)
 from apscheduler.schedulers.blocking import BlockingScheduler
-from apscheduler.triggers.cron import CronTrigger
+# from utils.my_crontrigger import my_CronTrigger
+from apscheduler.triggers.cron import CronTrigger as my_CronTrigger
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
@@ -900,7 +901,7 @@ class YQTSpider(object):
                                                    ':', '_'))
             logger.info(self.data_file_path)
             # 设置关键词
-            self.modifi_keywords_new()
+            # self.modifi_keywords_new()
 
             # 抓取数据并记录
             resp = self._crawl2(time_sleep)
@@ -934,7 +935,7 @@ def work_it(myconfig, start_time, end_time):
     chromedriver_path = myconfig.getValueByDict('chromerdriver', 'path')
     chrome_service = Service(chromedriver_path)
     chrome_service.start()
-
+    print("22")
     # yqt_spider = YQTSpider(infos[0], start_time=start_time, end_time=end_time)
     yqt_spider = YQTSpider(myconfig, start_time=start_time, end_time=end_time)
 
@@ -1000,10 +1001,18 @@ def work_it_hour(myconfig):
         # 2021-07-15 00:00:00   1626278400
         #                       1626321600
         #                           43200
-        for i in range(1626278400,1626796800,21600):
+        # for i in range(1626278400,1626886800,28800):
+        #     # start_time = datetime.datetime.strptime(t_1, "%Y-%m-%d %H:%M:%S")
+        #     start_time_pre = i
+        #     end_time_pre=i+28800
+        #     start_time=time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time_pre))
+        #     end_time=time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time_pre))
+        #     print(start_time,end_time)
+        #     work_it(myconfig, start_time, end_time)
+        for i in range(1626832516,1626278400,-28800):
             # start_time = datetime.datetime.strptime(t_1, "%Y-%m-%d %H:%M:%S")
-            start_time_pre = i
-            end_time_pre=i+43200
+            start_time_pre = i-28800
+            end_time_pre=i
             start_time=time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time_pre))
             end_time=time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time_pre))
             print(start_time,end_time)
@@ -1028,12 +1037,14 @@ def work_it_one_day(myconfig):
 
 
 def apscheduler(myconfig):
-    trigger1 = CronTrigger(minute='*/20', second=00, jitter=5)
     cron_info = myconfig.getDictBySection('cron_info')
+    # 日常cron
+    trigger1 = my_CronTrigger.from_crontab(cron_info["daily_cron"])
     # for key,value in cron_info.items():
     #     cron_info[key]=eval(value)
-    tigger_hour = CronTrigger(**cron_info)
-    trigger2 = CronTrigger(hour='0', minute='01', second=00, jitter=5)
+    tigger_hour = my_CronTrigger.from_crontab(cron_info['hour_cron'])
+    # 每天记录
+    trigger2 = my_CronTrigger(cron_info['day_record_cron'])
     sched = BlockingScheduler()
     sched.add_job(work_it_hour, trigger1, max_instances=10, id='my_job_id',kwargs={'myconfig':myconfig})
     # sched.add_job(work_it_one_day, trigger2, max_instances=10, id='my_job_id_ever',kwargs={'myconfig':myconfig})
@@ -1062,8 +1073,8 @@ if __name__ == '__main__':
     industry_name = myconfig.getValueByDict('industry_info', 'industry_name')
     ssql_helper.get_month_data(time1, today, industry_name)
 
-    p1 = Process(target=java_task, name='java程序')
-    # p2 = Process(target=apscheduler, kwargs={'myconfig': myconfig}, name='定时抓取')
+    # p1 = Process(target=java_task, name='java程序')
+    p2 = Process(target=apscheduler, kwargs={'myconfig': myconfig}, name='定时抓取')
     # p1.start()
     # p2.start()
     # # print("运行结束")
