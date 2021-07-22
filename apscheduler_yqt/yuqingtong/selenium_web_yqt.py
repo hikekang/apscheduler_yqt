@@ -599,6 +599,7 @@ class YQTSpider(object):
         点击每页100条按钮
         :return:
         """
+        # 更换页面进行接下来操作
         self.spider_driver.get("http://yuqing.sina.com/yqmonitor")
         if not self._is_page_loaded():
             logger.info("更改100条数据/每页前，页面加载有问题")
@@ -635,21 +636,21 @@ class YQTSpider(object):
         # 设置时间
         self._adapt_time_interval()
 
-        if self.next_page_num > 1:
-            logger.info(f"直接进入第{self.next_page_num}页")
-            self.spider_driver.find_element_by_xpath(
-                '//input[@class="ant-input ng-untouched ng-pristine ng-valid"]').send_keys(
-                self.next_page_num)
-            time.sleep(0.5)
-            self.spider_driver.find_element_by_xpath('//span[contains(text(),"确定")]').click()
-        if not self._is_page_loaded():
-            logger.info("直接进入第多少页时页面加载出现问题")
-            return False
-        page_num = int(self.spider_driver.find_element_by_xpath('//span[@ng-bind="page"]').text)
-        if int(page_num) != self.next_page_num:
-            logger.warning("页面上当前页面和应该进入的页面不一样，请检查")
-            return False
-        logger.info("进入成功")
+        # if self.next_page_num > 1:
+        #     logger.info(f"直接进入第{self.next_page_num}页")
+        #     self.spider_driver.find_element_by_xpath(
+        #         '//input[@class="ant-input ng-untouched ng-pristine ng-valid"]').send_keys(
+        #         self.next_page_num)
+        #     time.sleep(0.5)
+        #     self.spider_driver.find_element_by_xpath('//span[contains(text(),"确定")]').click()
+        # if not self._is_page_loaded():
+        #     logger.info("直接进入第多少页时页面加载出现问题")
+        #     return False
+        # page_num = int(self.spider_driver.find_element_by_xpath('//span[@ng-bind="page"]').text)
+        # if int(page_num) != self.next_page_num:
+        #     logger.warning("页面上当前页面和应该进入的页面不一样，请检查")
+        #     return False
+        # logger.info("进入成功")
         return True
 
     @property
@@ -894,7 +895,6 @@ class YQTSpider(object):
             self.excludewords = info['excludewords']
             self.C_Id=info['id']
             # 重新设置项目路径
-
             self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                                f"data\{self.project_name}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
                                                f"{self}_{self.info['customer']}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
@@ -935,27 +935,18 @@ def work_it(myconfig, start_time, end_time):
     chromedriver_path = myconfig.getValueByDict('chromerdriver', 'path')
     chrome_service = Service(chromedriver_path)
     chrome_service.start()
-    print("22")
-    # yqt_spider = YQTSpider(infos[0], start_time=start_time, end_time=end_time)
     yqt_spider = YQTSpider(myconfig, start_time=start_time, end_time=end_time)
 
-    p_data = []
     customer_list_data = ssql_helper.get_industry_keywords()
-
-    # project_list = ssql_helper.merger_industry_data(customer_list_data)
-    # for project_data in project_list:
-    #     if project_data['industry_name'] == yqt_spider.industry_name:
-    #         p_data.append(project_data)
-    # logger.info(p_data)
 
     # 根据项目进行抓取，方便统计
     industry_keywords=myconfig.getValueByDict('industry_info','industry_keywords')
-    customer_name=myconfig.getValueByDict('industry_info','project_name')
-    print(customer_name)
+    # 获取项目名字
+    project_name=myconfig.getValueByDict('industry_info','project_name')
     for d in customer_list_data:
         print(d)
         if d['industry_name'] in industry_keywords:
-            if d['customer'] in customer_name:
+            if d['customer'] in project_name:
                 if d['keywords']!='':
                     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=d, is_one_day=False)
                     print("完成一轮")
@@ -1040,15 +1031,14 @@ def apscheduler(myconfig):
     cron_info = myconfig.getDictBySection('cron_info')
     # 日常cron
     trigger1 = my_CronTrigger.from_crontab(cron_info["daily_cron"])
-    # for key,value in cron_info.items():
-    #     cron_info[key]=eval(value)
     tigger_hour = my_CronTrigger.from_crontab(cron_info['hour_cron'])
     # 每天记录
     trigger2 = my_CronTrigger(cron_info['day_record_cron'])
     sched = BlockingScheduler()
     sched.add_job(work_it_hour, trigger1, max_instances=10, id='my_job_id',kwargs={'myconfig':myconfig})
-    # sched.add_job(work_it_one_day, trigger2, max_instances=10, id='my_job_id_ever',kwargs={'myconfig':myconfig})
+    # 每天进行数据补抓一次
     sched.add_job(work_it_one_day, tigger_hour, max_instances=10, id='my_job_id_ever',kwargs={'myconfig':myconfig})
+    # 进行数据从统计
     sched.add_job(ssql_helper.find_day_data_count, trigger2, max_instances=10, id='my_job_id_ever_count',kwargs={'myconfig':myconfig})
     sched.start()
 

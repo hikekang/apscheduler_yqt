@@ -14,22 +14,23 @@ from datetime import datetime
 def test():
     print("测试")
     print(datetime.now())
-cron_1="*/3 * * * *  "
+cron_1="*/2 * * * *"
 
-cron_1="5 */1 * * * * *"
+# cron_1="5 */1 * * * * *"
 # 秒级别任务
-class my_CronTrigger(CronTrigger):
-    @classmethod
-    def my_from_crontab(cls, expr, timezone=None):
-        values = expr.split()
-        if len(values) != 7:
-            raise ValueError('Wrong number of fields; got {}, expected 7'.format(len(values)))
+# class my_CronTrigger(CronTrigger):
+#     @classmethod
+#     def my_from_crontab(cls, expr, timezone=None):
+#         values = expr.split()
+#         if len(values) != 7:
+#             raise ValueError('Wrong number of fields; got {}, expected 7'.format(len(values)))
+#
+#         return cls(second=values[0], minute=values[1], hour=values[2], day=values[3], month=values[4],
+#                    day_of_week=values[5], year=values[6], timezone=timezone)
 
-        return cls(second=values[0], minute=values[1], hour=values[2], day=values[3], month=values[4],
-                   day_of_week=values[5], year=values[6], timezone=timezone)
 
-
-c1=my_CronTrigger.my_from_crontab(cron_1)
+# c1=my_CronTrigger.my_from_crontab(cron_1)
+c1=CronTrigger.from_crontab(cron_1)
 sched=BlockingScheduler()
 sched.add_job(test,c1,max_instances=10,id="hike")
 sched.start()

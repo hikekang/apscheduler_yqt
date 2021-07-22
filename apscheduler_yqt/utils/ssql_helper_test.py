@@ -974,7 +974,7 @@ def sub_class_match_data(info,d):
         match_sub_class_data(i_data, d)
 
 
-def get_month_data(time1, time2, industry_name):
+def get_month_data(time1, time2, industry_name,flushall=False):
     """
 
     :param time1:开始时间
@@ -983,8 +983,8 @@ def get_month_data(time1, time2, industry_name):
     :return:
     """
     myredis = my_redis()
-
-    myredis.redis.flushall()
+    if flushall:
+        myredis.redis.flushall()
     sql = "select industry_id,url from %s where publish_time between '%s' and '%s'" % (
         tables[industry_name], time1, time2)
     datas = db_qbba.execute_query(sql)
@@ -1127,13 +1127,13 @@ def record_day_datas():
                     print(count_source_type)
                     # 舆情通数量待定
                     try:
-                        # sq_tsa=f"select yqt_num from record_log_table where start_time='{date_yesterday}' and end_time='{date_now}' and customer='{data['customer']}'"
-                        # print(sq_tsa)
-                        # if sq_tsa:
-                        #     sql_a=db_qbba.execute_query(sq_tsa)[0][0]
-                        # else:
-                        #     sql_a=0
-                        sql_a=0
+                        sq_tsa=f"select yqt_num from record_log_table where start_time='{date_yesterday}' and end_time='{date_now}' and customer='{data['customer']}'"
+                        print(sq_tsa)
+                        if sq_tsa:
+                            sql_a=db_qbba.execute_query(sq_tsa)[0][0]
+                        else:
+                            sql_a=0
+                        # sql_a=0
                         source_type_list=list(count_source_type.values())
                         print(source_type_list)
                         spide_helper.all_project_save_record_day(outfile,sql_a,sql_num_B,data['customer'],data['industry_name'],source_type_list)
@@ -1152,7 +1152,7 @@ if __name__ == '__main__':
     #     print(d)
     #     print("***"*20)
     for data in get_industry_keywords():
-        pprint(data)
+        print(data)
     # c_d=get_industry_keywords()
     # mao_d=[]
     # for d in c_d:
@@ -1179,8 +1179,3 @@ if __name__ == '__main__':
     # file_name=os.path.join(  os.path.dirname(os.path.abspath(__file__)),f"记录\\" ,f"{datetime.date.today()}.xlsx")
     # print(file_name)
     # record_day_datas()
-    # print(contain_keywords("三联学院","""
-    # 学习好难 被蚊子咬 被桌子磕
-# 合肥·安徽
-# 三联学院
-# 本部"""))

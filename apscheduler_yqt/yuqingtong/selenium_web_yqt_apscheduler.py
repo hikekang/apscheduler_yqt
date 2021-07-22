@@ -1042,10 +1042,11 @@ def work_it_one_day(myconfig):
 def apscheduler(myconfig):
     # 日常cron
     cron_info = myconfig.getDictBySection('cron_info')
+    print(cron_info["daily_cron"])
     trigger1 = CronTrigger.from_crontab(cron_info["daily_cron"])
     tigger_hour = CronTrigger.from_crontab(cron_info['hour_cron'])
     # 每天记录
-    trigger2 = CronTrigger(cron_info['day_record_cron'])
+    trigger2 = CronTrigger.from_crontab(cron_info['day_record_cron'])
 
     sched = BlockingScheduler()
     sched.add_job(work_it_hour, trigger1, max_instances=10, id='my_job_id', kwargs={'myconfig': myconfig})
@@ -1073,7 +1074,7 @@ if __name__ == '__main__':
     time1 = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d')
     myconfig = config.redconfig()
     industry_name = myconfig.getValueByDict('industry_info', 'industry_name')
-    ssql_helper.get_month_data(time1, today, industry_name,flushall=False)
+    # ssql_helper.get_month_data(time1, today, industry_name,flushall=False)
 
     # p1 = Process(target=java_task, name='java程序')
     p2 = Process(target=apscheduler, kwargs={'myconfig': myconfig}, name='定时抓取')
