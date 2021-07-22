@@ -263,7 +263,10 @@ class YQTSpider(object):
                     title = result_a_t_1[1]
                 else:
                     author=''
-                    title=''
+                    if result_a_t_1:
+                        title= result_a_t_1[0]
+                    if result_a_t:
+                        title=result_a_t[0]
             # 行业
             # industry = p.sub("", td_title.xpath('.//div[@class="profile-tip inline-block"]/nz-tag[2]/span/text()')[0])
             # 关键词
@@ -314,8 +317,8 @@ class YQTSpider(object):
             #         data['images']+=item_pic['bmiddlePic']
             # if data['sort'] == '原创':
             #     data['转发内容'] = spread+content+relate_words
-            if len(data['标题']) > 20:
-                data['标题'] = data['标题'][0:20]
+            # if len(data['标题']) > 20:
+            #     data['标题'] = data['标题'][0:20]
             if data['发布人']:
                 if '：' in data['发布人'] or ":" in data['发布人']:
                     publish_man = re.sub(':|：', '', data['发布人'])
@@ -539,15 +542,18 @@ class YQTSpider(object):
         time.sleep(0.2)
         end_input.send_keys(end_time)
         time.sleep(0.2)
+        # condai
         driver.find_element_by_xpath('//span[contains(@ng-click,"confirmTime(1)")]').click()
-        time.sleep(0.2)
-        self.spider_driver.find_element_by_xpath("//input[@id='wb']").click()
-        time.sleep(0.5)
-        self.spider_driver.find_element_by_xpath("//input[@id='wx']").click()
-        time.sleep(0.5)
-        self.spider_driver.find_element_by_xpath("//input[@id='sp']").click()
-        time.sleep(0.5)
-        self.spider_driver.find_element_by_xpath("//input[@id='lt']").click()
+
+        if not eval(self.myconfig.getValueByDict("crawl_condition","all")):
+            time.sleep(0.2)
+            self.spider_driver.find_element_by_xpath("//input[@id='wb']").click()
+            time.sleep(0.5)
+            self.spider_driver.find_element_by_xpath("//input[@id='wx']").click()
+            time.sleep(0.5)
+            self.spider_driver.find_element_by_xpath("//input[@id='sp']").click()
+            time.sleep(0.5)
+            self.spider_driver.find_element_by_xpath("//input[@id='lt']").click()
         time.sleep(0.5)
         print("点击查询")
         driver.find_element_by_xpath("//a[@id='searchListButton']").click()
@@ -856,10 +862,6 @@ class YQTSpider(object):
         keywords.clear()
         keywords.clear()
         time.sleep(0.3)
-        # if self.SimultaneousWord:
-        #     keyword = "({0})+({1})".format(self.keyword, self.SimultaneousWord)
-        # else:
-        #     keyword = self.keyword
         keywords.send_keys(self.info['yqt_keywords'])
         # print(keyword)
         time.sleep(0.3)
@@ -929,27 +931,21 @@ def work_it(myconfig, start_time, end_time):
     chromedriver_path = myconfig.getValueByDict('chromerdriver', 'path')
     chrome_service = Service(chromedriver_path)
     chrome_service.start()
-    print("22")
-    # yqt_spider = YQTSpider(infos[0], start_time=start_time, end_time=end_time)
     yqt_spider = YQTSpider(myconfig, start_time=start_time, end_time=end_time)
 
-    p_data = []
     customer_list_data = ssql_helper.get_industry_keywords()
 
-    # project_list = ssql_helper.merger_industry_data(customer_list_data)
-    # for project_data in project_list:
-    #     if project_data['industry_name'] == yqt_spider.industry_name:
-    #         p_data.append(project_data)
-    # logger.info(p_data)
 
     # 根据项目进行抓取，方便统计
+    # 获取行业名字
     industry_keywords=myconfig.getValueByDict('industry_info','industry_keywords')
-    customer_name=myconfig.getValueByDict('industry_info','project_name')
-    print(customer_name)
+    # 获取项目名字
+    project_name=myconfig.getValueByDict('industry_info','project_name')
+    print(project_name)
     for d in customer_list_data:
         print(d)
         if d['industry_name'] in industry_keywords:
-            if d['customer'] in customer_name:
+            if d['customer'] in project_name:
                 if d['keywords']!='':
                     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=d, is_one_day=False)
                     print("完成一轮")
@@ -962,8 +958,13 @@ def work_it(myconfig, start_time, end_time):
 
 
 def work_it_hour(myconfig):
-    # end_time = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d ") + "00:00:00"
+    """
+    日常抓取
+    :param myconfig:
+    :return:
+    """
     time_info = myconfig.getDictBySection('time_info')
+    # 按分钟进行抓取
     if list(time_info.keys())[0] == 'minutes':
         minutes = int(time_info['minutes'])
         start_time = (datetime.datetime.now() - datetime.timedelta(minutes=minutes)).strftime("%Y-%m-%d %H:%M:%S")
@@ -972,6 +973,7 @@ def work_it_hour(myconfig):
         end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
         print(start_time, end_time)
         work_it(myconfig, start_time, end_time)
+    # 按小时进行抓取
     elif list(time_info.keys())[0] == 'hours':
         end_time = datetime.datetime.now().strftime('%Y-%m-%d %H') + ":00:00"
         hours = int(time_info['hours'])
@@ -980,6 +982,7 @@ def work_it_hour(myconfig):
         end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
         print(start_time, end_time)
         work_it(myconfig, start_time, end_time)
+    #按天进行抓取
     elif list(time_info.keys())[0] == 'days':
         days = int(time_info['days'])
         end_time = (datetime.datetime.now()).strftime("%Y-%m-%d ") + "00:00:00"
@@ -987,53 +990,70 @@ def work_it_hour(myconfig):
         start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
         end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
         work_it(myconfig, start_time, end_time)
+    # 自定义的时间
     elif list(time_info.keys())[0] == 'myself_days':
-        t_1=myconfig.getValueByDict('time_info','start_days')
-        t_2=myconfig.getValueByDict('time_info','end_days')
-        print(t_1)
-        print(t_2)
+        myself_days=eval(myconfig.getValueByDict('time_info','myself_days'))
+        t_1=myself_days[0]
+        t_2=myself_days[1]
+        interval_hour=myself_days[-1]*3600
         # 2021-07-15 00:00:00   1626278400
         #                       1626321600
         #                           43200
-        for i in range(1626796804,1626886800,43200):
-            # start_time = datetime.datetime.strptime(t_1, "%Y-%m-%d %H:%M:%S")
-            start_time_pre = i
-            end_time_pre=i+43200
-            start_time=time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time_pre))
-            end_time=time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time_pre))
-            print(start_time,end_time)
-            work_it(myconfig, start_time, end_time)
+
+        if myself_days[-1]:
+            # -----------------时间循环进行抓取-----------------
+            start_int_time=int(time.mktime(time.strptime(t_1,'%Y-%m-%d %H:%M:%S')))
+            end_int_time=int(time.mktime(time.strptime(t_2,'%Y-%m-%d %H:%M:%S')))
+            if end_int_time-start_int_time>interval_hour:
+                for i in range(start_int_time,end_int_time,interval_hour):
+                    # start_time = datetime.datetime.strptime(t_1, "%Y-%m-%d %H:%M:%S")
+                    start_time_pre = i
+                    end_time_pre=i+interval_hour
+                    start_time=time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time_pre))
+                    end_time=time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time_pre))
+                    print(start_time,end_time)
+                    work_it(myconfig, start_time, end_time)
+            else:
+                work_it(t_1,t_2)
+        else:
+            work_it(t_1, t_2)
 
 
 def work_it_one_day(myconfig):
-    time_info = myconfig.getDictBySection('time_info')
-    if list(time_info.keys())[0] == 'days':
-        days = int(time_info['days'])
-        end_time = (datetime.datetime.now()).strftime("%Y-%m-%d ") + "00:00:00"
-        start_time = (datetime.datetime.now() - datetime.timedelta(days=days)).strftime("%Y-%m-%d ") + "00:00:00"
-        start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-        end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
-        work_it(myconfig,start_time, end_time)
-    else:
-        end_time = (datetime.datetime.now()).strftime("%Y-%m-%d ") + "00:00:00"
-        start_time = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d ") + "00:00:00"
-        start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-        end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
-        work_it(myconfig,start_time, end_time)
+    """
+    补抓前一天的数据
+    从当前时刻 的前一天数据
+    :param myconfig:
+    :return:
+    """
+
+    now_time=int(time.time())*1000
+    day_time_ago=now_time-43200
+    # 一天数据分成3次抓取也就是抓取的间隔时间为4小时
+    for i in range(day_time_ago,now_time,14400):
+        start_time_pre=i
+        end_time_pre=start_time_pre+14400
+        start_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time_pre))
+        end_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time_pre))
+        print(start_time, end_time)
+        work_it(myconfig, start_time, end_time)
 
 
 def apscheduler(myconfig):
-    trigger1 = CronTrigger(minute='*/20', second=00, jitter=5)
+    # 日常cron
     cron_info = myconfig.getDictBySection('cron_info')
-    # for key,value in cron_info.items():
-    #     cron_info[key]=eval(value)
-    tigger_hour = CronTrigger(**cron_info)
-    trigger2 = CronTrigger(hour='0', minute='01', second=00, jitter=5)
+    trigger1 = CronTrigger.from_crontab(cron_info["daily_cron"])
+    tigger_hour = CronTrigger.from_crontab(cron_info['hour_cron'])
+    # 每天记录
+    trigger2 = CronTrigger(cron_info['day_record_cron'])
+
     sched = BlockingScheduler()
-    sched.add_job(work_it_hour, trigger1, max_instances=10, id='my_job_id',kwargs={'myconfig':myconfig})
-    # sched.add_job(work_it_one_day, trigger2, max_instances=10, id='my_job_id_ever',kwargs={'myconfig':myconfig})
-    sched.add_job(work_it_one_day, tigger_hour, max_instances=10, id='my_job_id_ever',kwargs={'myconfig':myconfig})
-    sched.add_job(ssql_helper.find_day_data_count, trigger2, max_instances=10, id='my_job_id_ever_count',kwargs={'myconfig':myconfig})
+    sched.add_job(work_it_hour, trigger1, max_instances=10, id='my_job_id', kwargs={'myconfig': myconfig})
+    # 每天进行数据补抓一次
+    sched.add_job(work_it_one_day, tigger_hour, max_instances=10, id='my_job_id_ever', kwargs={'myconfig': myconfig})
+    # 进行数据从统计
+    sched.add_job(ssql_helper.find_day_data_count, trigger2, max_instances=10, id='my_job_id_ever_count',
+                  kwargs={'myconfig': myconfig})
     sched.start()
 
 
@@ -1050,12 +1070,10 @@ def java_task():
 if __name__ == '__main__':
     # try:
     today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    # time1 = (datetime.datetime.now() - datetime.timedelta(days=3)).strftime('%Y-%m-%d')
     time1 = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d')
     myconfig = config.redconfig()
-    # print("加载数据")
     industry_name = myconfig.getValueByDict('industry_info', 'industry_name')
-    ssql_helper.get_month_data(time1, today, industry_name)
+    ssql_helper.get_month_data(time1, today, industry_name,flushall=False)
 
     # p1 = Process(target=java_task, name='java程序')
     p2 = Process(target=apscheduler, kwargs={'myconfig': myconfig}, name='定时抓取')
@@ -1063,6 +1081,7 @@ if __name__ == '__main__':
     p2.start()
     # # print("运行结束")
     work_it_hour(myconfig)
+
     # print("抓取结束")
     # # except Exception as e:
     # #     my_e = my_Email()
