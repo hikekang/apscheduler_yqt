@@ -48,7 +48,7 @@ from utils.webdriverhelper import MyWebDriver
 from utils.webdriverhelper import WebDriverHelper
 from yuqingtong import config
 # from utils import  ssql_helper
-from utils import ssql_helper_test as ssql_helper
+from utils import qinbaobing_ssql as ssql_helper
 import re
 from selenium.webdriver.chrome.service import Service
 from multiprocessing import Process
@@ -249,6 +249,7 @@ class YQTSpider(object):
             # 针对于文章是标题  针对于微博是作者
             author = td_title.xpath('.//div[contains(@class,"profile-title inline-block")]/a')[0].xpath('string(.)').replace("\n","")
             author_or_title = p.sub("", author)
+            title=''
             if site_name == '新浪微博':
                 author = author_or_title
             else:
@@ -524,8 +525,10 @@ class YQTSpider(object):
         :return: True or Flase
         """
         driver = self.spider_driver
-        start_time = start_time.strftime(config.DATETIME_FORMAT)
-        end_time = end_time.strftime(config.DATETIME_FORMAT)
+        if not isinstance(start_time, str):
+            start_time = start_time.strftime(config.DATETIME_FORMAT)
+        if not isinstance(end_time, str):
+            end_time = end_time.strftime(config.DATETIME_FORMAT)
         print("选择时间")
         driver.find_element_by_xpath('//span[contains(text(),"自定义")]/parent::div').click()
         time.sleep(0.1)
@@ -545,15 +548,13 @@ class YQTSpider(object):
         # condai
         driver.find_element_by_xpath('//span[contains(@ng-click,"confirmTime(1)")]').click()
 
-        if not eval(self.myconfig.getValueByDict("crawl_condition","all")):
-            time.sleep(0.2)
-            self.spider_driver.find_element_by_xpath("//input[@id='wb']").click()
-            time.sleep(0.5)
-            self.spider_driver.find_element_by_xpath("//input[@id='wx']").click()
-            time.sleep(0.5)
-            self.spider_driver.find_element_by_xpath("//input[@id='sp']").click()
-            time.sleep(0.5)
-            self.spider_driver.find_element_by_xpath("//input[@id='lt']").click()
+        for key,value in eval(self.myconfig.getValueByDict("crawl_condition","condition")).items():
+            if key=="all" and value:
+                self.spider_driver.find_element_by_xpath(f"//input[@id='{key}']").click()
+            else:
+                time.sleep(0.2)
+                self.spider_driver.find_element_by_xpath(f"//input[@id='{key}']").click()
+
         time.sleep(0.5)
         print("点击查询")
         driver.find_element_by_xpath("//a[@id='searchListButton']").click()
@@ -661,7 +662,14 @@ class YQTSpider(object):
 
     @property
     def _count_number(self):
-        return int(self.spider_driver.find_element_by_xpath('//span[@ng-bind="originStat.total"]').text)
+        total_number=0
+        for key,value in eval(self.myconfig.getValueByDict("crawl_condition","condition")).items():
+            if key=="all" and value:
+                total_number=int(self.spider_driver.find_element_by_xpath('//span[@ng-bind="originStat.total"]').text)
+            else :
+                total_number+=int(self.spider_driver.find_element_by_xpath(f'//input[@id="{key}"]/parent::div/following-sibling::div[1]/span').text)
+        return total_number
+
     def _is_data_count_outside(self):
         """
         数据量是否超出5000
@@ -992,10 +1000,14 @@ def work_it_hour(myconfig):
         work_it(myconfig, start_time, end_time)
     # 自定义的时间
     elif list(time_info.keys())[0] == 'myself_days':
-        myself_days=eval(myconfig.getValueByDict('time_info','myself_days'))
+        myself_days=eval(eval(myconfig.getValueByDict('time_info','myself_days')))
+        print(myself_days)
+        print(type(myself_days))
         t_1=myself_days[0]
+        print(t_1)
         t_2=myself_days[1]
         interval_hour=myself_days[-1]*3600
+        print(interval_hour)
         # 2021-07-15 00:00:00   1626278400
         #                       1626321600
         #                           43200
@@ -1071,10 +1083,10 @@ def java_task():
 if __name__ == '__main__':
     # try:
     today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    time1 = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d')
+    time1 = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
     myconfig = config.redconfig()
     industry_name = myconfig.getValueByDict('industry_info', 'industry_name')
-    # ssql_helper.get_month_data(time1, today, industry_name,flushall=False)
+    ssql_helper.get_month_data(time1, today, industry_name,flushall=False)
 
     # p1 = Process(target=java_task, name='java程序')
     p2 = Process(target=apscheduler, kwargs={'myconfig': myconfig}, name='定时抓取')
