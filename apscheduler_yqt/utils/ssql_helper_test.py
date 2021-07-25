@@ -12,7 +12,7 @@ import redis
 import re
 import requests
 from utils.email_helper import my_Email
-from utils.ssql_pool_helper import DataBase, config_QBBA, config_QBBB, config_net_TS_A, config_net_QBBA
+from utils.ssql_pool_helper import DataBase, config_QBBA, config_QBBB
 from utils.redis_helper import my_redis
 from tqdm import tqdm
 import uuid
@@ -37,7 +37,6 @@ config = {
 # db_b = DataBase('sqlserver', config_B)
 db_qbba = DataBase('sqlserver', config_QBBA)
 db_qbbb = DataBase('sqlserver', config_QBBB)
-db_net_a = DataBase('sqlserver', config_net_TS_A)
 tables = {
 
     # 1.流通贸易
@@ -77,7 +76,6 @@ tables = {
     "公关传统": "dbo.TS_industry_news_PR",
     "其它": "dbo.TS_industry_news_other",
 }
-db_net_qbba = DataBase('sqlserver', config_net_QBBA)
 
 '''
 优速 流通贸易
@@ -597,9 +595,6 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         requests.get(url=url, proxies=proxies, params=tag_data)
 
 
-    # sql_ts_a_second_data = "insert into TS_Second_Data (id,industry_id,ic_id,keywords_id,url) values (%d,%d,%s,%s,%s)"
-    sql_ts_a = "insert into TS_A." + table_name + " (id,industry_id,title,summary,content,url,author," \
-                                                  "publish_time,emotion_status) values (%d,%d,%s,%s,%s,%s,%s,%s,%s)"
     #     schemas
     sql_qbb_a = "insert into QBB_A." + table_name + "(id,industry_id,title,summary,content,url,author,publish_time," \
                                                     "is_original,location,emotion_status) " \
@@ -1088,10 +1083,11 @@ def record_day_datas():
                     print(data['customer'])
                     sql_qbbb = "select count(*) from TS_DataMerge_Base where C_Id='{0}' and PublishDate_Std " \
                                "between '{2}' and '{1}'".format(data['id'], date_now, date_yesterday)
-                    # print(sql_qbbb)
+                    print(sql_qbbb)
                     sql_num_B=db_qbbb.execute_query(sql_qbbb)[0][0]
                     sql_qbbb_source_type="select source_type,count(*) from QBB_B.dbo.TS_DataMerge_Base  where C_Id='{0}'  and " \
                                          "PublishDate_Std between '{2}' and '{1}' group by source_type".format(data['id'], date_now, date_yesterday)
+                    print(sql_qbbb_source_type)
                     source_type=db_qbbb.execute_query(sql_qbbb_source_type)
                     count_source_type={
                         '网媒':0,
@@ -1178,4 +1174,4 @@ if __name__ == '__main__':
     #     print("匹配成功")
     # file_name=os.path.join(  os.path.dirname(os.path.abspath(__file__)),f"记录\\" ,f"{datetime.date.today()}.xlsx")
     # print(file_name)
-    # record_day_datas()
+    record_day_datas()

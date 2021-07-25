@@ -105,15 +105,19 @@ if __name__ == '__main__':
     myconfig=redconfig()
     # print(myconfig.getValueByDict('yqt_info','username'))
     # print(myconfig.getDictBySection('time_info'))
-    cron_info=myconfig.getDictBySection('cron_info')
-    # for key,value in cron_info.items():
-    #     cron_info[key]=eval(value)
-    tigger1=CronTrigger(**cron_info)
-    print(tigger1.fields)
-    scheduler=BlockingScheduler()
-    scheduler.add_job(print_it,tigger1,max_instances=10,id='212')
-    scheduler.start()
-
+    # cron_info=myconfig.getDictBySection('cron_info')
+    # # for key,value in cron_info.items():
+    # #     cron_info[key]=eval(value)
+    # tigger1=CronTrigger(**cron_info)
+    # print(tigger1.fields)
+    # scheduler=BlockingScheduler()
+    # scheduler.add_job(print_it,tigger1,max_instances=10,id='212')
+    # scheduler.start()
+    test1=eval(myconfig.getValueByDict("crawl_condition", "condition"))
+    print(type(test1))
+    print(test1)
+    for key,value in test1.items():
+        print(key,value)
     # dir_path = os.path.dirname(os.path.dirname(os.path.relpath(__file__)))
     # dir_path=os.path.dirname(os.getcwd())
     # config_xlsx_path = os.path.join(dir_path, r'config.xlsx')

@@ -592,7 +592,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         requests.get(url=url, proxies=proxies, params=tag_data)
 
     #     schemas
-    sql_qbb_a = "insert into QBB_A." + table_name + "(id,industry_id,title,summary,content,url,author,publish_time," \
+    sql_qbb_a = "insert into myQBB_A." + table_name + "(id,industry_id,title,summary,content,url,author,publish_time," \
                                                     "is_original,location,emotion_status) " \
                                                     "values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
 
@@ -915,7 +915,7 @@ def sub_class_match_data(info, d):
     :return:
     """
     sql = "select A.id,C_Id,parent_id,subject_id,classId,ruleContent,homonymWords,exclusionWords from " \
-          "QBB_B.dbo.TS_MonitorSubject as A inner join QBB_B.dbo.TS_MonitorSubject_rules as B " \
+          "myQBB_B.dbo.TS_MonitorSubject as A inner join myQBB_B.dbo.TS_MonitorSubject_rules as B " \
           "on A.id=B.classId where A.subject_id={0} and A.id!={0} and parent_id={0}".format(info['T_Id'])
 
     # 获得当前监测主题下的所有子分类
@@ -933,7 +933,7 @@ def sub_class_match_data(info, d):
         :return:
         """
         sql_sub_class = "select A.id,C_Id,parent_id,subject_id,classId,ruleContent,homonymWords,exclusionWords from " \
-                        "QBB_B.dbo.TS_MonitorSubject as A inner join QBB_B.dbo.TS_MonitorSubject_rules as B " \
+                        "myQBB_B.dbo.TS_MonitorSubject as A inner join myQBB_B.dbo.TS_MonitorSubject_rules as B " \
                         "on A.id=B.classId where A.subject_id={0} and A.id!={0} " \
                         "and parent_id={1}".format(class_info['subject_id'], class_info['A_id'])
         # 查看当前分类下面是否有子分类
@@ -988,7 +988,7 @@ def get_month_data(time1, time2, industry_name, flushall=False):
     for d in tqdm(iterable=datas, desc="加载<%s>数据数据" % industry_name, unit='条'):
         myredis.redis.sadd(d[0], d[1])
 
-    sql = "select * from  QBB_B.dbo.TS_MediumURL where id in (select min(id) as mid from QBB_B.dbo.TS_MediumURL group by (domain))"
+    sql = "select * from  myQBB_B.dbo.TS_MediumURL where id in (select min(id) as mid from QBB_B.dbo.TS_MediumURL group by (domain))"
     data = db_my_qbbb.execute_query(sql)
     for d in tqdm(iterable=data, desc="加载url数据", unit='条'):
         myredis.redis.hset("url", d[3], str(d))
@@ -1111,7 +1111,7 @@ def record_day_datas():
                     for item in source_type:
                         # print(item)
                         # item_ssql=f"select source_type from QBB_B.dbo.TS_MediumURL where {item[0]}=id"
-                        item_ssql = f"select medium_type from QBB_B.dbo.TS_MediumURL where {item[0]}=id"
+                        item_ssql = f"select medium_type from myQBB_B.dbo.TS_MediumURL where {item[0]}=id"
                         item_type = db_my_qbbb.execute_query(item_ssql)
                         sourc_dict = {
                             "1": "网媒",

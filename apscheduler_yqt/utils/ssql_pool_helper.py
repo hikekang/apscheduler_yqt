@@ -45,20 +45,20 @@ config_QBBB = {
     'charset': 'utf8',
     'autocommit': True
 }
-config_net_QBBA = {
-    'host': '192.168.0.77',
+config_myQBB_A = {
+    'host': '223.223.180.10',
     'user': 'sa',
-    'password': '33221100@aA',
-    'database': 'QBB_A',
+    'password': 'amtfamtf@123',
+    'database': 'myQBB_A',
     'port': '1433',
     'charset': 'utf8',
     'autocommit': True
 }
-config_net_TS_A = {
-    'host': '192.168.0.77',
+config_myQBB_B = {
+    'host': '223.223.180.10',
     'user': 'sa',
-    'password': '33221100@aA',
-    'database': 'TS_A',
+    'password': 'amtfamtf@123',
+    'database': 'myQBB_B',
     'port': '1433',
     'charset': 'utf8',
     'autocommit': True

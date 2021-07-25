@@ -48,7 +48,8 @@ from utils.webdriverhelper import MyWebDriver
 from utils.webdriverhelper import WebDriverHelper
 from yuqingtong import config
 # from utils import  ssql_helper
-from utils import qinbaobing_ssql as ssql_helper
+# from utils import qinbaobing_ssql as ssql_helper
+from utils import ssql_helper_test as ssql_helper
 import re
 from selenium.webdriver.chrome.service import Service
 from multiprocessing import Process
@@ -550,10 +551,15 @@ class YQTSpider(object):
 
         for key,value in eval(self.myconfig.getValueByDict("crawl_condition","condition")).items():
             if key=="all" and value:
-                self.spider_driver.find_element_by_xpath(f"//input[@id='{key}']").click()
-            else:
                 time.sleep(0.2)
-                self.spider_driver.find_element_by_xpath(f"//input[@id='{key}']").click()
+                input=self.spider_driver.find_element_by_xpath(f"//input[@id='{key}']")
+                if not input.is_selected():
+                    input.click()
+            elif key!="all" and value:
+                time.sleep(0.2)
+                input = self.spider_driver.find_element_by_xpath(f"//input[@id='{key}']")
+                if not input.is_selected():
+                    input.click()
 
         time.sleep(0.5)
         print("点击查询")
@@ -636,21 +642,21 @@ class YQTSpider(object):
         # 设置时间
         self._adapt_time_interval()
 
-        if self.next_page_num > 1:
-            logger.info(f"直接进入第{self.next_page_num}页")
-            self.spider_driver.find_element_by_xpath(
-                '//input[@class="ant-input ng-untouched ng-pristine ng-valid"]').send_keys(
-                self.next_page_num)
-            time.sleep(0.5)
-            self.spider_driver.find_element_by_xpath('//span[contains(text(),"确定")]').click()
-        if not self._is_page_loaded():
-            logger.info("直接进入第多少页时页面加载出现问题")
-            return False
-        page_num = int(self.spider_driver.find_element_by_xpath('//span[@ng-bind="page"]').text)
-        if int(page_num) != self.next_page_num:
-            logger.warning("页面上当前页面和应该进入的页面不一样，请检查")
-            return False
-        logger.info("进入成功")
+        # if self.next_page_num > 1:
+        #     logger.info(f"直接进入第{self.next_page_num}页")
+        #     self.spider_driver.find_element_by_xpath(
+        #         '//input[@class="ant-input ng-untouched ng-pristine ng-valid"]').send_keys(
+        #         self.next_page_num)
+        #     time.sleep(0.5)
+        #     self.spider_driver.find_element_by_xpath('//span[contains(text(),"确定")]').click()
+        # if not self._is_page_loaded():
+        #     logger.info("直接进入第多少页时页面加载出现问题")
+        #     return False
+        # page_num = int(self.spider_driver.find_element_by_xpath('//span[@ng-bind="page"]').text)
+        # if int(page_num) != self.next_page_num:
+        #     logger.warning("页面上当前页面和应该进入的页面不一样，请检查")
+        #     return False
+        # logger.info("进入成功")
         return True
 
     @property
@@ -666,7 +672,7 @@ class YQTSpider(object):
         for key,value in eval(self.myconfig.getValueByDict("crawl_condition","condition")).items():
             if key=="all" and value:
                 total_number=int(self.spider_driver.find_element_by_xpath('//span[@ng-bind="originStat.total"]').text)
-            else :
+            elif key!="all" and value :
                 total_number+=int(self.spider_driver.find_element_by_xpath(f'//input[@id="{key}"]/parent::div/following-sibling::div[1]/span').text)
         return total_number
 
@@ -853,7 +859,10 @@ class YQTSpider(object):
         关键词修改
         :return:
         """
+        print("更改关键词")
         driver = self.spider_driver
+        # driver.current_url
+        driver.get("http://yuqing.sina.com/staticweb/#/yqmonitor/index/yqpage/yqlist")
         span = driver.find_element_by_xpath('//span[@class="yqt_tree_li act ng-star-inserted"]')
 
         action = ActionChains(driver)
@@ -884,9 +893,9 @@ class YQTSpider(object):
 
     def start(self, start_time, end_time, time_sleep, info, is_one_day):
         # try:
-            # 1.登录
-            if not self._login():
-                raise Exception("登录环节出现问题")
+        #     # 1.登录
+        #     if not self._login():
+        #         raise Exception("登录环节出现问题")
             self.interval = [start_time, end_time]
             self.last_end_time = self.interval[0]
             self.next_end_time = self.interval[1]
@@ -934,12 +943,8 @@ class YQTSpider(object):
 
 
 # 自定义时间抓取任务
-def work_it(myconfig, start_time, end_time):
+def work_it(myconfig, start_time, end_time,yqt_spider):
     # 获取驱动文件路径
-    chromedriver_path = myconfig.getValueByDict('chromerdriver', 'path')
-    chrome_service = Service(chromedriver_path)
-    chrome_service.start()
-    yqt_spider = YQTSpider(myconfig, start_time=start_time, end_time=end_time)
 
     customer_list_data = ssql_helper.get_industry_keywords()
 
@@ -958,14 +963,14 @@ def work_it(myconfig, start_time, end_time):
                     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=d, is_one_day=False)
                     print("完成一轮")
 
-    if yqt_spider.spider_driver.service.is_connectable():
-        print("进入finally2")
-        yqt_spider.spider_driver.close()
-        print("关闭")
-    chrome_service.stop()
+    # if yqt_spider.spider_driver.service.is_connectable():
+    #     print("进入finally2")
+    #     yqt_spider.spider_driver.close()
+    #     print("关闭")
+    # chrome_service.stop()
 
 
-def work_it_hour(myconfig):
+def work_it_hour(myconfig,yqt_spider):
     """
     日常抓取
     :param myconfig:
@@ -980,7 +985,7 @@ def work_it_hour(myconfig):
         end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
         print(start_time, end_time)
-        work_it(myconfig, start_time, end_time)
+        work_it(myconfig, start_time, end_time,yqt_spider)
     # 按小时进行抓取
     elif list(time_info.keys())[0] == 'hours':
         end_time = datetime.datetime.now().strftime('%Y-%m-%d %H') + ":00:00"
@@ -989,7 +994,7 @@ def work_it_hour(myconfig):
         start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
         end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
         print(start_time, end_time)
-        work_it(myconfig, start_time, end_time)
+        work_it(myconfig, start_time, end_time,yqt_spider)
     #按天进行抓取
     elif list(time_info.keys())[0] == 'days':
         days = int(time_info['days'])
@@ -997,7 +1002,7 @@ def work_it_hour(myconfig):
         start_time = (datetime.datetime.now() - datetime.timedelta(days=days)).strftime("%Y-%m-%d ") + "00:00:00"
         start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
         end_time = datetime.datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
-        work_it(myconfig, start_time, end_time)
+        work_it(myconfig, start_time, end_time,yqt_spider)
     # 自定义的时间
     elif list(time_info.keys())[0] == 'myself_days':
         myself_days=eval(eval(myconfig.getValueByDict('time_info','myself_days')))
@@ -1024,14 +1029,14 @@ def work_it_hour(myconfig):
                     start_time=time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time_pre))
                     end_time=time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time_pre))
                     print(start_time,end_time)
-                    work_it(myconfig, start_time, end_time)
+                    work_it(myconfig, start_time, end_time,yqt_spider)
             else:
-                work_it(t_1,t_2)
+                work_it(myconfig,t_1,t_2,yqt_spider)
         else:
-            work_it(t_1, t_2)
+            work_it(myconfig,t_1, t_2,yqt_spider)
 
 
-def work_it_one_day(myconfig):
+def work_it_one_day(myconfig,yqt_spider):
     """
     补抓前一天的数据
     从当前时刻 的前一天数据
@@ -1048,24 +1053,28 @@ def work_it_one_day(myconfig):
         start_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time_pre))
         end_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time_pre))
         print(start_time, end_time)
-        work_it(myconfig, start_time, end_time)
+        work_it(myconfig, start_time, end_time,yqt_spider)
 
 
-def apscheduler(myconfig):
+def apscheduler(myconfig,yqt_spider):
     # 日常cron
+    print("进来")
     cron_info = myconfig.getDictBySection('cron_info')
     print(cron_info["daily_cron"])
     trigger1 = CronTrigger.from_crontab(cron_info["daily_cron"])
     tigger_hour = CronTrigger.from_crontab(cron_info['hour_cron'])
     # 每天记录
     trigger2 = CronTrigger.from_crontab(cron_info['day_record_cron'])
+    trigger3 = CronTrigger.from_crontab(cron_info['word_cron'])
 
     sched = BlockingScheduler()
-    sched.add_job(work_it_hour, trigger1, max_instances=10, id='my_job_id', kwargs={'myconfig': myconfig})
+    sched.add_job(work_it_hour, trigger1, max_instances=10, id='my_job_id', kwargs={'myconfig': myconfig,"yqt_spider":yqt_spider})
     # 每天进行数据补抓一次
-    sched.add_job(work_it_one_day, tigger_hour, max_instances=10, id='my_job_id_ever', kwargs={'myconfig': myconfig})
+    sched.add_job(work_it_one_day, tigger_hour, max_instances=10, id='my_job_id_ever', kwargs={'myconfig': myconfig,"yqt_spider":yqt_spider})
     # 进行数据从统计
     sched.add_job(ssql_helper.find_day_data_count, trigger2, max_instances=10, id='my_job_id_ever_count',
+                  kwargs={'myconfig': myconfig})
+    sched.add_job(ssql_helper.record_day_datas, trigger3, max_instances=10, id='my_job_id_ever_count',
                   kwargs={'myconfig': myconfig})
     sched.start()
 
@@ -1087,13 +1096,22 @@ if __name__ == '__main__':
     myconfig = config.redconfig()
     industry_name = myconfig.getValueByDict('industry_info', 'industry_name')
     ssql_helper.get_month_data(time1, today, industry_name,flushall=False)
-
+    chromedriver_path = myconfig.getValueByDict('chromerdriver', 'path')
+    chrome_service = Service(chromedriver_path)
+    chrome_service.start()
+    yqt_spider = YQTSpider(myconfig)
+    # 1.登录
+    if not yqt_spider._login():
+        raise Exception("登录环节出现问题")
+    else:
+        print("loging_success")
     # p1 = Process(target=java_task, name='java程序')
-    p2 = Process(target=apscheduler, kwargs={'myconfig': myconfig}, name='定时抓取')
+    # p2 = Process(target=apscheduler, kwargs={'myconfig': myconfig}, name='定时抓取')
     # p1.start()
-    p2.start()
+    # p2.start()
     # # print("运行结束")
-    work_it_hour(myconfig)
+    # work_it_hour(myconfig,yqt_spider)
+    apscheduler(myconfig,yqt_spider)
 
     # print("抓取结束")
     # # except Exception as e:
