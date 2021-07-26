@@ -198,22 +198,32 @@ def get_industry_keywords():
                         "simultaneouswords":"",
                         "excludewords":""
                     }
+                    # if da[0]:
+                    #     if da[1]:
+                    #         new_d['keywords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
+                    #         new_d['yqt_keywords'] += "(" + re.sub('、', '|', d_a.encode('latin1').decode('gbk'))
+                    #         project_word['keywords'] += "(" + re.sub('、', '|', d_a.encode('latin1').decode('gbk'))
+                    #     else:
+                    #         new_d['keywords'] += "("+re.sub('、', '|', da[0].encode('latin1').decode('gbk')) + '|'
+                    #         new_d['yqt_keywords'] += "(" + re.sub('、', '|', da[0].encode('latin1').decode('gbk'))
+                    #         project_word['keywords'] += "(" + re.sub('、', '|', da[0].encode('latin1').decode('gbk'))
+
                     for i, d_a in enumerate(da):
+                        # 关键词
                         if d_a and i == 0:
                             new_d['keywords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
                             # new_d['keywords'] += re.sub('、', '|', d_a) + '|'
                             new_d['yqt_keywords']+="("+re.sub('、', '|', d_a.encode('latin1').decode('gbk'))
                             project_word['keywords']+="("+re.sub('、', '|', d_a.encode('latin1').decode('gbk'))
-
-                        # if d_a and i == 2:
+                        # 排除词
                         if d_a and i == 2:
                             new_d['excludewords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
                             project_word['excludewords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
                             # new_d['excludewords'] += re.sub('、', '|', d_a) + '|'
-
+                        # 同现词
                         if d_a and i == 1:
                             new_d['simultaneouswords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
-                            new_d['yqt_keywords'] += "+("+re.sub('、', '|', d_a.encode('latin1').decode('gbk')) +"))|"
+                            new_d['yqt_keywords'] = new_d['yqt_keywords']+")+("+re.sub('、', '|', d_a.encode('latin1').decode('gbk')) +"))|"
                             project_word['keywords'] += "+("+re.sub('、', '|', d_a.encode('latin1').decode('gbk')) +"))"
                             # new_d['simultaneouswords'] += re.sub('、', '|', d_a) + '|'
                         elif d_a==None and i==1:
@@ -1148,7 +1158,8 @@ if __name__ == '__main__':
     #     print(d)
     #     print("***"*20)
     for data in get_industry_keywords():
-        print(data)
+        if data['customer']=='柯尼卡':
+            pprint(data)
     # c_d=get_industry_keywords()
     # mao_d=[]
     # for d in c_d:
@@ -1174,4 +1185,4 @@ if __name__ == '__main__':
     #     print("匹配成功")
     # file_name=os.path.join(  os.path.dirname(os.path.abspath(__file__)),f"记录\\" ,f"{datetime.date.today()}.xlsx")
     # print(file_name)
-    record_day_datas()
+    # record_day_datas()
