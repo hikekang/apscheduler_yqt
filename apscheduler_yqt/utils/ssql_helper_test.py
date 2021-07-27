@@ -211,9 +211,9 @@ def get_industry_keywords():
                     for i, d_a in enumerate(da):
                         # 关键词
                         if d_a and i == 0:
-                            new_d['keywords'] += re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
+                            new_d['keywords']+= re.sub('、', '|', d_a.encode('latin1').decode('gbk')) + '|'
                             # new_d['keywords'] += re.sub('、', '|', d_a) + '|'
-                            new_d['yqt_keywords']+="("+re.sub('、', '|', d_a.encode('latin1').decode('gbk'))
+                            new_d['yqt_keywords']+="(("+re.sub('、', '|', d_a.encode('latin1').decode('gbk'))
                             project_word['keywords']+="("+re.sub('、', '|', d_a.encode('latin1').decode('gbk'))
                         # 排除词
                         if d_a and i == 2:
@@ -227,7 +227,7 @@ def get_industry_keywords():
                             project_word['keywords'] += "+("+re.sub('、', '|', d_a.encode('latin1').decode('gbk')) +"))"
                             # new_d['simultaneouswords'] += re.sub('、', '|', d_a) + '|'
                         elif d_a==None and i==1:
-                            new_d['yqt_keywords']+=")|"
+                            new_d['yqt_keywords']+="))|"
                             project_word['keywords'] +="))"
                         # project_word['keywords']+=')'
                     new_d['project_words'].append(project_word)
@@ -1080,7 +1080,7 @@ def record_day_datas():
     project_name=eval(mycon.getValueByDict('spider_config','project_name'))
     print(project_name)
     # outfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"记录\\", f"{datetime.date.today()}.xlsx")
-    for i in range(0,1):
+    for i in range(0,4):
         date_now = (datetime.datetime.now()- datetime.timedelta(days=i)).strftime('%Y-%m-%d 00:00:00')
         date_yesterday = (datetime.datetime.now() - datetime.timedelta(days=i+1)).strftime("%Y-%m-%d 00:00:00")
         record_time=(datetime.datetime.now() - datetime.timedelta(days=i+1)).strftime("%Y-%m-%d")
@@ -1091,8 +1091,9 @@ def record_day_datas():
             for item in project_name:
                 if data['customer'] == item:
                     print(data['customer'])
-                    sql_qbbb = "select count(*) from TS_DataMerge_Base where C_Id='{0}' and PublishDate_Std " \
-                               "between '{2}' and '{1}'".format(data['id'], date_now, date_yesterday)
+                    sql_qbbb = """
+                        select sum (url_count) from (select count(*) as url_count from 
+                        TS_DataMerge_Base where C_Id='{0}' and PublishDate_Std between '{2}' and '{1}') as temp""".format(data['id'], date_now, date_yesterday)
                     print(sql_qbbb)
                     sql_num_B=db_qbbb.execute_query(sql_qbbb)[0][0]
                     sql_qbbb_source_type="select source_type,count(*) from QBB_B.dbo.TS_DataMerge_Base  where C_Id='{0}'  and " \
@@ -1132,19 +1133,20 @@ def record_day_datas():
                             count_source_type[sourc_dict[str(item_type[0][0])]]+=item[-1]
                     print(count_source_type)
                     # 舆情通数量待定
+
+                    sq_tsa=f"select yqt_num from record_log_table where start_time='{date_yesterday}' and end_time='{date_now}' and customer='{data['customer']}'"
+                    print(sq_tsa)
                     try:
-                        sq_tsa=f"select yqt_num from record_log_table where start_time='{date_yesterday}' and end_time='{date_now}' and customer='{data['customer']}'"
-                        print(sq_tsa)
                         if sq_tsa:
                             sql_a=db_qbba.execute_query(sq_tsa)[0][0]
-                        else:
-                            sql_a=0
-                        # sql_a=0
-                        source_type_list=list(count_source_type.values())
-                        print(source_type_list)
-                        spide_helper.all_project_save_record_day(outfile,sql_a,sql_num_B,data['customer'],data['industry_name'],source_type_list)
                     except Exception as e:
                         print(e)
+                        sql_a=0
+                    # sql_a=0
+                    source_type_list=list(count_source_type.values())
+                    print(source_type_list)
+                    spide_helper.all_project_save_record_day(outfile,sql_a,sql_num_B,data['customer'],data['industry_name'],source_type_list)
+
 
 
 if __name__ == '__main__':
@@ -1158,8 +1160,8 @@ if __name__ == '__main__':
     #     print(d)
     #     print("***"*20)
     for data in get_industry_keywords():
-        if data['customer']=='柯尼卡':
-            pprint(data)
+        # if data['customer']=='柯尼卡':
+        pprint(data)
     # c_d=get_industry_keywords()
     # mao_d=[]
     # for d in c_d:
