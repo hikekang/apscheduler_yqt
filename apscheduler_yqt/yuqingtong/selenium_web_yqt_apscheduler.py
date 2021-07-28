@@ -259,10 +259,10 @@ class YQTSpider(object):
 
                 if len(result_a_t) >= 2 :
                     author = result_a_t[0]
-                    title=result_a_t[1]
+                    title=''.join(result_a_t[1:])
                 elif len(result_a_t_1)>=2:
                     author = result_a_t_1[0]
-                    title = result_a_t_1[1]
+                    title = ''.join(result_a_t_1[1:])
                 else:
                     author=''
                     if result_a_t_1:

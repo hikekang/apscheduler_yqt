@@ -587,13 +587,9 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         # post_data_list_event_2_1.append(post_data)
         # 更新redis
         myredis.redis.sadd(industry_id, data['链接'])
-        tuple_data_ts_a = (
-            id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
-            data['positive_prob_number'])
 
         tuple_data_qbb_a = (id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
             data['is_original'], data['area'], data['positive_prob_number'])
-        tuple_data_list_ts_a.append(tuple_data_ts_a)
 
         tuple_data_list_qbb_a.append(tuple_data_qbb_a)
         tag_data = {
@@ -1080,7 +1076,7 @@ def record_day_datas():
     project_name=eval(mycon.getValueByDict('spider_config','project_name'))
     print(project_name)
     # outfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"记录\\", f"{datetime.date.today()}.xlsx")
-    for i in range(0,4):
+    for i in range(0,1):
         date_now = (datetime.datetime.now()- datetime.timedelta(days=i)).strftime('%Y-%m-%d 00:00:00')
         date_yesterday = (datetime.datetime.now() - datetime.timedelta(days=i+1)).strftime("%Y-%m-%d 00:00:00")
         record_time=(datetime.datetime.now() - datetime.timedelta(days=i+1)).strftime("%Y-%m-%d")
@@ -1160,7 +1156,7 @@ if __name__ == '__main__':
     #     print(d)
     #     print("***"*20)
     for data in get_industry_keywords():
-        # if data['customer']=='柯尼卡':
+    #     # if data['customer']=='柯尼卡':
         pprint(data)
     # c_d=get_industry_keywords()
     # mao_d=[]
@@ -1187,4 +1183,4 @@ if __name__ == '__main__':
     #     print("匹配成功")
     # file_name=os.path.join(  os.path.dirname(os.path.abspath(__file__)),f"记录\\" ,f"{datetime.date.today()}.xlsx")
     # print(file_name)
-    # record_day_datas()
+    record_day_datas()

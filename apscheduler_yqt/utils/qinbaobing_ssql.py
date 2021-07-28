@@ -574,13 +574,9 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         # post_data_list_event_2_1.append(post_data)
         # 更新redis
         myredis.redis.sadd(industry_id, data['链接'])
-        tuple_data_ts_a = (
-            id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
-            data['positive_prob_number'])
 
         tuple_data_qbb_a = (id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
                             data['is_original'], data['area'], data['positive_prob_number'])
-        tuple_data_list_ts_a.append(tuple_data_ts_a)
 
         tuple_data_list_qbb_a.append(tuple_data_qbb_a)
         tag_data = {
@@ -843,6 +839,18 @@ def mark_java_match_data(d, theam_list):
                 'message': str({"sN": d['SN'], "cId": d['C_Id']})
             }
             requests.get(url=url, proxies=proxies, params=tag_data)
+            # TODO 相似新闻处理
+            # a_week_ago_date=item_dict['PublishDate_Std'].strftime("%Y-%m-%d %H:%M:%S")
+            a_week_ago_date=datetime.datetime.strftime(item_dict['PublishDate_Std'],"%Y-%m-%d %H:%M:%S")-datetime.timedelta(datas=30).strftime('%Y-%m-%d %H:%M:%S')
+
+            similar_news_sql=f"select SN from TS_DataMerge_Base where Title like '%{item_dict['Title']}%' " \
+                             f"and PublishDate_Std between {item_dict['PublishDate_Std']} and {a_week_ago_date} order by PublishDate_Std asc"
+            similar_result=db_my_qbbb.execute_query(similar_news_sql)
+            if len(similar_result)>1:
+                for item in similar_result[1:]:
+                    similar_update_sql=f"update TS_DataMerge_Base set group_SN='{similar_result[0]}' where sn='{item[0]}'"
+                    db_my_qbbb.execute(similar_update_sql)
+
             # 数据插入B库
             sql_of_base = 'insert into TS_DataMerge_Base ({}) values ({})'. \
                 format(",".join(iisql.keys()), ",".join(['%s'] * len(iisql.keys())))
