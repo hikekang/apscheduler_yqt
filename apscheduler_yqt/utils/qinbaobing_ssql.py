@@ -841,10 +841,10 @@ def mark_java_match_data(d, theam_list):
             requests.get(url=url, proxies=proxies, params=tag_data)
             # TODO 相似新闻处理
             # a_week_ago_date=item_dict['PublishDate_Std'].strftime("%Y-%m-%d %H:%M:%S")
-            a_week_ago_date=datetime.datetime.strftime(item_dict['PublishDate_Std'],"%Y-%m-%d %H:%M:%S")-datetime.timedelta(datas=30).strftime('%Y-%m-%d %H:%M:%S')
+            a_month_ago_date=datetime.datetime.strftime(item_dict['PublishDate_Std'],"%Y-%m-%d %H:%M:%S")-datetime.timedelta(days=30).strftime('%Y-%m-%d %H:%M:%S')
 
             similar_news_sql=f"select SN from TS_DataMerge_Base where Title like '%{item_dict['Title']}%' " \
-                             f"and PublishDate_Std between {item_dict['PublishDate_Std']} and {a_week_ago_date} order by PublishDate_Std asc"
+                             f"and PublishDate_Std between {item_dict['PublishDate_Std']} and {a_month_ago_date} order by PublishDate_Std asc"
             similar_result=db_my_qbbb.execute_query(similar_news_sql)
             if len(similar_result)>1:
                 for item in similar_result[1:]:

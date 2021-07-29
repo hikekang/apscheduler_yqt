@@ -110,57 +110,69 @@ class YQTSpider(object):
     def __str__(self):
         return "舆情通"
 
-    def _login(self, count=1):
+    def _login(self, count=1,cookie_login=False):
         """
         登录
         :return: True OR False
         """
+        logger.info(f"开始登录....{count}")
         driver = self.spider_driver
         if count > 10:
             logger.warning("登录次数超过10次,请检查登录流程")
             return False
+        if cookie_login:
+            with open('cookie.json', "r") as f:
+                cookie_list = eval(f.read())
+            driver.get('http://yuqing.sina.com/yqMonitor')
+            for cookie in cookie_list:
+                driver.add_cookie(cookie)
+            driver.get('http://yuqing.sina.com/yqMonitor')
+        else:
 
-        logger.info(f"开始登录....{count}")
-        driver.get("http://yuqing.sina.com/staticweb/#/login/login")
-        username = driver.find_element_by_xpath("//input[@formcontrolname='userName']")
-        password = driver.find_element_by_xpath("//input[@formcontrolname='password']")
-        yqzcode = driver.find_element_by_xpath("//input[@formcontrolname='yqzcode']")
+            driver.get("http://yuqing.sina.com/staticweb/#/login/login")
+            username = driver.find_element_by_xpath("//input[@formcontrolname='userName']")
+            password = driver.find_element_by_xpath("//input[@formcontrolname='password']")
+            yqzcode = driver.find_element_by_xpath("//input[@formcontrolname='yqzcode']")
 
-        submit_buttion = driver.find_element_by_xpath("//button[contains(@class,'login-form-button')]")
+            submit_buttion = driver.find_element_by_xpath("//button[contains(@class,'login-form-button')]")
 
-        # username.send_keys(self.info['yuqingtong_username'])
-        username.send_keys(self.myconfig.getValueByDict('yqt_info', 'username'))
-        # password.send_keys(self.info['yuqingtong_password'])
-        password.send_keys(self.myconfig.getValueByDict('yqt_info', 'pwd'))
+            # username.send_keys(self.info['yuqingtong_username'])
+            username.send_keys(self.myconfig.getValueByDict('yqt_info', 'username'))
+            # password.send_keys(self.info['yuqingtong_password'])
+            password.send_keys(self.myconfig.getValueByDict('yqt_info', 'pwd'))
 
-        logger.info("获取验证码....")
-        while 1:
-            code_img = None
-            try:
-                code_img = self.wait.until(
-                    EC.presence_of_element_located((By.XPATH, "//img[contains(@src,'validate/image')]")))
-            except TimeoutException:
-                pass
+            logger.info("获取验证码....")
+            while 1:
+                code_img = None
+                try:
+                    code_img = self.wait.until(
+                        EC.presence_of_element_located((By.XPATH, "//img[contains(@src,'validate/image')]")))
+                except TimeoutException:
+                    pass
 
-            if code_img and code_img.size.get("width") > 0:
-                break
-            logger.info("验证码图片没加载出来，刷新...")
-            driver.refresh()
-        code_img_base64 = code_img.screenshot_as_base64
-        code = SpiderHelper.recognise_code(code_img_base64, self.myconfig)
-        logger.info(f"获取验证码:{code}")
-        if not code:
-            code = "1234hi"
+                if code_img and code_img.size.get("width") > 0:
+                    break
+                logger.info("验证码图片没加载出来，刷新...")
+                driver.refresh()
+            code_img_base64 = code_img.screenshot_as_base64
+            code = SpiderHelper.recognise_code(code_img_base64, self.myconfig)
+            logger.info(f"获取验证码:{code}")
+            if not code:
+                code = "1234hi"
 
-        yqzcode.send_keys(code)
-        time.sleep(0.2)
-        submit_buttion.click()
+            yqzcode.send_keys(code)
+            time.sleep(0.2)
+            submit_buttion.click()
 
         try:
             wait = self.wait.until(
                 EC.invisibility_of_element_located((By.XPATH, "//input[@formcontrolname='userName']")))
             print(wait)
             print("登录成功")
+            cookies=driver.get_cookies()
+            if cookie_login==False:
+                with open('cookie.json',"w+") as f:
+                    f.write(str(cookies))
             return True
         except Exception as e:
             logger.warning(e)
@@ -1095,13 +1107,16 @@ if __name__ == '__main__':
     time1 = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
     myconfig = config.redconfig()
     industry_name = myconfig.getValueByDict('industry_info', 'industry_name')
-    ssql_helper.get_month_data(time1, today, industry_name,flushall=False)
+
+    # ssql_helper.get_month_data(time1, today, industry_name,flushall=False)
+
     chromedriver_path = myconfig.getValueByDict('chromerdriver', 'path')
+
     chrome_service = Service(chromedriver_path)
     chrome_service.start()
     yqt_spider = YQTSpider(myconfig)
     # 1.登录
-    if not yqt_spider._login():
+    if not yqt_spider._login(cookie_login=True):
         raise Exception("登录环节出现问题")
     else:
         print("loging_success")
