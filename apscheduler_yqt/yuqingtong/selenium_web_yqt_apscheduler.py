@@ -310,8 +310,8 @@ class YQTSpider(object):
             title_time = parse_time(td_time)
             print(author,attitude,title_time)
             highpoints = re.compile(u'[\U00010000-\U0010ffff]')
-            title=highpoints.sub(u'', title)
-            content=highpoints.sub(u'', content)
+            title=highpoints.sub(u'', title).replace(" ","")
+            content=highpoints.sub(u'', content).replace(" ","")
             source_url=td_title.xpath('.//div[@class="btn-group inline-block"]/ul/li[4]/a/@href')[0]
             data = {
                 '时间': title_time,
