@@ -880,8 +880,8 @@ class YQTSpider(object):
         driver = self.spider_driver
         # driver.current_url
         driver.get("http://yuqing.sina.com/staticweb/#/yqmonitor/index/yqpage/yqlist")
+        driver.implicitly_wait(10)
         span = driver.find_element_by_xpath('//span[@class="yqt_tree_li act ng-star-inserted"]')
-
         action = ActionChains(driver)
         time.sleep(1)
         # 移动到该元素
@@ -970,10 +970,10 @@ def work_it(myconfig, start_time, end_time,yqt_spider):
     # 获取行业名字
     industry_keywords=myconfig.getValueByDict('industry_info','industry_keywords')
     # 获取项目名字
-    project_name=myconfig.getValueByDict('industry_info','project_name')
+    project_name=eval(myconfig.getValueByDict("industry_info", "project_name"))
     print(project_name)
     for d in customer_list_data:
-        print(d)
+        print(d['customer'])
         if d['industry_name'] in industry_keywords:
             if d['customer'] in project_name:
                 if d['keywords']!='':
@@ -1116,7 +1116,7 @@ if __name__ == '__main__':
     myconfig = config.redconfig()
     industry_name = myconfig.getValueByDict('industry_info', 'industry_name')
 
-    # ssql_helper.get_month_data(time1, today, industry_name,flushall=False)
+    ssql_helper.get_month_data(time1, today, industry_name,flushall=False)
 
     chromedriver_path = myconfig.getValueByDict('chromerdriver', 'path')
 
@@ -1133,8 +1133,8 @@ if __name__ == '__main__':
     # p1.start()
     # p2.start()
     # # print("运行结束")
-    # work_it_hour(myconfig,yqt_spider)
-    apscheduler(myconfig,yqt_spider)
+    work_it_hour(myconfig,yqt_spider)
+    # apscheduler(myconfig,yqt_spider)
 
     # print("抓取结束")
     # # except Exception as e:
