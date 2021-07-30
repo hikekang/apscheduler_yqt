@@ -128,7 +128,6 @@ class YQTSpider(object):
                 driver.add_cookie(cookie)
             driver.get('http://yuqing.sina.com/yqMonitor')
         else:
-
             driver.get("http://yuqing.sina.com/staticweb/#/login/login")
             username = driver.find_element_by_xpath("//input[@formcontrolname='userName']")
             password = driver.find_element_by_xpath("//input[@formcontrolname='password']")
@@ -568,10 +567,16 @@ class YQTSpider(object):
                 if not input.is_selected():
                     input.click()
             elif key!="all" and value:
-                time.sleep(0.2)
-                input = self.spider_driver.find_element_by_xpath(f"//input[@id='{key}']")
-                if not input.is_selected():
-                    input.click()
+                if value:
+                    time.sleep(0.2)
+                    input = self.spider_driver.find_element_by_xpath(f"//input[@id='{key}']")
+                    if not input.is_selected():
+                        input.click()
+                else:
+                    time.sleep(0.2)
+                    input = self.spider_driver.find_element_by_xpath(f"//input[@id='{key}']")
+                    if input.is_selected():
+                        input.click()
 
         time.sleep(0.5)
         print("点击查询")
@@ -1079,6 +1084,8 @@ def apscheduler(myconfig,yqt_spider):
     trigger2 = CronTrigger.from_crontab(cron_info['day_record_cron'])
     trigger3 = CronTrigger.from_crontab(cron_info['word_cron'])
 
+    trigger4 = CronTrigger.from_crontab(cron_info['login_cron'])
+
     sched = BlockingScheduler()
     sched.add_job(work_it_hour, trigger1, max_instances=10, id='my_job_id', kwargs={'myconfig': myconfig,"yqt_spider":yqt_spider})
     # 每天进行数据补抓一次
@@ -1088,6 +1095,7 @@ def apscheduler(myconfig,yqt_spider):
                   kwargs={'myconfig': myconfig})
     sched.add_job(ssql_helper.record_day_datas, trigger3, max_instances=10, id='my_job_id_ever_count',
                   kwargs={'myconfig': myconfig})
+    sched.add_job(yqt_spider._login, trigger4, max_instances=10, id='my_job_id_everday_login')
     sched.start()
 
 
