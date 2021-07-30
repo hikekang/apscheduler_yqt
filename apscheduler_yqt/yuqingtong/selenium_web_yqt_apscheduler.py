@@ -566,7 +566,7 @@ class YQTSpider(object):
                 input=self.spider_driver.find_element_by_xpath(f"//input[@id='{key}']")
                 if not input.is_selected():
                     input.click()
-            elif key!="all" and value:
+            elif key!="all":
                 if value:
                     time.sleep(0.2)
                     input = self.spider_driver.find_element_by_xpath(f"//input[@id='{key}']")
