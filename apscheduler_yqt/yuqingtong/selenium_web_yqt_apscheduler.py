@@ -240,11 +240,16 @@ class YQTSpider(object):
 
             # 转发类型  原创 有一部分是没有的 在这里只进行微博的判断
             if site_name=="新浪微博":
-                sort_1 = td_title.xpath('.//span[contains(@ng,"icc.repostsFlg!=0")]/text()')
-                if len(sort_1) > 0:
-                    sort = p.sub("", sort_1[0])
-                else:
+                # sort_1 = td_title.xpath('.//span[contains(@ng-if,"icc.repostsFlg!=0")]/text()')
+                sort_1 = td_title.xpath('.//span[contains(@ng-if,"icc.repostsFlg")]')[0].get('ng-if')
+                if sort_1=="icc.repostsFlg==0":
                     sort = "原创"
+                else:
+                    sort = "转发"
+                # if len(sort_1) > 0:
+                #     sort = p.sub("", sort_1[0])
+                # else:
+                #     sort = "原创"
             else:
                 sort="原创"
 
@@ -313,6 +318,7 @@ class YQTSpider(object):
             title=highpoints.sub(u'', title).replace(" ","")
             content=highpoints.sub(u'', content).replace(" ","")
             source_url=td_title.xpath('.//div[@class="btn-group inline-block"]/ul/li[4]/a/@href')[0]
+            print("转发原创类型：", sort, source_url)
             data = {
                 '时间': title_time,
                 '标题': title if title!='' else content,
@@ -327,6 +333,7 @@ class YQTSpider(object):
                 'area': p.sub("", td_orgin.xpath('.//div[contains(@ng-if,"icc.province!")]')[0].text),
                 'C_Id': self.info['id']  # 客户id
             }
+
             # if item['forwarderImages']:
             #     for item_pic in item['forwarderImages']:
             #         data['images']+=item_pic['bmiddlePic']
@@ -406,6 +413,11 @@ class YQTSpider(object):
             if "微博" in data['site_name']:
                 # print("处理标题")
                 data['标题'] =data['描述'][0:20]
+                if data['sort']=='转发':
+                    if len(data["转发内容"]) >= 120:
+                        data['描述'] = data['转发内容'][0:120]
+                    else:
+                        data['描述'] = data['转发内容']
             if len(data['描述']) > 120:
                 # print("处理描述")
                 data['描述'] = data['描述'][0:120]
