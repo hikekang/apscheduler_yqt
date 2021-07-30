@@ -685,11 +685,11 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         mark_java_match_data(d, thream_info_list)
         print("完成")
 
-    with ThreadPoolExecutor(4) as pool:
-        for index, d in enumerate(data_list):
-            pool.submit(load_data, index, d)
-    # for index, d in enumerate(data_list):
-    #     load_data(index, d)
+    # with ThreadPoolExecutor(4) as pool:
+    #     for index, d in enumerate(data_list):
+    #         pool.submit(load_data, index, d)
+    for index, d in enumerate(data_list):
+        load_data(index, d)
     myredis.close()
     # post_mq.close_mq()
 
@@ -714,13 +714,15 @@ def match_insert_alone_data(data, info, T_id):
             "msNodeid": data['subject_id'],
             "publishDate": data['时间']
         }
-        proxies = {'http': None, 'https': None}
-        similar_data = {
-            'queues': 'qbb.task.msg.similar_2.1',
-            'message': str(post_data)
-        }
-        url = 'http://localhost:8090/jms/send'
-        requests.get(url=url, proxies=proxies, params=similar_data)
+
+        # proxies = {'http': None, 'https': None}
+        # similar_data = {
+        #     'queues': 'qbb.task.msg.similar_2.1',
+        #     'message': str(post_data)
+        # }
+        # url = 'http://localhost:8090/jms/send'
+        # requests.get(url=url, proxies=proxies, params=similar_data)
+
         insert_b_data = ((data['C_Id'], data['SN'], T_id, 0, 0, 0))
         sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map " \
                                              "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort) " \
@@ -736,13 +738,13 @@ def match_insert_alone_data(data, info, T_id):
             "msNodeid": data['class_id'][0],  # 对应分类的id多分类时只发送⼀次即可，分类ID取not_first_sort=0时的数据
             "publishDate": data['时间']
         }
-        proxies = {'http': None, 'https': None}
-        similar_data = {
-            'queues': 'qbb.task.msg.similar_2.1',
-            'message': str(post_data)
-        }
-        url = 'http://localhost:8090/jms/send'
-        requests.get(url=url, proxies=proxies, params=similar_data)
+        # proxies = {'http': None, 'https': None}
+        # similar_data = {
+        #     'queues': 'qbb.task.msg.similar_2.1',
+        #     'message': str(post_data)
+        # }
+        # url = 'http://localhost:8090/jms/send'
+        # requests.get(url=url, proxies=proxies, params=similar_data)
         # post_mq.send_to_queue('qbb.task.msg.similar_2.1', str(post_data))
         # 进行了一次匹配
         if len(data['class_id']) == 1:
@@ -839,23 +841,25 @@ def mark_java_match_data(d, theam_list):
                 'message': str({"sN": d['SN'], "cId": d['C_Id']})
             }
             requests.get(url=url, proxies=proxies, params=tag_data)
-            # TODO 相似新闻处理
-            # a_week_ago_date=item_dict['PublishDate_Std'].strftime("%Y-%m-%d %H:%M:%S")
-            a_month_ago_date=datetime.datetime.strftime(item_dict['PublishDate_Std'],"%Y-%m-%d %H:%M:%S")-datetime.timedelta(days=30).strftime('%Y-%m-%d %H:%M:%S')
 
-            similar_news_sql=f"select SN from TS_DataMerge_Base where Title like '%{item_dict['Title']}%' " \
-                             f"and PublishDate_Std between {item_dict['PublishDate_Std']} and {a_month_ago_date} order by PublishDate_Std asc"
-            similar_result=db_my_qbbb.execute_query(similar_news_sql)
-            if len(similar_result)>1:
-                for item in similar_result[1:]:
-                    similar_update_sql=f"update TS_DataMerge_Base set group_SN='{similar_result[0]}' where sn='{item[0]}'"
-                    db_my_qbbb.execute(similar_update_sql)
 
             # 数据插入B库
             sql_of_base = 'insert into TS_DataMerge_Base ({}) values ({})'. \
                 format(",".join(iisql.keys()), ",".join(['%s'] * len(iisql.keys())))
             db_my_qbbb.execute(sql_of_base, tuple(item_dict.values()))
 
+            # TODO 相似新闻处理
+            t2 = datetime.datetime.strptime(item_dict['PublishDate_Std'], '%Y-%m-%d %H:%M:%S')
+            a_month_ago_date = (t2 - datetime.timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
+
+            similar_news_sql = f"select SN from TS_DataMerge_Base where Title like '%{item_dict['Title']}%' " \
+                               f"and PublishDate_Std between '{item_dict['PublishDate_Std']}' and '{a_month_ago_date}' order by PublishDate_Std asc"
+            similar_result = db_my_qbbb.execute_query(similar_news_sql)
+            if len(similar_result) > 1:
+                print("相似新闻匹配")
+                for item in similar_result[1:]:
+                    similar_update_sql = f"update TS_DataMerge_Base set group_SN='{similar_result[0]}' where sn='{item[0]}'"
+                    db_my_qbbb.execute(similar_update_sql)
             if info['keywords'] != '':
                 if info['excludewords'] == '' and info['simultaneouswords'] == '':
                     if contain_keywords(info['keywords'], match_data):
