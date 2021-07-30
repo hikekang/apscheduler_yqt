@@ -309,7 +309,9 @@ class YQTSpider(object):
             attitude = p.sub("", td_title.xpath('.//div[contains(@class,"sensitive-status-content") and not(contains(@class,"ng-hide"))]')[0].xpath(".//span")[0].text)
             title_time = parse_time(td_time)
             print(author,attitude,title_time)
-
+            highpoints = re.compile(u'[\U00010000-\U0010ffff]')
+            title=highpoints.sub(u'', title)
+            content=highpoints.sub(u'', content)
             source_url=td_title.xpath('.//div[@class="btn-group inline-block"]/ul/li[4]/a/@href')[0]
             data = {
                 '时间': title_time,
