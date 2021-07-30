@@ -855,11 +855,11 @@ def mark_java_match_data(d,theam_list):
                 format(",".join(iisql.keys()), ",".join(['%s'] * len(iisql.keys())))
             db_qbbb.execute(sql_of_base, tuple(item_dict.values()))
             t2 = datetime.datetime.strptime(item_dict['PublishDate_Std'], '%Y-%m-%d %H:%M:%S')
-            a_month_ago_date = (t2 - datetime.timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
+            a_month_ago_date = (t2 - datetime.timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
 
-            similar_news_sql = f"select SN from TS_DataMerge_Base where Title ='{item_dict['Title']}' " \
+            similar_news_sql = f"select SN from TS_DataMerge_Base where Title ='{item_dict['Title']}' with (NOLOCK)  " \
                                f"and PublishDate_Std between '{a_month_ago_date}' and '{item_dict['PublishDate_Std']}' " \
-                               f"and C_Id='{item_dict['C_Id']}'  order by PublishDate_Std,SN asc"
+                               f"and C_Id='{item_dict['C_Id']}'  order by PublishDate_Std,SN asc "
             similar_result = db_qbbb.execute_query(similar_news_sql)
             print(similar_news_sql)
             print(similar_result)
