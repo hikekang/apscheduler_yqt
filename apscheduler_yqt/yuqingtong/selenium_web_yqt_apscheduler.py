@@ -58,6 +58,9 @@ from lxml import etree
 from utils.post_helper import SecondData
 from concurrent.futures import ThreadPoolExecutor
 import json
+from gne import GeneralNewsExtractor
+import requests
+extractor=GeneralNewsExtractor()
 # 教程
 class YQTSpider(object):
 
@@ -432,6 +435,13 @@ class YQTSpider(object):
                     data['is_original'] = 2
             else:
                 data['is_original'] = 2
+            if "微博" not in data['site_name']:
+                try:
+                    html = requests.get(data['链接']).text
+                    content=filter_emoji(extractor.extract(html,title_xpath='//h5/text()'))
+                    data['转发内容']+=content['content']
+                except Exception as e:
+                    print("二层抓取错误")
             sec_list.append(data)
         # logger.info("数据处理花费时间:", t2 - t1)
         # logger.info("数据处理完毕之后的数量", len(sec_list))
@@ -1121,7 +1131,12 @@ def java_task():
     command = r'java -jar ' + path_java
     os.system(command)
     print("执行成功")
-
+def filter_emoji(desstr,restr=''):
+    try:
+        co = re.compile(u'[\U00010000-\U0010ffff]')
+    except re.error:
+        co = re.compile(u'[\uD800-\uDBFF][\uDC00-\uDFFF]')
+    return co.sub(restr, desstr)
 
 if __name__ == '__main__':
     # try:
