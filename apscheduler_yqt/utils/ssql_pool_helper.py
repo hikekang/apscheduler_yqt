@@ -109,7 +109,7 @@ class DataBase(object):
             return rst
         except Exception as e:
             print('sql:[{}]meet error'.format(sql))
-            print(e.args[-1][1].decode())
+            # print(e.args[-1][1].decode())
         finally:
             if conn:
                 conn.close()
