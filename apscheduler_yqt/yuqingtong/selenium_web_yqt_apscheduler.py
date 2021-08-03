@@ -58,6 +58,7 @@ from lxml import etree
 from utils.post_helper import SecondData
 from concurrent.futures import ThreadPoolExecutor
 import json
+from utils.secodnd_data_utils import crawl_second_by_requests,crawl_second_by_webdriver
 from gne import GeneralNewsExtractor
 import requests
 extractor=GeneralNewsExtractor()
@@ -318,8 +319,8 @@ class YQTSpider(object):
             title_time = parse_time(td_time)
             print(author,attitude,title_time)
             highpoints = re.compile(u'[\U00010000-\U0010ffff]')
-            title=highpoints.sub(u'', title).replace(" ","")
-            content=highpoints.sub(u'', content).replace(" ","")
+            title=highpoints.sub(u'', title).replace(" ","").replace("\n","")
+            content=highpoints.sub(u'', content).replace(" ","").replace("\n","")
             source_url=td_title.xpath('.//div[@class="btn-group inline-block"]/ul/li[4]/a/@href')[0]
             print("转发原创类型：", sort, source_url)
             data = {
@@ -435,13 +436,27 @@ class YQTSpider(object):
                     data['is_original'] = 2
             else:
                 data['is_original'] = 2
+
             if "微博" not in data['site_name']:
                 try:
-                    html = requests.get(data['链接']).text
-                    content=filter_emoji(extractor.extract(html,title_xpath='//h5/text()'))
-                    data['转发内容']+=content['content']
+                    html = requests.get(data['链接'])
+                    html_content=html.content.decode('utf-8')
+                    content=filter_emoji(extractor.extract(html_content,title_xpath='//html/text()')['content'])
+                    data['转发内容']+=content
+                    print(data['转发内容'])
                 except Exception as e:
                     print("二层抓取错误")
+                    js_web='window.open("%s");'%data['链接']
+                    self.spider_driver.execute_script(js_web)
+                    self.spider_driver.switch_to.window(self.spider_driver.window_handles[-1])
+                    page_source=self.spider_driver.page_source
+                    self.spider_driver.close()
+                    content = filter_emoji(extractor.extract(page_source, title_xpath='//html/text()')['content'])
+                    data['转发内容']+="通过selenium抓取"
+                    data['转发内容'] += content
+                    self.spider_driver.switch_to.window(self.spider_driver.window_handles[0])
+                    print(data['转发内容'])
+
             sec_list.append(data)
         # logger.info("数据处理花费时间:", t2 - t1)
         # logger.info("数据处理完毕之后的数量", len(sec_list))
@@ -1001,8 +1016,9 @@ def work_it(myconfig, start_time, end_time,yqt_spider):
         if d['industry_name'] in industry_keywords:
             if d['customer'] in project_name:
                 if d['keywords']!='':
+                    time_1=time.time()
                     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=d, is_one_day=False)
-                    print("完成一轮")
+                    print("完成一轮花费时间为：",time.time()-time_1)
 
     # if yqt_spider.spider_driver.service.is_connectable():
     #     print("进入finally2")
@@ -1117,8 +1133,7 @@ def apscheduler(myconfig,yqt_spider):
     # 进行数据从统计
     sched.add_job(ssql_helper.find_day_data_count, trigger2, max_instances=10, id='my_job_id_ever_count',
                   kwargs={'myconfig': myconfig})
-    sched.add_job(ssql_helper.record_day_datas, trigger3, max_instances=10, id='my_job_id_ever_count',
-                  kwargs={'myconfig': myconfig})
+    sched.add_job(ssql_helper.record_day_datas, trigger3, max_instances=10, id='my_job_id_ever_record_count')
     sched.add_job(yqt_spider._login, trigger4, max_instances=10, id='my_job_id_everday_login')
     sched.start()
 
@@ -1152,8 +1167,9 @@ if __name__ == '__main__':
     chrome_service = Service(chromedriver_path)
     chrome_service.start()
     yqt_spider = YQTSpider(myconfig)
+    cookie_login = eval(myconfig.getValueByDict('spider_config', 'cookie_login'))
     # 1.登录
-    if not yqt_spider._login(cookie_login=True):
+    if not yqt_spider._login(cookie_login=cookie_login):
         raise Exception("登录环节出现问题")
     else:
         print("loging_success")
