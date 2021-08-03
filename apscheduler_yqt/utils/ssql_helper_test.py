@@ -568,9 +568,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     sql_industry_id = "select id from TS_Industry where name='" + industry_name + "'"
     industry_id = db_qbbb.execute_query(sql_industry_id)[0][0]
 
-    tuple_data_list_ts_a = []
     tuple_data_list_qbb_a = []
-    post_data_list_event_2_1 = []
 
     for work_id, data in enumerate(data_list):
         # 生成雪花id
@@ -699,7 +697,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         mark_java_match_data(d, thream_info_list)
         print("完成")
 
-    with ThreadPoolExecutor(4) as pool:
+    with ThreadPoolExecutor(10) as pool:
         for index,d in enumerate(data_list):
             pool.submit(load_data,index,d)
     # for index, d in enumerate(data_list):
@@ -856,18 +854,19 @@ def mark_java_match_data(d,theam_list):
             db_qbbb.execute(sql_of_base, tuple(item_dict.values()))
             t2 = datetime.datetime.strptime(item_dict['PublishDate_Std'], '%Y-%m-%d %H:%M:%S')
             a_month_ago_date = (t2 - datetime.timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
-
-            similar_news_sql = f"select SN from with (NOLOCK) TS_DataMerge_Base where Title ='{item_dict['Title']}'   " \
+            title=item_dict['Title'].replace("'",'')
+            similar_news_sql = f"select SN from TS_DataMerge_Base with (NOLOCK) where Title ='{title}'   " \
                                f"and PublishDate_Std between '{a_month_ago_date}' and '{item_dict['PublishDate_Std']}' " \
                                f"and C_Id='{item_dict['C_Id']}'  order by PublishDate_Std,SN asc "
             similar_result = db_qbbb.execute_query(similar_news_sql)
             print(similar_news_sql)
             print(similar_result)
-            if len(similar_result) > 1:
-                print("相似新闻匹配")
-                for item in similar_result[1:]:
-                    similar_update_sql = f"update TS_DataMerge_Base set group_SN='{similar_result[0][0]}' where sn='{item[0]}' and C_Id='{item_dict['C_Id']}' "
-                    db_qbbb.execute(similar_update_sql)
+            if similar_result:
+                if len(similar_result) > 1:
+                    print("相似新闻匹配")
+                    for item in similar_result[1:]:
+                        similar_update_sql = f"update TS_DataMerge_Base set group_SN='{similar_result[0][0]}' where sn='{item[0]}' and C_Id='{item_dict['C_Id']}' "
+                        db_qbbb.execute(similar_update_sql)
 
             if info['keywords'] != '':
                 if info['excludewords'] == '' and info['simultaneouswords'] == '':
@@ -1170,8 +1169,8 @@ if __name__ == '__main__':
     #     print(d)
     #     print("***"*20)
     for data in get_industry_keywords():
-    #     # if data['customer']=='柯尼卡':
-        pprint(data)
+        # if data['customer']=='柯尼卡':
+            print(data)
     # c_d=get_industry_keywords()
     # mao_d=[]
     # for d in c_d:
