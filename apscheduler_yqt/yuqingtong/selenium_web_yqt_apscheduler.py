@@ -297,7 +297,7 @@ class YQTSpider(object):
             # 行业
             # industry = p.sub("", td_title.xpath('.//div[@class="profile-tip inline-block"]/nz-tag[2]/span/text()')[0])
             # 关键词
-            relate_words = p.sub("", td_title.xpath('.//span[@ng-bind="icc.referenceKeyword"]')[0].xpath('string(.)'))
+            relate_words = "【关键词：】"+p.sub("", td_title.xpath('.//span[@ng-bind="icc.referenceKeyword"]')[0].xpath('string(.)'))+"\n"
             attitude = p.sub("", td_title.xpath('.//div[contains(@class,"sensitive-status-content") and not(contains(@class,"ng-hide"))]')[0].xpath(".//span")[0].text)
             title_time = parse_time(td_time)
             print(author,attitude,title_time)
@@ -311,7 +311,7 @@ class YQTSpider(object):
                 '标题': title if title!='' else content,
                 '描述': content,  # 微博原创
                 '链接': source_url,
-                '转发内容': spread_content+content+relate_words,
+                '转发内容': "<pre><zhengwen>"+spread_content+content+"</zhengwen></pre>",
                 '发布人': author,
                 'attitude': attitude,
                 'sort': sort,
@@ -361,6 +361,7 @@ class YQTSpider(object):
             if data["标题"] == "" and data["链接"] == "":
                 # new_data_list.remove(data)
                 continue
+            #     二层正文处理
             if data["标题"] == "":
                 if len(data["转发内容"]) >= 20:
                     data["标题"] = data["转发内容"][0:20]
@@ -425,8 +426,9 @@ class YQTSpider(object):
                     print("通过selenium抓取")
                     content=crawl_second_by_webdriver(data['链接'])
                     print("抓取完毕")
-                    data['转发内容']+="【通过selenium抓取】"
-                    data['转发内容'] += content
+                    if len(content)>len(data['转发内容']):
+                        data['转发内容']= "<pre><zhengwen>"+content+"</zhengwen></pre>"
+                        data['转发内容']+="<requests>\n【通过selenium抓取】</requests>"
                     # self.spider_driver.switch_to.window(self.spider_driver.window_handles[0])
                     # print(data['转发内容'])
                 else:
@@ -436,7 +438,9 @@ class YQTSpider(object):
                         pass
                     else:
                         content= crawl_second_by_requests(data['链接'])
-                        data['转发内容'] += content
+                        if len(content) > len(data['转发内容']):
+                            data['转发内容']= "<pre><zhengwen>"+content+"</zhengwen></pre>"
+                            data['转发内容'] += "<selenium>\n【通过request抓取】</selenium>"
             clear_data_list.append(data)
 
     # 第一次根据爬取链接去重
@@ -512,7 +516,7 @@ class YQTSpider(object):
             logger.info('数据抓取完毕')
             # 数据进行处理
             clear_data_list=[]
-            # self.clear_data(data_list,clear_data_list)
+            self.clear_data(data_list,clear_data_list)
             # data_list = self.clear_data(data_list)
 
             with ThreadPoolExecutor(10) as pool:

@@ -40,7 +40,7 @@ def crawl_second_by_requests(url:str):
         content = filter_emoji(extractor.extract(html_content, title_xpath='//html/text()')['content'])
         print("通过requests抓取",url)
     except Exception as e:
-        content=""
+        content="【request抓取错误】"
     return content
 
 def crawl_second_by_webdriver(url):
@@ -79,7 +79,7 @@ def crawl_second_by_webdriver(url):
             page_source = webdriver.page_source
             content = filter_emoji(extractor.extract(page_source, title_xpath='//html/text()')['content'])
     except Exception as e:
-        content=""
+        content="【selenium抓取错误】"
     finally:
         print("关闭网页")
         webdriver.close()
