@@ -22,7 +22,7 @@ import redis
 import re
 import requests
 from utils.email_helper import my_Email
-from utils.ssql_pool_helper import DataBase, config_QBBA, config_QBBB,config_myQBB_A,config_myQBB_B
+from utils.ssql_pool_helper import DataBase, config_myQBB_A,config_myQBB_B,config_myQBB_A_net
 from utils.redis_helper import my_redis
 from tqdm import tqdm
 import uuid
@@ -34,6 +34,7 @@ from yuqingtong import config as myconfig
 pool = redis.ConnectionPool(host='localhost', port=6379, decode_responses=True)
 r = redis.Redis(connection_pool=pool)
 db_my_qbba = DataBase('sqlserver', config_myQBB_A)
+db_my_qbba_net = DataBase('sqlserver', config_myQBB_A_net)
 db_my_qbbb = DataBase('sqlserver', config_myQBB_B)
 tables = {
 
@@ -95,15 +96,14 @@ def find_curent_num(start_time, end_time, myconfig, info, yqt_count):
         table_name=table_name, start_time=start_time, end_time=end_time)
 
     count_A = db_my_qbba.execute_query(sql_A)[0][0]
+    # TODO 后续替换
+    count_A_net = db_my_qbba_net.execute_query(sql_A)[0][0]
     sql_B = "select count(*) from TS_DataMerge_Base where " \
             "C_Id={C_Id} and PublishDate_Std between '{start_time}' and '{end_time}' ".format(
         C_Id=info['id'], start_time=start_time, end_time=end_time)
 
     count_B = db_my_qbbb.execute_query(sql_B)[0][0]
 
-    # sql_record_log_customer="insert into record_log_customer (customer,record_time,yqt_num,TS_A_num,QBB_B_num) " \
-    #                         "values (%s,%s,%d,%d,%d)"
-    # db_my_qbba.execute(sql_record_log_customer,(info['customer'],end_time,yqt_count,count_A,count_B))
 
     return count_A, count_B
 
@@ -136,6 +136,8 @@ def find_day_data_count(myconfig):
         industry_table_name, start_time=start_time, end_time=end_time)
     # 流通贸易这个行业在A库中的数据量
     count_A = db_my_qbba.execute_query(sql_A)[0][0]
+    # TODO 后续添加 完成DONE
+    count_A_net = db_my_qbba_net.execute_query(sql_A)[0][0]
 
     count_B = 0
     # 根据C_Id查询B库中的数据量
@@ -150,8 +152,7 @@ def find_day_data_count(myconfig):
 
     db_my_qbba.execute(sql_insert_a, (industry_name, end_time, count_A, count_B))
 
-    # 插入记录
-
+    db_my_qbba_net.execute(sql_insert_a, (industry_name, end_time, count_A_net, count_B))
     return count_B
 
 
@@ -190,6 +191,8 @@ def get_industry_keywords():
                            "group by Word,SimultaneousWord,Excludeword".format(dd)
 
                 data_A = db_my_qbba.execute_query(sql_QBBA)
+                # TODO 后续替换
+                data_A_net = db_my_qbba_net.execute_query(sql_QBBA)
                 for da in data_A:
                     project_word = {
                         "keywords": "(",
@@ -394,6 +397,9 @@ def post_data(data_list, industry_name):
         # print("执行")
         # 插入QBB_A库
         db_my_qbba.execute(sql_qbb_a)
+
+        db_my_qbba_net.execute(sql_qbb_a)
+
         # 拉取信息到B库
         # post_mq.send_to_queue('reptile.stay.process_2.1',str(data))
 
@@ -524,6 +530,8 @@ def upload_many_data_java(data_list, industry_name, datacenter_id):
     # print(tuple_data_list_qbb_a)
     for d in tuple_data_list_qbb_a:
         db_my_qbba.execute(sql_qbb_a, d)
+
+        db_my_qbba_net.execute(sql_qbb_a, d)
     # db_my_qbba.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
     # db_net_qbba.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
 
@@ -598,6 +606,8 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     # 插入qbba库
     db_my_qbba.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
 
+    db_my_qbba_net.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
+
     """
         info['id']:Customer ID
         info['xxxword']:所有检测主题XXX词
@@ -610,6 +620,9 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
 
     # First check the topic ID based on the customer ID
     T_id = db_my_qbba.execute_query(sql_of_Tid)
+    # TODO 后续替换
+    T_id_net = db_my_qbba_net.execute_query(sql_of_Tid)
+
     for tt in T_id:
         info_t = {
             'id': info['id'],
@@ -852,13 +865,15 @@ def mark_java_match_data(d, theam_list):
             t2 = datetime.datetime.strptime(item_dict['PublishDate_Std'], '%Y-%m-%d %H:%M:%S')
             a_month_ago_date = (t2 - datetime.timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
 
-            similar_news_sql = f"select SN from TS_DataMerge_Base where Title like '%{item_dict['Title']}%' " \
+            similar_news_sql = f"select SN from TS_DataMerge_Base with (NOLOCK) where Title like '%{item_dict['Title']}%' " \
                                f"and PublishDate_Std between '{item_dict['PublishDate_Std']}' and '{a_month_ago_date}' order by PublishDate_Std asc"
+            print(similar_news_sql)
+            print(similar_result)
             similar_result = db_my_qbbb.execute_query(similar_news_sql)
             if len(similar_result) > 1:
                 print("相似新闻匹配")
                 for item in similar_result[1:]:
-                    similar_update_sql = f"update TS_DataMerge_Base set group_SN='{similar_result[0]}' where sn='{item[0]}'"
+                    similar_update_sql = f"update TS_DataMerge_Base set group_SN='{similar_result[0][0]}' where sn='{item[0]}'"
                     db_my_qbbb.execute(similar_update_sql)
             if info['keywords'] != '':
                 if info['excludewords'] == '' and info['simultaneouswords'] == '':
@@ -997,6 +1012,8 @@ def get_month_data(time1, time2, industry_name, flushall=False):
     sql = "select industry_id,url from %s where publish_time between '%s' and '%s'" % (
         tables[industry_name], time1, time2)
     datas = db_my_qbba.execute_query(sql)
+    # TODO 后续替换
+    datas_net = db_my_qbba_net.execute_query(sql)
     for d in tqdm(iterable=datas, desc="加载<%s>数据数据" % industry_name, unit='条'):
         myredis.redis.sadd(d[0], d[1])
 
@@ -1036,6 +1053,8 @@ def record_log(data):
     sql_record = "insert into record_log_table values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
     # data=('3', '2021-4-26 00:00:00','2021-4-26 00:00:00', '2021-4-26 00:00:00', '4', '5', '6', '1')
     db_my_qbba.execute(sql_record, data)
+
+    db_my_qbba_net.execute(sql_record, data)
     # my_e = my_Email()
     # if data[4] != 0 and data[5] != 0:
     #     if (data[5] / data[4]) < 0.7:
@@ -1146,6 +1165,8 @@ def record_day_datas():
                         print(sq_tsa)
                         if sq_tsa:
                             sql_a = db_my_qbba.execute_query(sq_tsa)[0][0]
+                            # TODO 后续替换
+                            sql_a_net = db_my_qbba_net.execute_query(sq_tsa)[0][0]
                         else:
                             sql_a = 0
                         # sql_a=0

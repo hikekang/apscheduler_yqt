@@ -113,13 +113,19 @@ if __name__ == '__main__':
     # scheduler=BlockingScheduler()
     # scheduler.add_job(print_it,tigger1,max_instances=10,id='212')
     # scheduler.start()
-    test1=eval(myconfig.getValueByDict("crawl_condition", "condition"))
-    print(type(test1))
-    print(test1)
-    for key,value in test1.items():
-        print(key,value)
+    # test1=eval(myconfig.getValueByDict("crawl_condition", "condition"))
+    # print(type(test1))
+    # print(test1)
+    # for key,value in test1.items():
+    #     print(key,value)
     # dir_path = os.path.dirname(os.path.dirname(os.path.relpath(__file__)))
     # dir_path=os.path.dirname(os.getcwd())
     # config_xlsx_path = os.path.join(dir_path, r'config.xlsx')
     # wb = load_workbook(config_xlsx_path, data_only=True)
+
+    test1 = eval(myconfig.getValueByDict("industry_info", "project_name"))
+    print(test1)
+    print(type(test1))
+    # for i in test1:
+    print('优速测试_快消品' in test1)
 

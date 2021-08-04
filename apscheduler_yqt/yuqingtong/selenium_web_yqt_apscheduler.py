@@ -311,13 +311,15 @@ class YQTSpider(object):
                 '标题': title if title!='' else content,
                 '描述': content,  # 微博原创
                 '链接': source_url,
-                '转发内容': "<pre><zhengwen>"+spread_content+content+"</zhengwen></pre>",
+                '转发内容': '<pre style="white-space: pre-wrap;white-space: -moz-pre-wrap;' \
+                                      'white-space: -pre-wrap;white-space: -o-pre-wrap; ' \
+                                      'word-wrap: break-word;">'+spread_content+content+"</zhengwen></pre>",
                 '发布人': author,
                 'attitude': attitude,
                 'sort': sort,
                 'related_words': relate_words,
                 'site_name': site_name,
-                'area': p.sub("", td_orgin.xpath('.//div[contains(@ng-if,"icc.province!")]')[0].text),
+                'area': p.sub("", td_orgin.xpath('.//div[contains(@ng-if,"icc.province")]')[0].text),
                 'C_Id': self.info['id']  # 客户id
             }
 
@@ -426,21 +428,29 @@ class YQTSpider(object):
                     print("通过selenium抓取")
                     content=crawl_second_by_webdriver(data['链接'])
                     print("抓取完毕")
+                    if content == "":
+                        data['转发内容'] += "<selenium_error hidden>selenium抓取错误</selenium_error hidden>"
                     if len(content)>len(data['转发内容']):
-                        data['转发内容']= "<pre><zhengwen>"+content+"</zhengwen></pre>"
-                        data['转发内容']+="<requests>\n【通过selenium抓取】</requests>"
+                        data['转发内容']= '<pre style="white-space: pre-wrap;white-space: -moz-pre-wrap;' \
+                                      'white-space: -pre-wrap;white-space: -o-pre-wrap; ' \
+                                      'word-wrap: break-word;" ><zhengwen>'+content+"</zhengwen></pre>"
+                        data['转发内容']+="<selenium hidden>\n【通过selenium抓取】</selenium>"
                     # self.spider_driver.switch_to.window(self.spider_driver.window_handles[0])
                     # print(data['转发内容'])
                 else:
                     match_video=video_url.findall(data['链接'])
                     if match_video:
                         print("跳过视频")
-                        pass
+                        data['转发内容'] += "<viode_error hidden>跳过视频</viode_error hidden>"
                     else:
                         content= crawl_second_by_requests(data['链接'])
+                        if content=="":
+                            data['转发内容']+="<requests_error hidden>requests抓取错误</requests_error hidden>"
                         if len(content) > len(data['转发内容']):
-                            data['转发内容']= "<pre><zhengwen>"+content+"</zhengwen></pre>"
-                            data['转发内容'] += "<selenium>\n【通过request抓取】</selenium>"
+                            data['转发内容']= '<pre style="white-space: pre-wrap;white-space: -moz-pre-wrap;' \
+                                      'white-space: -pre-wrap;white-space: -o-pre-wrap; ' \
+                                      'word-wrap: break-word;" ><zhengwen>'+content+"</zhengwen></pre>"
+                            data['转发内容'] += "<requests hidden>\n【通过request抓取】</requests>"
             clear_data_list.append(data)
 
     # 第一次根据爬取链接去重
@@ -516,8 +526,7 @@ class YQTSpider(object):
             logger.info('数据抓取完毕')
             # 数据进行处理
             clear_data_list=[]
-            self.clear_data(data_list,clear_data_list)
-            # data_list = self.clear_data(data_list)
+            # self.clear_data(data_list,clear_data_list)
 
             with ThreadPoolExecutor(10) as pool:
                 pool.submit(self.clear_data,data_list,clear_data_list)

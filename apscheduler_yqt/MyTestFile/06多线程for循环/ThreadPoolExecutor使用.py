@@ -17,9 +17,7 @@ from utils.webdriverhelper import WebDriverHelper
 extractor=GeneralNewsExtractor()
 
 
-def add_number(list:list,number:int):
-    list.append(number)
-    print("添加完毕")
+
 def add_number_2(list:list,number:int):
     list.append(number)
     print("添加完毕2")
@@ -51,16 +49,12 @@ def open_web(url):
 def test_print(list_1):
     for item in list_1:
         print(item)
-
+def add_number(list:list,number:int):
+    list.append(number)
+    print("添加完毕")
 if __name__ == '__main__':
     test_list = []
-    list_2=[12,3,4,5,6,7,9]
-    with ThreadPoolExecutor(5) as pool:
-        # # for i in range(10):
-        # # url=f"https://v.qq.com/channel/variety?listpage={i+1}&channel=variety&source=1&exclusive=1"
-        # url="https://www.toutiao.com/w/i1703710959904775/"
-        # pool.submit(open_web,url)
-        # for i in range(10):
-        #     pool.submit(add_number,test_list,i)
-        #     pool.submit(add_number_2,test_list,i)
-        pool.submit(test_print,list_2)
+    with ThreadPoolExecutor(1000) as pool:
+        for i in range(10000):
+            pool.submit(add_number,test_list,i)
+    print(test_list)

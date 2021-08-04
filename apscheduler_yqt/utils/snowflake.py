@@ -54,7 +54,7 @@ class IdWorker(object):
         # sanity check
         if worker_id > MAX_WORKER_ID or worker_id < 0:
             # print(worker_id)
-            raise ValueError('worker_id值越界')
+            raise ValueError('worker_id值越界',worker_id)
 
         if datacenter_id > MAX_DATACENTER_ID or datacenter_id < 0:
             raise ValueError('datacenter_id值越界')

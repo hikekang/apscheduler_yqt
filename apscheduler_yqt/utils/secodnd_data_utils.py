@@ -16,7 +16,8 @@ from utils.webdriverhelper import WebDriverHelper
 import time
 from fake_useragent import UserAgent
 extractor=GeneralNewsExtractor()
-webdriver = WebDriverHelper.init_webdriver(is_headless=True, is_hide_image=True)
+# webdriver = WebDriverHelper.init_webdriver(is_headless=True, is_hide_image=True)
+webdriver = WebDriverHelper.init_webdriver(is_headless=False, is_hide_image=True)
 
 def filter_emoji(desstr,restr=''):
     try:
@@ -40,7 +41,7 @@ def crawl_second_by_requests(url:str):
         content = filter_emoji(extractor.extract(html_content, title_xpath='//html/text()')['content'])
         print("通过requests抓取",url)
     except Exception as e:
-        content="【request抓取错误】"
+        content=""
     return content
 
 def crawl_second_by_webdriver(url):
@@ -79,7 +80,7 @@ def crawl_second_by_webdriver(url):
             page_source = webdriver.page_source
             content = filter_emoji(extractor.extract(page_source, title_xpath='//html/text()')['content'])
     except Exception as e:
-        content="【selenium抓取错误】"
+        content=""
     finally:
         print("关闭网页")
         webdriver.close()

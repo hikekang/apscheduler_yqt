@@ -63,6 +63,24 @@ config_myQBB_B = {
     'charset': 'utf8',
     'autocommit': True
 }
+config_myQBB_A_net = {
+    'host': '192.168.3.140',
+    'user': 'sa',
+    'password': '33221100aA',
+    'database': 'myQBB_A',
+    'port': '1433',
+    'charset': 'utf8',
+    'autocommit': True
+}
+config_QBBA_net = {
+    'host': '192.168.3.140',
+    'user': 'sa',
+    'password': '33221100aA',
+    'database': 'QBB_A',
+    'port': '1433',
+    'charset': 'utf8',
+    'autocommit': True
+}
 class DataBase(object):
 
     def __init__(self, db_type, config):
@@ -171,8 +189,11 @@ class DataBase(object):
                 cur.close()
 
 if __name__ == '__main__':
-    db=DataBase('sqlserver',config_QBBA)
-    db.execute_query("select * from Ip")
+    db=DataBase('sqlserver',config_QBBA_net)
+    ip=db.execute_query("select * from crawler_word")
+    for item in ip:
+        print(item)
+
     # str=b"\xe7\x94\xa8\xe6\x88\xb7
     # 'sa' \xe7\x99\xbb\xe5\xbd\x95\xe5\xa4\xb1\xe8\xb4\xa5\xe3\x80\x82DB-Lib error message 20018,
     # severity 14:\nGeneral SQL Server error: Check messages from the SQL Server\nDB-Lib error message 20002,
