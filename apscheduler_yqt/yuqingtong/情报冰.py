@@ -10,19 +10,11 @@
 """
 #!/usr/bin/python3.x
 # -*- coding=utf-8 -*-
-"""
- Time       : 2021/7/21 9:44
- Author     : hike
- Email      : hikehaidong@gmail.com
- File Name  : selenium_web_yqt_apscheduler.py
- Description:
- Software   : PyCharm
-"""
+from concurrent.futures.thread import ThreadPoolExecutor
 import time
 import datetime
 import os
 import sys
-import threading
 from multiprocessing.dummy import Pool as ThreadPool
 # sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 # sys.path.append(os.path.dirname(os.path.realpath(__file__)))
@@ -39,24 +31,25 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.action_chains import ActionChains
 from utils.mylogger import logger
 from utils.spider_helper import SpiderHelper
-# from utils.ssql_helper import get_industry_keywords
 
-from utils.ssql_helper_test import get_industry_keywords
-from utils.extract_content import extract_content as ex
 from utils.webdriverhelper import MyWebDriver
 from utils.webdriverhelper import WebDriverHelper
 from yuqingtong import config
-# from utils import  ssql_helper
 from utils import qinbaobing_ssql as ssql_helper
 import re
 from selenium.webdriver.chrome.service import Service
 from multiprocessing import Process
 # from utils.email_helper import my_Email
 from lxml import etree
-from utils.post_helper import SecondData
-from concurrent.futures import ThreadPoolExecutor
-import json
+from utils.secodnd_data_utils import crawl_second_by_requests,crawl_second_by_webdriver
+from gne import GeneralNewsExtractor
+extractor=GeneralNewsExtractor()
 # 教程
+web_url_selenium=re.compile('http[s]://(www.toutiao.com)|(mp.weixin.qq.com)|'
+                            '(dy.163.com/v2/article/detail)|(kuaibao.qq.com)|(www.sohu.com)|(www.360kuai.com)|(view.inews.qq.com).*')
+# web_url_selenium_list=['www.toutiao.com','mp.weixin.qq.com']
+video_url=re.compile('http[s]://(v.qq.com)|(live.kuaishou.com)|(www.iesdouyin.com)|(www.ixigua.com)|(m.toutiaoimg.cn).*')
+# video_url_list=['v.qq.com','live.kuaishou.com','www.iesdouyin.com','www.ixigua.com']
 class YQTSpider(object):
 
     def __init__(self, myconfig, spider_driver=None, start_time=None, end_time=None, *args, **kwargs):
@@ -238,11 +231,16 @@ class YQTSpider(object):
 
             # 转发类型  原创 有一部分是没有的 在这里只进行微博的判断
             if site_name=="新浪微博":
-                sort_1 = td_title.xpath('.//span[contains(@ng,"icc.repostsFlg!=0")]/text()')
-                if len(sort_1) > 0:
-                    sort = p.sub("", sort_1[0])
-                else:
+                # sort_1 = td_title.xpath('.//span[contains(@ng-if,"icc.repostsFlg!=0")]/text()')
+                sort_1 = td_title.xpath('.//span[contains(@ng-if,"icc.repostsFlg")]')[0].get('ng-if')
+                if sort_1=="icc.repostsFlg==0":
                     sort = "原创"
+                else:
+                    sort = "转发"
+                # if len(sort_1) > 0:
+                #     sort = p.sub("", sort_1[0])
+                # else:
+                #     sort = "原创"
             else:
                 sort="原创"
 
@@ -257,7 +255,10 @@ class YQTSpider(object):
             else:
                 spread_content = ''
             # 针对于文章是标题  针对于微博是作者
-            author = td_title.xpath('.//div[contains(@class,"profile-title inline-block")]/a')[0].xpath('string(.)').replace("\n","")
+            try:
+                author = td_title.xpath('.//div[contains(@class,"profile-title inline-block")]/a')[0].xpath('string(.)').replace("\n","")
+            except:
+                author=''
             author_or_title = p.sub("", author)
             title=''
             if site_name == '新浪微博':
@@ -281,48 +282,32 @@ class YQTSpider(object):
             # 行业
             # industry = p.sub("", td_title.xpath('.//div[@class="profile-tip inline-block"]/nz-tag[2]/span/text()')[0])
             # 关键词
-            relate_words = p.sub("", td_title.xpath('.//span[@ng-bind="icc.referenceKeyword"]')[0].xpath('string(.)'))
-            # 转发数量
-            # forwarding_span = td_title.xpath(
-            #     './/i[contains(@class,"anticon font-size-16 mr5")]/following-sibling::span')
-            # if forwarding_span:
-            #     forwarding_num = p.sub("", td_title.xpath(
-            #         './/i[contains(@class,"anticon font-size-16 mr5")]/following-sibling::span')[0].text)
-            # else:
-            #     forwarding_num = 0
-            # # 评论数量
-            # comment_num_span = td_title.xpath(
-            #     './/i[contains(@iconfont,"fa-pinglunshu")]/following-sibling::span/text()')
-            # if comment_num_span:
-            #     comment_num = comment_num_span[0]
-            # else:
-            #     comment_num = 0
-            # img_src = ",".join([img.attrib['src'] for img in td_title.xpath('//img')])
-            # attitude = p.sub("", td_title.xpath('.//div[@class="sensitive-status-content fmg"]')[0].text)
-            # ]/div/div[2]/div[1]/div[2]/nz-tag
-            # attitude = p.sub("", td_title.xpath('./div[contains(@class,"sensitive-status-content fmg")]/span/text()')[0])
-            # //*[@id="news-content_316266263107310667912626"]/div[3]/div[1]/div[1]/div/div[2]
-            # //*[@id="news-content_316266263107310667912626"]/div[3]/div[1]/div[1]/div/div[2]
-            # attitude = p.sub("", td_title.xpath('./div/div[3]/div[1]/div[1]/div/div[2]/span')[0].xpath("string(.)"))
+            relate_words = "【关键词：】"+p.sub("", td_title.xpath('.//span[@ng-bind="icc.referenceKeyword"]')[0].xpath('string(.)'))+"\n"
             attitude = p.sub("", td_title.xpath('.//div[contains(@class,"sensitive-status-content") and not(contains(@class,"ng-hide"))]')[0].xpath(".//span")[0].text)
             title_time = parse_time(td_time)
             print(author,attitude,title_time)
-
+            highpoints = re.compile(u'[\U00010000-\U0010ffff]')
+            title=highpoints.sub(u'', title).replace(" ","").replace("\n","")
+            content=highpoints.sub(u'', content).replace(" ","").replace("\n","")
             source_url=td_title.xpath('.//div[@class="btn-group inline-block"]/ul/li[4]/a/@href')[0]
+            print("转发原创类型：", sort, source_url)
             data = {
                 '时间': title_time,
                 '标题': title if title!='' else content,
                 '描述': content,  # 微博原创
                 '链接': source_url,
-                '转发内容': spread_content+content+relate_words,
+                '转发内容': '<pre style="white-space: pre-wrap;white-space: -moz-pre-wrap;' \
+                                      'white-space: -pre-wrap;white-space: -o-pre-wrap; ' \
+                                      'word-wrap: break-word;"><zhengwen>'+spread_content+content+"</zhengwen></pre>",
                 '发布人': author,
                 'attitude': attitude,
                 'sort': sort,
                 'related_words': relate_words,
                 'site_name': site_name,
-                'area': p.sub("", td_orgin.xpath('.//div[contains(@ng-if,"icc.province!")]')[0].text),
+                'area': p.sub("", td_orgin.xpath('.//div[contains(@ng-if,"icc.province")]')[0].text),
                 'C_Id': self.info['id']  # 客户id
             }
+
             # if item['forwarderImages']:
             #     for item_pic in item['forwarderImages']:
             #         data['images']+=item_pic['bmiddlePic']
@@ -350,7 +335,7 @@ class YQTSpider(object):
         return data_list
 
     # 数据处理
-    def clear_data(self, data_list):
+    def clear_data(self, data_list,clear_data_list):
         logger.info("数据处理")
         new_data_list = self.quchong(data_list, "链接")
 
@@ -358,12 +343,12 @@ class YQTSpider(object):
         new_data_list = ssql_helper.filter_by_url(new_data_list, self.industry_name)
         self.redis_len += len(new_data_list)
 
-        sec_list = []
         for data in new_data_list:
             # 1.标题或url为空的舍去
             if data["标题"] == "" and data["链接"] == "":
                 # new_data_list.remove(data)
                 continue
+            #     二层正文处理
             if data["标题"] == "":
                 if len(data["转发内容"]) >= 20:
                     data["标题"] = data["转发内容"][0:20]
@@ -402,6 +387,11 @@ class YQTSpider(object):
             if "微博" in data['site_name']:
                 # print("处理标题")
                 data['标题'] =data['描述'][0:20]
+                if data['sort']=='转发':
+                    if len(data["转发内容"]) >= 120:
+                        data['描述'] = data['转发内容'][0:120]
+                    else:
+                        data['描述'] = data['转发内容']
             if len(data['描述']) > 120:
                 # print("处理描述")
                 data['描述'] = data['描述'][0:120]
@@ -416,10 +406,37 @@ class YQTSpider(object):
                     data['is_original'] = 2
             else:
                 data['is_original'] = 2
-            sec_list.append(data)
-        # logger.info("数据处理花费时间:", t2 - t1)
-        # logger.info("数据处理完毕之后的数量", len(sec_list))
-        return sec_list
+
+            if "微博" not in data['site_name']:
+                match_selenim=web_url_selenium.findall( data['链接'])
+                if match_selenim:
+                    print("通过selenium抓取")
+                    content=crawl_second_by_webdriver(data['链接'])
+                    print("抓取完毕")
+                    if content == "":
+                        data['转发内容'] += "<selenium_error hidden>selenium抓取错误</selenium_error hidden>"
+                    if len(content)>len(data['转发内容']):
+                        data['转发内容']= '<pre style="white-space: pre-wrap;white-space: -moz-pre-wrap;' \
+                                      'white-space: -pre-wrap;white-space: -o-pre-wrap; ' \
+                                      'word-wrap: break-word;" ><zhengwen>'+content+"</zhengwen></pre>"
+                        data['转发内容']+="<selenium hidden>\n【通过selenium抓取】</selenium>"
+                    # self.spider_driver.switch_to.window(self.spider_driver.window_handles[0])
+                    # print(data['转发内容'])
+                else:
+                    match_video=video_url.findall(data['链接'])
+                    if match_video:
+                        print("跳过视频")
+                        # data['转发内容'] += "<viode_error hidden>跳过视频</viode_error hidden>"
+                    else:
+                        content= crawl_second_by_requests(data['链接'])
+                        if content=="":
+                            data['转发内容']+="<requests_error hidden>requests抓取错误</requests_error hidden>"
+                        if len(content) > len(data['转发内容']):
+                            data['转发内容']= '<pre style="white-space: pre-wrap;white-space: -moz-pre-wrap;' \
+                                      'white-space: -pre-wrap;white-space: -o-pre-wrap; ' \
+                                      'word-wrap: break-word;" ><zhengwen>'+content+"</zhengwen></pre>"
+                            data['转发内容'] += "<requests hidden>\n【通过request抓取】</requests>"
+            clear_data_list.append(data)
 
     # 第一次根据爬取链接去重
     def quchong(self, dir_list, key):
@@ -493,15 +510,19 @@ class YQTSpider(object):
             data_list = self.parse_data()
             logger.info('数据抓取完毕')
             # 数据进行处理
-            data_list = self.clear_data(data_list)
+            clear_data_list=[]
+            # self.clear_data(data_list,clear_data_list)
 
+            with ThreadPoolExecutor(10) as pool:
+                pool.submit(self.clear_data,data_list,clear_data_list)
             # 插入到数据库，返回一个成功插入的值
             # 上传数据,每页抓取
-            if data_list:
-                ssql_helper.upload_many_data(data_list, self.industry_name, i, self.info)
+
+            if clear_data_list:
+                ssql_helper.upload_many_data(clear_data_list, self.industry_name, i, self.info)
                 # ssql_helper.upload_many_data_java(data_list, self.industry_name, i)
-                logger.info(f"解析到{len(data_list)}条数据")
-                self.post_number += len(data_list)
+                logger.info(f"解析到{len(clear_data_list)}条数据")
+                self.post_number += len(clear_data_list)
                 logger.info(f"保存完毕")
                 # SpiderHelper.save_xlsx(data_list=data_list, out_file=self.data_file_path, sheet_name=self.industry_name)
                 logger.info(f"保存完毕")
@@ -610,9 +631,6 @@ class YQTSpider(object):
             # return False
             self.devide_keywords = True
             break
-        # logger.info(
-        #     f"当前时间区间:{self.last_end_time.strftime(config.DATETIME_FORMAT)}  --"
-        #     f" {self.next_end_time.strftime(config.DATETIME_FORMAT)}")
 
 
     def _switch_data_count_perpage(self):
@@ -621,7 +639,7 @@ class YQTSpider(object):
         点击每页100条按钮
         :return:
         """
-        self.spider_driver.get("http://yuqing.sina.com/yqmonitor")
+        self.spider_driver.get("http://yuqing.sina.com/newEdition/yqmonitor")
         if not self._is_page_loaded():
             logger.info("更改100条数据/每页前，页面加载有问题")
             return False
@@ -657,21 +675,6 @@ class YQTSpider(object):
         # 设置时间
         self._adapt_time_interval()
 
-        # if self.next_page_num > 1:
-        #     logger.info(f"直接进入第{self.next_page_num}页")
-        #     self.spider_driver.find_element_by_xpath(
-        #         '//input[@class="ant-input ng-untouched ng-pristine ng-valid"]').send_keys(
-        #         self.next_page_num)
-        #     time.sleep(0.5)
-        #     self.spider_driver.find_element_by_xpath('//span[contains(text(),"确定")]').click()
-        # if not self._is_page_loaded():
-        #     logger.info("直接进入第多少页时页面加载出现问题")
-        #     return False
-        # page_num = int(self.spider_driver.find_element_by_xpath('//span[@ng-bind="page"]').text)
-        # if int(page_num) != self.next_page_num:
-        #     logger.warning("页面上当前页面和应该进入的页面不一样，请检查")
-        #     return False
-        # logger.info("进入成功")
         return True
 
     @property
@@ -738,72 +741,6 @@ class YQTSpider(object):
                 keywords.append(key)
             # 多关键词抓取
             self.yqt_total_number=self._count_number
-            # if self._count_number > 5000:
-            #     for keyword in keywords:
-            #         input_keywords = self.spider_driver.find_element_by_xpath(
-            #             '//input[@class="ant-input ng-untouched ng-pristine ng-valid ng-star-inserted"]')
-            #         input_keywords.clear()
-            #         input_keywords.send_keys(keyword)
-            #         time.sleep(1)
-            #         self.spider_driver.find_element_by_xpath(
-            #             '//i[@class="anticon anticon-search ng-star-inserted"]').click()
-            #         if self._is_page_loaded():
-            #             max_page_num = self._maxpage
-            #             # 翻页并抓取数据
-            #             resp = self._turn_page(max_page_num, time_sleep)
-            #             if resp == "restart_browser":
-            #                 return resp
-            #             elif not resp:
-            #                 self._turn_page(max_page_num, time_sleep)
-            #                 if turn_page_reload_count >= 3:
-            #                     logger.warning("翻页时，连续出现问题3次，退出")
-            #                     return False
-            #                 turn_page_reload_count += 1
-            #                 is_reload = True
-            #                 continue
-            #             turn_page_reload_count = 0
-            #             # 翻页结束
-            #
-            #             # 设置下次抓取条件
-            #             self.next_page_num = 1
-            #             if self.next_end_time >= self.interval[1]:
-            #                 logger.info("解析到终止时间，抓取完成")
-            #                 logger.info("全部抓取完毕上传数据")
-            #                 logger.info("开始记录")
-            #                 # 舆情通数量
-            #                 yqt_count = self._count_number
-            #                 record_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            #                                                 f"record\{self.project_name}", f"{self}_记录.xlsx")
-            #                 sql_number = ssql_helper.find_info_count(self.interval[0], self.interval[1],
-            #                                                          self.industry_name)
-            #                 data_list = [self.project_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            #                              self.last_end_time, self.next_end_time]
-            #                 SpiderHelper.save_record_auto(record_file_path, yqt_count, self.post_number, sql_number,
-            #                                               data_list=data_list)
-            #                 # record_dict = (self.industry_name, datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.last_end_time,
-            #                 # self.next_end_time, yqt_count, self.post_number, self.project_name)
-            #
-            #                 record_dict = (
-            #                     self.industry_name,  # 行业名称
-            #                     datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # 抓取时间
-            #                     self.last_end_time,  # 开始时间
-            #                     self.next_end_time,  # 结束时间
-            #                     yqt_count,  # 舆情通数量
-            #                     self.post_number,  # 上传数量
-            #                     self.project_name,  # 项目名称
-            #                     self.first_len,  # 第一次过滤之后的数量
-            #                     self.redis_len  # redis过滤之后的数量
-            #                 )
-            #
-            #                 # 数据统计记录
-            #                 ssql_helper.record_log(record_dict)
-            #                 # SpiderHelper.save_record(record_file_path,yqt_count,xlsx_num,post_info['number'],post_info2['number'],sql_number,data_list=data_list)
-            #                 return True
-            #             else:
-            #                 self.last_end_time = self.next_end_time  # 上次终止时间就是下次起始时间
-            #                 self.next_end_time = self.interval[1]
-
-            # else:
             if self._is_page_loaded():
                 max_page_num = self._maxpage
                 # 翻页并抓取数据
@@ -878,8 +815,8 @@ class YQTSpider(object):
         driver = self.spider_driver
         # driver.current_url
         driver.get("http://yuqing.sina.com/staticweb/#/yqmonitor/index/yqpage/yqlist")
+        driver.implicitly_wait(10)
         span = driver.find_element_by_xpath('//span[@class="yqt_tree_li act ng-star-inserted"]')
-
         action = ActionChains(driver)
         time.sleep(1)
         # 移动到该元素
@@ -968,15 +905,16 @@ def work_it(myconfig, start_time, end_time,yqt_spider):
     # 获取行业名字
     industry_keywords=myconfig.getValueByDict('industry_info','industry_keywords')
     # 获取项目名字
-    project_name=myconfig.getValueByDict('industry_info','project_name')
+    project_name=eval(myconfig.getValueByDict("industry_info", "project_name"))
     print(project_name)
     for d in customer_list_data:
-        print(d)
+        print(d['customer'])
         if d['industry_name'] in industry_keywords:
             if d['customer'] in project_name:
                 if d['keywords']!='':
+                    time_1=time.time()
                     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=d, is_one_day=False)
-                    print("完成一轮")
+                    print("完成一轮花费时间为：",time.time()-time_1)
 
     # if yqt_spider.spider_driver.service.is_connectable():
     #     print("进入finally2")
@@ -1091,8 +1029,7 @@ def apscheduler(myconfig,yqt_spider):
     # 进行数据从统计
     sched.add_job(ssql_helper.find_day_data_count, trigger2, max_instances=10, id='my_job_id_ever_count',
                   kwargs={'myconfig': myconfig})
-    sched.add_job(ssql_helper.record_day_datas, trigger3, max_instances=10, id='my_job_id_ever_count2',
-                  )
+    sched.add_job(ssql_helper.record_day_datas, trigger3, max_instances=10, id='my_job_id_ever_record_count')
     sched.add_job(yqt_spider._login, trigger4, max_instances=10, id='my_job_id_everday_login')
     sched.start()
 
@@ -1105,12 +1042,17 @@ def java_task():
     command = r'java -jar ' + path_java
     os.system(command)
     print("执行成功")
-
+def filter_emoji(desstr,restr=''):
+    try:
+        co = re.compile(u'[\U00010000-\U0010ffff]')
+    except re.error:
+        co = re.compile(u'[\uD800-\uDBFF][\uDC00-\uDFFF]')
+    return co.sub(restr, desstr)
 
 if __name__ == '__main__':
     # try:
     today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    time1 = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+    time1 = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
     myconfig = config.redconfig()
     industry_name = myconfig.getValueByDict('industry_info', 'industry_name')
 
@@ -1121,8 +1063,9 @@ if __name__ == '__main__':
     chrome_service = Service(chromedriver_path)
     chrome_service.start()
     yqt_spider = YQTSpider(myconfig)
+    cookie_login = eval(myconfig.getValueByDict('spider_config', 'cookie_login'))
     # 1.登录
-    if not yqt_spider._login(cookie_login=True):
+    if not yqt_spider._login(cookie_login=cookie_login):
         raise Exception("登录环节出现问题")
     else:
         print("loging_success")
