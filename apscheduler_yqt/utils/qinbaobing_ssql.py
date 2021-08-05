@@ -31,9 +31,7 @@ from urllib import parse
 from utils.spider_helper import SpiderHelper
 from yuqingtong import config as myconfig
 
-pool = redis.ConnectionPool(host='localhost', port=6379, decode_responses=True)
-r = redis.Redis(connection_pool=pool)
-db_my_qbba = DataBase('sqlserver', config_myQBB_A)
+myredis=my_redis(host='localhost', port=6379, decode_responses=True,db=1)
 db_my_qbba_net = DataBase('sqlserver', config_myQBB_A_net)
 db_my_qbbb = DataBase('sqlserver', config_myQBB_B)
 tables = {
@@ -95,9 +93,10 @@ def find_curent_num(start_time, end_time, myconfig, info, yqt_count):
     sql_A = "select count(*) from {table_name} where publish_time between '{start_time}' and '{end_time}' ".format(
         table_name=table_name, start_time=start_time, end_time=end_time)
 
-    count_A = db_my_qbba.execute_query(sql_A)[0][0]
+    # count_A = db_my_qbba.execute_query(sql_A)[0][0]
+    count_A = db_my_qbba_net.execute_query(sql_A)[0][0]
     # TODO 后续替换
-    count_A_net = db_my_qbba_net.execute_query(sql_A)[0][0]
+    # count_A_net = db_my_qbba_net.execute_query(sql_A)[0][0]
     sql_B = "select count(*) from TS_DataMerge_Base where " \
             "C_Id={C_Id} and PublishDate_Std between '{start_time}' and '{end_time}' ".format(
         C_Id=info['id'], start_time=start_time, end_time=end_time)
@@ -135,7 +134,8 @@ def find_day_data_count(myconfig):
     sql_A = "select count(*) from {} where publish_time between '{start_time}' and '{end_time}' ".format(
         industry_table_name, start_time=start_time, end_time=end_time)
     # 流通贸易这个行业在A库中的数据量
-    count_A = db_my_qbba.execute_query(sql_A)[0][0]
+    # count_A = db_my_qbba.execute_query(sql_A)[0][0]
+    # count_A = db_my_qbba_net.execute_query(sql_A)[0][0]
     # TODO 后续添加 完成DONE
     count_A_net = db_my_qbba_net.execute_query(sql_A)[0][0]
 
@@ -150,7 +150,8 @@ def find_day_data_count(myconfig):
 
     sql_insert_a = "insert into record_log_industry (industry,record_time,TS_A_num,QBB_B_num) values (%s,%s,%d,%d)"
 
-    db_my_qbba.execute(sql_insert_a, (industry_name, end_time, count_A, count_B))
+    # db_my_qbba.execute(sql_insert_a, (industry_name, end_time, count_A, count_B))
+    # db_my_qbba_net.execute(sql_insert_a, (industry_name, end_time, count_A, count_B))
 
     db_my_qbba_net.execute(sql_insert_a, (industry_name, end_time, count_A_net, count_B))
     return count_B
@@ -190,10 +191,10 @@ def get_industry_keywords():
                 sql_QBBA = "select Word,SimultaneousWord,Excludeword from TS_Keywords where C_ID={} " \
                            "group by Word,SimultaneousWord,Excludeword".format(dd)
 
-                data_A = db_my_qbba.execute_query(sql_QBBA)
+                # data_A = db_my_qbba.execute_query(sql_QBBA)
                 # TODO 后续替换
                 data_A_net = db_my_qbba_net.execute_query(sql_QBBA)
-                for da in data_A:
+                for da in data_A_net:
                     project_word = {
                         "keywords": "(",
                         "simultaneouswords": "",
@@ -390,13 +391,13 @@ def post_data(data_list, industry_name):
             "industryId": industry_id
         }
         # 更新redis
-        r.sadd(industry_id, data['链接'])
+        myredis.redis.sadd(industry_id, data['链接'])
 
         # 滤重
         # post_mq.send_to_queue('reptile.stay.process',str(data))
         # print("执行")
         # 插入QBB_A库
-        db_my_qbba.execute(sql_qbb_a)
+        # db_my_qbba.execute(sql_qbb_a)
 
         db_my_qbba_net.execute(sql_qbb_a)
 
@@ -470,9 +471,7 @@ def match_alone_keyword_(info, d):
 def upload_many_data_java(data_list, industry_name, datacenter_id):
     """
     多数据插入
-
     """
-    myredis = my_redis()
     table_name = tables[industry_name]
     # 查询hangyeid
     sql_industry_id = "select id from TS_Industry where name='" + industry_name + "'"
@@ -529,7 +528,7 @@ def upload_many_data_java(data_list, industry_name, datacenter_id):
     print("qbba数据量为：", len(tuple_data_list_qbb_a))
     # print(tuple_data_list_qbb_a)
     for d in tuple_data_list_qbb_a:
-        db_my_qbba.execute(sql_qbb_a, d)
+        # db_my_qbba.execute(sql_qbb_a, d)
 
         db_my_qbba_net.execute(sql_qbb_a, d)
     # db_my_qbba.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
@@ -558,7 +557,6 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     多数据插入
 
     """
-    myredis = my_redis()
     table_name = tables[industry_name]
     # 查询行业id
     sql_industry_id = "select id from TS_Industry where name='" + industry_name + "'"
@@ -604,7 +602,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     # 插入A库
     # db_a.execute_many(sql_ts_a, tuple_data_list_ts_a)
     # 插入qbba库
-    db_my_qbba.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
+    # db_my_qbba.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
 
     db_my_qbba_net.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
 
@@ -619,11 +617,12 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     thream_info_list = []
 
     # First check the topic ID based on the customer ID
-    T_id = db_my_qbba.execute_query(sql_of_Tid)
+    # T_id = db_my_qbba.execute_query(sql_of_Tid)
     # TODO 后续替换
     T_id_net = db_my_qbba_net.execute_query(sql_of_Tid)
 
-    for tt in T_id:
+    # for tt in T_id:
+    for tt in T_id_net:
         info_t = {
             'id': info['id'],
             'industry_name': info['industry_name'],
@@ -866,9 +865,8 @@ def mark_java_match_data(d, theam_list):
             a_month_ago_date = (t2 - datetime.timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
 
             similar_news_sql = f"select SN from TS_DataMerge_Base with (NOLOCK) where Title like '%{item_dict['Title']}%' " \
-                               f"and PublishDate_Std between '{item_dict['PublishDate_Std']}' and '{a_month_ago_date}' order by PublishDate_Std asc"
+                               f"and PublishDate_Std between '{item_dict['PublishDate_Std']}' and '{a_month_ago_date}' order by PublishDate_Std,SN asc"
             print(similar_news_sql)
-            print(similar_result)
             similar_result = db_my_qbbb.execute_query(similar_news_sql)
             if len(similar_result) > 1:
                 print("相似新闻匹配")
@@ -1006,22 +1004,21 @@ def get_month_data(time1, time2, industry_name, flushall=False):
     :param industry_name:行业名字
     :return:
     """
-    myredis = my_redis()
     if flushall:
         myredis.redis.flushall()
     sql = "select industry_id,url from %s where publish_time between '%s' and '%s'" % (
         tables[industry_name], time1, time2)
-    datas = db_my_qbba.execute_query(sql)
+    # datas = db_my_qbba.execute_query(sql)
     # TODO 后续替换
     datas_net = db_my_qbba_net.execute_query(sql)
-    for d in tqdm(iterable=datas, desc="加载<%s>数据数据" % industry_name, unit='条'):
+    # for d in tqdm(iterable=datas, desc="加载<%s>数据数据" % industry_name, unit='条'):
+    for d in tqdm(iterable=datas_net, desc="加载<%s>数据数据" % industry_name, unit='条'):
         myredis.redis.sadd(d[0], d[1])
 
     sql = "select * from  myQBB_B.dbo.TS_MediumURL where id in (select min(id) as mid from QBB_B.dbo.TS_MediumURL group by (domain))"
     data = db_my_qbbb.execute_query(sql)
     for d in tqdm(iterable=data, desc="加载url数据", unit='条'):
         myredis.redis.hset("url", d[3], str(d))
-
     myredis.close()
 
 
@@ -1038,7 +1035,7 @@ def filter_by_url(datalist, industry_name):
     new_data_list = []
     # redis滤重
     for data in datalist:
-        if (r.sismember(industry_id, data['链接']) == False):
+        if (myredis.redis.sismember(industry_id, data['链接']) == False):
             new_data_list.append(data)
     print("rediss 滤重之后的数量")
     print(len(new_data_list))
@@ -1052,7 +1049,7 @@ def record_log(data):
     # A库 每一次抓取的记录
     sql_record = "insert into record_log_table values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
     # data=('3', '2021-4-26 00:00:00','2021-4-26 00:00:00', '2021-4-26 00:00:00', '4', '5', '6', '1')
-    db_my_qbba.execute(sql_record, data)
+    # db_my_qbba.execute(sql_record, data)
 
     db_my_qbba_net.execute(sql_record, data)
     # my_e = my_Email()
@@ -1164,7 +1161,7 @@ def record_day_datas():
                         sq_tsa = f"select yqt_num from record_log_table where start_time='{date_yesterday}' and end_time='{date_now}' and customer='{data['customer']}'"
                         print(sq_tsa)
                         if sq_tsa:
-                            sql_a = db_my_qbba.execute_query(sq_tsa)[0][0]
+                            # sql_a = db_my_qbba.execute_query(sq_tsa)[0][0]
                             # TODO 后续替换
                             sql_a_net = db_my_qbba_net.execute_query(sq_tsa)[0][0]
                         else:
@@ -1173,6 +1170,8 @@ def record_day_datas():
                         source_type_list = list(count_source_type.values())
                         print(source_type_list)
                         spide_helper.all_project_save_record_day(outfile, sql_a, sql_num_B, data['customer'],
+                                                                 data['industry_name'], source_type_list)
+                        spide_helper.all_project_save_record_day(outfile, sql_a_net, sql_num_B, data['customer'],
                                                                  data['industry_name'], source_type_list)
                     except Exception as e:
                         print(e)
