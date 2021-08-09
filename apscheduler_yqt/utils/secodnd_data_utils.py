@@ -16,8 +16,8 @@ from utils.webdriverhelper import WebDriverHelper
 import time
 from fake_useragent import UserAgent
 extractor=GeneralNewsExtractor()
-# webdriver = WebDriverHelper.init_webdriver(is_headless=True, is_hide_image=True)
-webdriver = WebDriverHelper.init_webdriver(is_headless=False, is_hide_image=True)
+webdriver = WebDriverHelper.init_webdriver(is_headless=True, is_hide_image=True)
+# webdriver = WebDriverHelper.init_webdriver(is_headless=False, is_hide_image=True)
 
 def filter_emoji(desstr,restr=''):
     try:
@@ -41,7 +41,8 @@ def crawl_second_by_requests(url:str):
         content = filter_emoji(extractor.extract(html_content, title_xpath='//html/text()')['content'])
         print("通过requests抓取",url)
     except Exception as e:
-        content=""
+        content=crawl_second_by_webdriver(url)
+
     return content
 
 def crawl_second_by_webdriver(url):
@@ -67,6 +68,9 @@ def crawl_second_by_webdriver(url):
             content=webdriver.find_element_by_xpath('//article[@class="article"]').text
         elif "view.inews.qq.com" in webdriver.current_url:
             content=webdriver.find_element_by_xpath('//div[@id="root"]').text
+        #百家号
+        elif "mbd.baidu.com" in webdriver.current_url:
+            content=webdriver.find_element_by_xpath('//div[@class="index-module_articleWrap_2Zphx"]').text
         elif "toutiao" in webdriver.current_url:
             if webdriver.title=='404错误页':
                 content=""
@@ -100,7 +104,8 @@ if __name__ == '__main__':
     # content=crawl_second_by_requests('https://new.qq.com/rain/a/20210602A0B3HG00')
     # content=crawl_second_by_requests('https://zhuanlan.zhihu.com/p/377206711')
     # content=crawl_second_by_requests('https://www.360kuai.com/9f164ef5c9b47ef93')
-    content=crawl_second_by_webdriver('https://view.inews.qq.com/a/20210620A0174400')
+    # content=crawl_second_by_webdriver('https://view.inews.qq.com/a/20210620A0174400')
+    content=crawl_second_by_webdriver('https://www.toutiao.com/i6992489672089862670/')
     # content=crawl_second_by_requests('https://new.qq.com/rain/a/20210620A0174400')
 
     # content=crawl_second_by_requests('https://view.inews.qq.com/a/20210602A01BEQ00')
