@@ -216,10 +216,13 @@ class YQTSpider(object):
         item_trs = doc.xpath('.//tr[@class="ng-scope"]')
         time.sleep(0.2)
         data_list = []
+        keyword_id=doc.xpath('.//li[contains(@class,"site-menu-item open is-shown")]')[0].get("id").split("kw_li_")[-1]
+        keyword_name=doc.xpath(f'.//span[contains(@id,"keywordName_{keyword_id}")]')[0].get("data-original-title")
         for tr in item_trs[1:]:
             tds = tr.xpath('.//td')
             # print(len(tds))
             # 内容
+            article_id=tds[0].xpath('.//input')[0].get('id').split("_")[-1]
             td_title = tds[1]
             # 来源
             td_orgin = tds[3]
@@ -313,14 +316,15 @@ class YQTSpider(object):
                 '链接': source_url,
                 '转发内容': '<pre style="white-space: pre-wrap;white-space: -moz-pre-wrap;' \
                                       'white-space: -pre-wrap;white-space: -o-pre-wrap; ' \
-                                      'word-wrap: break-word;">'+spread_content+content+"</zhengwen></pre>",
+                                      'word-wrap: break-word;"><zhengwen>'+spread_content+content+"</zhengwen></pre>",
                 '发布人': author,
                 'attitude': attitude,
                 'sort': sort,
                 'related_words': relate_words,
                 'site_name': site_name,
                 'area': p.sub("", td_orgin.xpath('.//div[contains(@ng-if,"icc.province")]')[0].text),
-                'C_Id': self.info['id']  # 客户id
+                'C_Id': self.info['id'],  # 客户id
+                'article_id':article_id
             }
 
             # if item['forwarderImages']:
@@ -353,75 +357,12 @@ class YQTSpider(object):
     def clear_data(self, data_list,clear_data_list):
         logger.info("数据处理")
         new_data_list = self.quchong(data_list, "链接")
-
+        title_pattern=re.compile('<zhengwen>(.*)</zhengwen>')
         # 第二次滤重
         new_data_list = ssql_helper.filter_by_url(new_data_list, self.industry_name)
         self.redis_len += len(new_data_list)
 
         for data in new_data_list:
-            # 1.标题或url为空的舍去
-            if data["标题"] == "" and data["链接"] == "":
-                # new_data_list.remove(data)
-                continue
-            #     二层正文处理
-            if data["标题"] == "":
-                if len(data["转发内容"]) >= 20:
-                    data["标题"] = data["转发内容"][0:20]
-                else:
-                    data["标题"] = data["转发内容"]
-            #2.转发微博并且转发内容为空的使舍去
-            elif data["标题"] == "转发微博" and data["转发内容"] == "":
-                # new_data_list.remove(data)
-                print("标题为转发微博，转发内容为空")
-                continue
-            #3.转发类型的微博，取前内容的前20个字符作为标题
-            elif data["标题"] == "转发微博":
-                if len(data["转发内容"]) >= 50:
-                    data["标题"] = data["转发内容"][0:20]
-                    data['描述'] = data["转发内容"][0:120]
-                else:
-                    data["标题"] = data["转发内容"]
-                    data['描述'] = data["转发内容"]
-
-            if data['描述'] != "" and data["转发内容"] == "" and len(data["转发内容"]) == 0:
-                data["转发内容"] = data['描述']
-
-            if data['转发内容'] != "" and data['描述'] == "" and len(data['转发内容']) != 0:
-                # if len(data["转发内容"]) >= 20:
-                #     data["标题"] = data["转发内容"][0:20]
-                # else:
-                #     data['描述'] = data['转发内容']
-                data['描述'] = data['转发内容']
-
-            if data['描述']=="转发微博" and data["转发内容"] != "":
-                if len(data["转发内容"]) >= 50:
-                    data['描述'] = data['转发内容'][0:120]
-                else:
-                    data['描述']=data['转发内容']
-
-            if "微博" in data['site_name']:
-                # print("处理标题")
-                data['标题'] =data['描述'][0:20]
-                if data['sort']=='转发':
-                    if len(data["转发内容"]) >= 120:
-                        data['描述'] = data['转发内容'][0:120]
-                    else:
-                        data['描述'] = data['转发内容']
-            if len(data['描述']) > 120:
-                # print("处理描述")
-                data['描述'] = data['描述'][0:120]
-
-            if "weibo.com" in data["链接"] and data["sort"] != "":
-                data['标题'] = data['描述'][0:20]
-                if data["sort"] == "原创":
-                    data['is_original'] = 1
-                elif data["sort"] == "转发":
-                    data['is_original'] = 0
-                else:
-                    data['is_original'] = 2
-            else:
-                data['is_original'] = 2
-
             if "微博" not in data['site_name']:
                 match_selenim=web_url_selenium.findall( data['链接'])
                 if match_selenim:
@@ -429,7 +370,8 @@ class YQTSpider(object):
                     content=crawl_second_by_webdriver(data['链接'])
                     print("抓取完毕")
                     if content == "":
-                        data['转发内容'] += "<selenium_error hidden>selenium抓取错误</selenium_error hidden>"
+                        data['转发内容'] += "<selenium_error hidden>" \
+                                        "</selenium_error hidden>"
                     if len(content)>len(data['转发内容']):
                         data['转发内容']= '<pre style="white-space: pre-wrap;white-space: -moz-pre-wrap;' \
                                       'white-space: -pre-wrap;white-space: -o-pre-wrap; ' \
@@ -451,6 +393,71 @@ class YQTSpider(object):
                                       'white-space: -pre-wrap;white-space: -o-pre-wrap; ' \
                                       'word-wrap: break-word;" ><zhengwen>'+content+"</zhengwen></pre>"
                             data['转发内容'] += "<requests hidden>\n【通过request抓取】</requests>"
+            content = title_pattern.findall(data["转发内容"])
+            # 1.标题或url为空的舍去
+            if data["标题"] == "" and data["链接"] == "":
+                # new_data_list.remove(data)
+                continue
+            #     二层正文处理
+            if data["标题"] == "":
+                if len(data["转发内容"]) >= 20:
+                    data["标题"] = content[0:20]
+                else:
+                    data["标题"] = content
+            #2.转发微博并且转发内容为空的舍去
+            elif data["标题"] == "转发微博" and data["转发内容"] == "":
+                # new_data_list.remove(data)
+                print("标题为转发微博，转发内容为空")
+                continue
+            #3.转发类型的微博，取前内容的前20个字符作为标题
+            elif data["标题"] == "转发微博":
+                if len(data["转发内容"]) >= 50:
+                    data["标题"] = content[0:20]
+                    data['描述'] = content[0:120]
+                else:
+                    data["标题"] = content
+                    data['描述'] = content
+
+            if data['描述'] != "" and content == "" and len(content) == 0:
+                data["转发内容"] = data['描述']
+
+            if data['转发内容'] != "" and data['描述'] == "" and len(content) != 0:
+                # if len(data["转发内容"]) >= 20:
+                #     data["标题"] = data["转发内容"][0:20]
+                # else:
+                #     data['描述'] = data['转发内容']
+                data['描述'] = data['转发内容']
+
+            if data['描述']=="转发微博" and content != "":
+                if len(content) >= 50:
+                    data['描述'] = content[0:120]
+                else:
+                    data['描述']=content
+
+            if "微博" in data['site_name']:
+                # print("处理标题")
+                data['标题'] =data['描述'][0:20]
+                if data['sort']=='转发':
+                    if len(content) >= 120:
+                        data['描述'] = content[0:120]
+                    else:
+                        data['描述'] = content
+            if len(data['描述']) > 120:
+                # print("处理描述")
+                data['描述'] = data['描述'][0:120]
+
+            if "weibo.com" in data["链接"] and data["sort"] != "":
+                data['标题'] = data['描述'][0:20]
+                if data["sort"] == "原创":
+                    data['is_original'] = 1
+                elif data["sort"] == "转发":
+                    data['is_original'] = 0
+                else:
+                    data['is_original'] = 2
+            else:
+                data['is_original'] = 2
+
+
             clear_data_list.append(data)
 
     # 第一次根据爬取链接去重
@@ -654,7 +661,7 @@ class YQTSpider(object):
         点击每页100条按钮
         :return:
         """
-        self.spider_driver.get("http://yuqing.sina.com/yqmonitor")
+        self.spider_driver.get("http://yuqing.sina.com/newEdition/yqmonitor")
         if not self._is_page_loaded():
             logger.info("更改100条数据/每页前，页面加载有问题")
             return False
