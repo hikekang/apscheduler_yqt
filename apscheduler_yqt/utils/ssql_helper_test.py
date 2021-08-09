@@ -8,24 +8,17 @@
 import os
 from concurrent.futures.thread import ThreadPoolExecutor
 from utils.snowflake import IdWorker
-import redis
 import re
 import requests
-from utils.email_helper import my_Email
 from utils.ssql_pool_helper import DataBase, config_QBBA, config_QBBB,config_QBBA_net
 from utils.redis_helper import my_redis
 from tqdm import tqdm
 import uuid
-# from utils import domain
-# from datetime import datetime
 import datetime
 from urllib import parse
-# from utils import post_mq
-from pprint import pprint
 from utils.spider_helper import SpiderHelper
 from yuqingtong import config as myconfig
-pool = redis.ConnectionPool(host='localhost', port=6379, decode_responses=True)
-r = redis.Redis(connection_pool=pool)
+myredis=my_redis(host='localhost', port=6379, decode_responses=True,db=0)
 config = {
     'server': '223.223.180.9',
     'user': 'tuser1',
@@ -402,7 +395,7 @@ def post_data(data_list, industry_name):
             "industryId": industry_id
         }
         # 更新redis
-        r.sadd(industry_id, data['链接'])
+        myredis.redis.sadd(industry_id, data['链接'])
 
         # 滤重
         # post_mq.send_to_queue('reptile.stay.process',str(data))
@@ -487,7 +480,6 @@ def upload_many_data_java(data_list, industry_name,datacenter_id):
     多数据插入
 
     """
-    myredis = my_redis()
     table_name = tables[industry_name]
     # 查询hangyeid
     sql_industry_id = "select id from TS_Industry where name='" + industry_name + "'"
@@ -571,7 +563,6 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     多数据插入
 
     """
-    myredis = my_redis()
     table_name = tables[industry_name]
     # 查询行业id
     sql_industry_id = "select id from TS_Industry where name='" + industry_name + "'"
@@ -685,7 +676,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         if flag == 0:
             # if r.hexists("url", '.'.join(rx[0:])):
             # 插入更新TS_MediumURL数据
-            url_data = (domain_search, "全网", domain_search, 8, 1)
+            url_data = (domain_search, "其它", domain_search, 8, 1)
             sql_MediumSource_Type = "insert into TS_MediumURL (source_name,source_type,domain,medium_type,stat)" \
                                     " values(%s,%s,%s,%d,%d)"
             db_qbbb.execute(sql_MediumSource_Type, url_data)
@@ -1014,7 +1005,6 @@ def get_month_data(time1, time2, industry_name,flushall=False):
     :param industry_name:行业名字
     :return:
     """
-    myredis = my_redis()
     if flushall:
         myredis.redis.flushall()
     sql = "select industry_id,url from %s where publish_time between '%s' and '%s'" % (
@@ -1046,7 +1036,7 @@ def filter_by_url(datalist, industry_name):
     new_data_list = []
     # redis滤重
     for data in datalist:
-        if (r.sismember(industry_id, data['链接']) == False):
+        if (myredis.redis.sismember(industry_id, data['链接']) == False):
             new_data_list.append(data)
     print("rediss 滤重之后的数量")
     print(len(new_data_list))
@@ -1111,7 +1101,7 @@ def record_day_datas():
     project_name=eval(mycon.getValueByDict('spider_config','project_name'))
     print(project_name)
     # outfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"记录\\", f"{datetime.date.today()}.xlsx")
-    for i in range(0,1):
+    for i in range(0,3):
         date_now = (datetime.datetime.now()- datetime.timedelta(days=i)).strftime('%Y-%m-%d 00:00:00')
         date_yesterday = (datetime.datetime.now() - datetime.timedelta(days=i+1)).strftime("%Y-%m-%d 00:00:00")
         record_time=(datetime.datetime.now() - datetime.timedelta(days=i+1)).strftime("%Y-%m-%d")
@@ -1122,12 +1112,16 @@ def record_day_datas():
             for item in project_name:
                 if data['customer'] == item:
                     print(data['customer'])
-                    sql_qbbb = """
-                        select sum (url_count) from (select count(*) as url_count from 
-                        TS_DataMerge_Base where C_Id='{0}' and PublishDate_Std between '{2}' and '{1}') as temp""".format(data['id'], date_now, date_yesterday)
+                    # sql_qbbb = """
+                    #     select sum (url_count) from (select count(*) as url_count from 
+                    #     TS_DataMerge_Base where C_Id='{0}' and PublishDate_Std
+                    #     between '{2}' and '{1}') as temp""".format(data['id'], date_now, date_yesterday)
+                    sql_qbbb = """ select count(*) from (select URL as url_count from 
+    TS_DataMerge_Base with (NOLOCK) where C_Id='{0}' and PublishDate_Std between '{2}' and '{1}' group by URL ) as temp""".format(
+                        data['id'], date_now, date_yesterday)
                     print(sql_qbbb)
                     sql_num_B=db_qbbb.execute_query(sql_qbbb)[0][0]
-                    sql_qbbb_source_type="select source_type,count(*) from QBB_B.dbo.TS_DataMerge_Base  where C_Id='{0}'  and " \
+                    sql_qbbb_source_type="select source_type,count(*) from QBB_B.dbo.TS_DataMerge_Base with (NOLOCK)  where C_Id='{0}'  and " \
                                          "PublishDate_Std between '{2}' and '{1}' group by source_type".format(data['id'], date_now, date_yesterday)
                     print(sql_qbbb_source_type)
                     source_type=db_qbbb.execute_query(sql_qbbb_source_type)
@@ -1141,12 +1135,13 @@ def record_day_datas():
                         '论坛':0,
                         '电子报':0,
                         '微博':0,
-                        "全网":0
+                        "其它":0
                     }
                     for item in source_type:
                         # print(item)
                         # item_ssql=f"select source_type from QBB_B.dbo.TS_MediumURL where {item[0]}=id"
-                        item_ssql=f"select medium_type from QBB_B.dbo.TS_MediumURL where {item[0]}=id"
+                        item_ssql=f"select source_type from QBB_B.dbo.TS_MediumURL with (NOLOCK)  where {item[0]}=id"
+                        print(item_ssql)
                         item_type=db_qbbb.execute_query(item_ssql)
                         sourc_dict={
                             "1":"网媒",
@@ -1156,16 +1151,20 @@ def record_day_datas():
                             "5":"论坛",
                             "6":"电子报",
                             "7":"微博",
-                            "8":"全网",
+                            "8":"其它",
                             "9":"问答",
                             "10":"客户端",
                         }
                         if item_type:
-                            count_source_type[sourc_dict[str(item_type[0][0])]]+=item[-1]
+                            # a=str(item_type[0][0])
+                            print(str(item_type[0][0]))
+                            # b=sourc_dict[a]
+                            c=item[-1]
+                            count_source_type[str(item_type[0][0])]+=c
                     print(count_source_type)
                     # 舆情通数量待定
 
-                    sq_tsa=f"select yqt_num from record_log_table where start_time='{date_yesterday}' and end_time='{date_now}' and customer='{data['customer']}'"
+                    sq_tsa=f"select yqt_num from record_log_table with (NOLOCK)  where start_time='{date_yesterday}' and end_time='{date_now}' and customer='{data['customer']}'"
                     print(sq_tsa)
                     try:
                         if sq_tsa:
@@ -1180,6 +1179,22 @@ def record_day_datas():
                     print(source_type_list)
                     spide_helper.all_project_save_record_day(outfile,sql_a,sql_num_B,data['customer'],data['industry_name'],source_type_list)
 
+def Content_correction():
+    select_sql="select * from TS_DataMerge_Base where title like '%pre style%' or Summary like '%pre style%' " \
+               "and PublishDate_Std>'2021-08-04 00:00:00'"
+    print(select_sql)
+    result=db_qbbb.execute_query(select_sql)
+    pattern = re.compile('<zhengwen>(.*)</zhengwen>')
+
+    # result[0][8].encode('latin1').decode('gbk')
+    for item in result:
+
+        content=item[8].encode('latin1').decode('gbk')
+        result=pattern.findall(content)
+        if len(result)>0:
+            content = result[0]
+            update_sql=f"update TS_DataMerge_Base set Title='{content[0:20]}',Summary='{content[0:120]}' where sn='{item[0]}' "
+            db_qbbb.execute(update_sql)
 
 
 if __name__ == '__main__':
@@ -1192,32 +1207,12 @@ if __name__ == '__main__':
     # for d in merger_industry_data(get_industry_keywords()):
     #     print(d)
     #     print("***"*20)
-    for data in get_industry_keywords():
-        # if data['customer']=='柯尼卡':
-            print(data)
-    # c_d=get_industry_keywords()
-    # mao_d=[]
-    # for d in c_d:
-    #     if d['industry_name']=='流通贸易':
-    #         mao_d.append(d)
-    # pprint(mao_d)
-    # url='http://thsggzyjy.tonghua.gov.cn/jyxx/004002/004002003/004002003002/20210621/e40bfb43-1a2c-41a7-bed5-8c68429f4a53.html'
-    # fi = domain.ExtractLevelDomain()
-    # for i in range(3, 0, -1):
-    #     flag = 0
-    #     print(i)
-    #     获取XX子级域名
-        # domain_level = fi.parse_url_level(url, i)
-        # print(domain_level)
-    #     if r.hexists("url", domain_level):
-    #         ret = eval(r.hget("url", domain_level))
-    #         print(ret[-2])  # medium_type)
-    #         # source_type:TS_MediumURL 的 id 自动增长
-    #         print(ret[0])
-    #         flag = 1
-    #         break
+    # for data in get_industry_keywords():
+    #     # if data['customer']=='柯尼卡':
+    #         print(data)
     # if flag==0:
     #     print("匹配成功")
     # file_name=os.path.join(  os.path.dirname(os.path.abspath(__file__)),f"记录\\" ,f"{datetime.date.today()}.xlsx")
     # print(file_name)
     record_day_datas()
+    # Content_correction()
