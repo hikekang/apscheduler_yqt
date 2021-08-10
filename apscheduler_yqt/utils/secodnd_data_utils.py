@@ -39,10 +39,12 @@ def crawl_second_by_requests(url:str):
         html = requests.get(url,proxies=proxy,headers=header)
         html_content = html.content.decode('utf-8')
         content = filter_emoji(extractor.extract(html_content, title_xpath='//html/text()')['content'])
+        content+="<requests hidden>\n【只使用request抓取】</requests>"
         print("通过requests抓取",url)
     except Exception as e:
         content=crawl_second_by_webdriver(url)
-
+        content+="<resuerst+selenium hidden>resuerst+selenium</resuerst+selenium>"
+    content += "<requests hidden>\n【通过request抓取】</requests>"
     return content
 
 def crawl_second_by_webdriver(url):
@@ -79,6 +81,12 @@ def crawl_second_by_webdriver(url):
                 print("获取源码")
                 page_source = webdriver.page_source
                 content = filter_emoji(extractor.extract(page_source, title_xpath='//html/text()')['content'])
+        elif "tousu.sina.com.cn" in webdriver.current_url:
+            question=webdriver.find_element_by_xpath('//div[@class="ts-d-question"]').text
+            steplist=webdriver.find_element_by_xpath('//div[@class="ts-d-steplist"]').text
+            content=question+steplist
+            return content
+
         else:
             print("获取源码")
             page_source = webdriver.page_source
@@ -105,7 +113,7 @@ if __name__ == '__main__':
     # content=crawl_second_by_requests('https://zhuanlan.zhihu.com/p/377206711')
     # content=crawl_second_by_requests('https://www.360kuai.com/9f164ef5c9b47ef93')
     # content=crawl_second_by_webdriver('https://view.inews.qq.com/a/20210620A0174400')
-    content=crawl_second_by_webdriver('https://www.toutiao.com/i6992489672089862670/')
+    content=crawl_second_by_webdriver('https://tousu.sina.com.cn/complaint/view/17354346525/')
     # content=crawl_second_by_requests('https://new.qq.com/rain/a/20210620A0174400')
 
     # content=crawl_second_by_requests('https://view.inews.qq.com/a/20210602A01BEQ00')
