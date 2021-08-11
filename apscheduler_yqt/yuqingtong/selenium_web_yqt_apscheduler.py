@@ -64,7 +64,8 @@ import requests
 extractor=GeneralNewsExtractor()
 # 教程
 web_url_selenium=re.compile('http[s]://(www.toutiao.com)|(mp.weixin.qq.com)|'
-                            '(dy.163.com/v2/article/detail)|(kuaibao.qq.com)|(www.sohu.com)|(www.360kuai.com)|(view.inews.qq.com).*')
+                            '(dy.163.com/v2/article/detail)|(kuaibao.qq.com)'
+                            '|(www.sohu.com)|(www.360kuai.com)|(view.inews.qq.com)|(tousu.sina.com.cn).*')
 # web_url_selenium_list=['www.toutiao.com','mp.weixin.qq.com']
 video_url=re.compile('http[s]://(v.qq.com)|(live.kuaishou.com)|(www.iesdouyin.com)|(www.ixigua.com)|(m.toutiaoimg.cn).*')
 # video_url_list=['v.qq.com','live.kuaishou.com','www.iesdouyin.com','www.ixigua.com']
@@ -216,8 +217,8 @@ class YQTSpider(object):
         item_trs = doc.xpath('.//tr[@class="ng-scope"]')
         time.sleep(0.2)
         data_list = []
-        keyword_id=doc.xpath('.//li[contains(@class,"site-menu-item open is-shown")]')[0].get("id").split("kw_li_")[-1]
-        keyword_name=doc.xpath(f'.//span[contains(@id,"keywordName_{keyword_id}")]')[0].get("data-original-title")
+        # keyword_id=doc.xpath('.//li[contains(@class,"site-menu-item open is-shown")]')[0].get("id").split("kw_li_")[-1]
+        # keyword_name=doc.xpath(f'.//span[contains(@id,"keywordName_{keyword_id}")]')[0].get("data-original-title")
         for tr in item_trs[1:]:
             tds = tr.xpath('.//td')
             # print(len(tds))
@@ -282,21 +283,14 @@ class YQTSpider(object):
             if site_name == '新浪微博':
                 author = author_or_title
             else:
-                result_a_t = author_or_title.split(":")
-                result_a_t_1 = author_or_title.split("：")
-
-                if len(result_a_t) >= 2 :
-                    author = result_a_t[0]
-                    title=''.join(result_a_t[1:])
-                elif len(result_a_t_1)>=2:
-                    author = result_a_t_1[0]
-                    title = ''.join(result_a_t_1[1:])
+                title_pattern=re.compile('(.*)[:|：](.*)')
+                title_match=title_pattern.findall(author_or_title)
+                if len(title_match)>1:
+                    author=title_match[0]
+                    title=''.join(title_match[1:])
                 else:
                     author=''
-                    if result_a_t_1:
-                        title= result_a_t_1[0]
-                    if result_a_t:
-                        title=result_a_t[0]
+                    title=title_match[0]
             # 行业
             # industry = p.sub("", td_title.xpath('.//div[@class="profile-tip inline-block"]/nz-tag[2]/span/text()')[0])
             # 关键词
@@ -364,26 +358,26 @@ class YQTSpider(object):
 
         for data in new_data_list:
             if "微博" not in data['site_name']:
-                match_selenim=web_url_selenium.findall( data['链接'])
-                if match_selenim:
-                    print("通过selenium抓取")
-                    content=crawl_second_by_webdriver(data['链接'])
-                    print("抓取完毕")
-                    if content == "":
-                        data['转发内容'] += "<selenium_error hidden>" \
-                                        "</selenium_error hidden>"
-                    if len(content)>len(data['转发内容']):
-                        data['转发内容']= '<pre style="white-space: pre-wrap;white-space: -moz-pre-wrap;' \
-                                      'white-space: -pre-wrap;white-space: -o-pre-wrap; ' \
-                                      'word-wrap: break-word;" ><zhengwen>'+content+"</zhengwen></pre>"
-                        data['转发内容']+="<selenium hidden>\n【通过selenium抓取】</selenium>"
-                    # self.spider_driver.switch_to.window(self.spider_driver.window_handles[0])
-                    # print(data['转发内容'])
+                match_video = video_url.findall(data['链接'])
+                if match_video:
+                    print("跳过视频")
+                    data['转发内容'] += "<viode_error hidden>跳过视频</viode_error hidden>"
                 else:
-                    match_video=video_url.findall(data['链接'])
-                    if match_video:
-                        print("跳过视频")
-                        data['转发内容'] += "<viode_error hidden>跳过视频</viode_error hidden>"
+                    match_selenim = web_url_selenium.findall(data['链接'])
+                    if match_selenim:
+                        print("通过selenium抓取")
+                        content=crawl_second_by_webdriver(data['链接'])
+                        print("抓取完毕")
+                        if content == "":
+                            data['转发内容'] += "<selenium_error hidden>" \
+                                            "</selenium_error hidden>"
+                        if len(content)>len(data['转发内容']):
+                            data['转发内容']= '<pre style="white-space: pre-wrap;white-space: -moz-pre-wrap;' \
+                                          'white-space: -pre-wrap;white-space: -o-pre-wrap; ' \
+                                          'word-wrap: break-word;" ><zhengwen>'+content+"</zhengwen></pre>"
+                            data['转发内容']+="<selenium hidden>\n【通过selenium抓取】</selenium>"
+                        # self.spider_driver.switch_to.window(self.spider_driver.window_handles[0])
+                        # print(data['转发内容'])
                     else:
                         content= crawl_second_by_requests(data['链接'])
                         if content=="":
@@ -392,7 +386,8 @@ class YQTSpider(object):
                             data['转发内容']= '<pre style="white-space: pre-wrap;white-space: -moz-pre-wrap;' \
                                       'white-space: -pre-wrap;white-space: -o-pre-wrap; ' \
                                       'word-wrap: break-word;" ><zhengwen>'+content+"</zhengwen></pre>"
-                            data['转发内容'] += "<requests hidden>\n【通过request抓取】</requests>"
+                        else:
+                            data['转发内容']+="<yqt hidden>\n【使用舆情通原内容】</yqt>"
             content = title_pattern.findall(data["转发内容"])
             # 1.标题或url为空的舍去
             if data["标题"] == "" and data["链接"] == "":
@@ -533,10 +528,10 @@ class YQTSpider(object):
             logger.info('数据抓取完毕')
             # 数据进行处理
             clear_data_list=[]
-            # self.clear_data(data_list,clear_data_list)
+            self.clear_data(data_list,clear_data_list)
 
-            with ThreadPoolExecutor(10) as pool:
-                pool.submit(self.clear_data,data_list,clear_data_list)
+            # with ThreadPoolExecutor(10) as pool:
+            #     pool.submit(self.clear_data,data_list,clear_data_list)
             # 插入到数据库，返回一个成功插入的值
             # 上传数据,每页抓取
 
@@ -618,7 +613,8 @@ class YQTSpider(object):
                     input = self.spider_driver.find_element_by_xpath(f"//input[@id='{key}']")
                     if input.is_selected():
                         input.click()
-
+        allinfo=self.spider_driver.find_element_by_xpath("//span[contains(text(),'全部信息')]")
+        allinfo.click()
         time.sleep(0.5)
         print("点击查询")
         driver.find_element_by_xpath("//a[@id='searchListButton']").click()
@@ -888,7 +884,7 @@ class YQTSpider(object):
                                                    ':', '_'))
             logger.info(self.data_file_path)
             # 设置关键词
-            self.modifi_keywords_new()
+            # self.modifi_keywords_new()
 
             # 抓取数据并记录
             resp = self._crawl2(time_sleep)
@@ -1078,7 +1074,7 @@ if __name__ == '__main__':
     myconfig = config.redconfig()
     industry_name = myconfig.getValueByDict('industry_info', 'industry_name')
 
-    ssql_helper.get_month_data(time1, today, industry_name,flushall=False)
+    # ssql_helper.get_month_data(time1, today, industry_name,flushall=True)
 
     chromedriver_path = myconfig.getValueByDict('chromerdriver', 'path')
 
