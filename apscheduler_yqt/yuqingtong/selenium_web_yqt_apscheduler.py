@@ -370,7 +370,7 @@ class YQTSpider(object):
     def clear_data(self, data_list,clear_data_list):
         logger.info("数据处理")
         new_data_list = self.quchong(data_list, "链接")
-        title_pattern=re.compile('<zhengwen>(.*)</zhengwen>')
+        title_pattern=re.compile('<zhengwen>([\s\S.]*)</zhengwen>')
         # 第二次滤重
         new_data_list = ssql_helper.filter_by_url(new_data_list, self.industry_name)
         self.redis_len += len(new_data_list)
@@ -407,6 +407,7 @@ class YQTSpider(object):
                                       'word-wrap: break-word;" ><zhengwen>'+content+"</zhengwen></pre>"
                         else:
                             data['转发内容']+="<yqt hidden>\n【使用舆情通原内容】</yqt>"
+            print(data["转发内容"])
             content = title_pattern.findall(data["转发内容"])[0]
             # 1.标题或url为空的舍去
             if data["标题"] == "" and data["链接"] == "":
