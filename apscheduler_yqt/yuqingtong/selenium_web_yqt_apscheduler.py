@@ -283,14 +283,33 @@ class YQTSpider(object):
             if site_name == '新浪微博':
                 author = author_or_title
             else:
-                title_pattern=re.compile('(.*)[:|：](.*)')
-                title_match=title_pattern.findall(author_or_title)
-                if len(title_match)>1:
-                    author=title_match[0]
-                    title=''.join(title_match[1:])
+                # title_pattern=re.compile('(.*)[:|：](.*)')
+                # title_match=title_pattern.findall(author_or_title)
+                # if len(title_match)>0:
+                #     if len(title_match[0])>1:
+                #         author=title_match[0][0]
+                #         title=''.join(title_match[0][1:])
+                #     else:
+                #         author=''
+                #         title=title_match[0][0]
+                # else:
+                #     author=''
+                #     title=author_or_title
+                result_a_t = author_or_title.split(":")
+                result_a_t_1 = author_or_title.split("：")
+
+                if len(result_a_t) >= 2:
+                    author = result_a_t[0]
+                    title = ''.join(result_a_t[1:])
+                elif len(result_a_t_1) >= 2:
+                    author = result_a_t_1[0]
+                    title = ''.join(result_a_t_1[1:])
                 else:
-                    author=''
-                    title=title_match[0]
+                    author = ''
+                    if result_a_t_1:
+                        title = result_a_t_1[0]
+                    if result_a_t:
+                        title = result_a_t[0]
             # 行业
             # industry = p.sub("", td_title.xpath('.//div[@class="profile-tip inline-block"]/nz-tag[2]/span/text()')[0])
             # 关键词
@@ -388,7 +407,7 @@ class YQTSpider(object):
                                       'word-wrap: break-word;" ><zhengwen>'+content+"</zhengwen></pre>"
                         else:
                             data['转发内容']+="<yqt hidden>\n【使用舆情通原内容】</yqt>"
-            content = title_pattern.findall(data["转发内容"])
+            content = title_pattern.findall(data["转发内容"])[0]
             # 1.标题或url为空的舍去
             if data["标题"] == "" and data["链接"] == "":
                 # new_data_list.remove(data)
@@ -614,7 +633,10 @@ class YQTSpider(object):
                     if input.is_selected():
                         input.click()
         allinfo=self.spider_driver.find_element_by_xpath("//span[contains(text(),'全部信息')]")
+        asc_time=self.spider_driver.find_element_by_xpath("//span[contains(text(),'时间升序')]")
         allinfo.click()
+        time.sleep(0.5)
+        asc_time.click()
         time.sleep(0.5)
         print("点击查询")
         driver.find_element_by_xpath("//a[@id='searchListButton']").click()
@@ -884,7 +906,7 @@ class YQTSpider(object):
                                                    ':', '_'))
             logger.info(self.data_file_path)
             # 设置关键词
-            # self.modifi_keywords_new()
+            self.modifi_keywords_new()
 
             # 抓取数据并记录
             resp = self._crawl2(time_sleep)
