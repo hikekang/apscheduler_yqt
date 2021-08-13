@@ -28,7 +28,7 @@ config = {
 }
 # db_a = DataBase('sqlserver', config_A)
 # db_b = DataBase('sqlserver', config_B)
-db_qbba = DataBase('sqlserver', config_QBBA)
+# db_qbba = DataBase('sqlserver', config_QBBA)
 db_qbbb = DataBase('sqlserver', config_QBBB)
 db_qbba_net = DataBase('sqlserver', config_QBBA_net)
 tables = {
@@ -90,7 +90,7 @@ def find_curent_num(start_time, end_time, myconfig,info,yqt_count):
     sql_A = "select count(*) from {table_name} where publish_time between '{start_time}' and '{end_time}' ".format(
         table_name=table_name, start_time=start_time, end_time=end_time)
 
-    count_A = db_qbba.execute_query(sql_A)[0][0]
+    # count_A = db_qbba.execute_query(sql_A)[0][0]
     # TODO 内网数据库查看数据量
     count_A_net = db_qbba_net.execute_query(sql_A)[0][0]
     sql_B = "select count(*) from TS_DataMerge_Base where " \
@@ -99,7 +99,7 @@ def find_curent_num(start_time, end_time, myconfig,info,yqt_count):
 
     count_B = db_qbbb.execute_query(sql_B)[0][0]
 
-    return count_A,count_B
+    return count_A_net,count_B
 
 
 def find_day_data_count(myconfig):
@@ -129,7 +129,7 @@ def find_day_data_count(myconfig):
     sql_A = "select count(*) from {} where publish_time between '{start_time}' and '{end_time}' ".format(
         industry_table_name, start_time=start_time, end_time=end_time)
     # 流通贸易这个行业在A库中的数据量
-    count_A = db_qbba.execute_query(sql_A)[0][0]
+    # count_A = db_qbba.execute_query(sql_A)[0][0]
     # TODO 后续添加 完成DONE
     count_A_net = db_qbba_net.execute_query(sql_A)[0][0]
 
@@ -145,7 +145,7 @@ def find_day_data_count(myconfig):
 
     sql_insert_a = "insert into record_log_industry (industry,record_time,TS_A_num,QBB_B_num) values (%s,%s,%d,%d)"
 
-    db_qbba.execute(sql_insert_a, (industry_name, end_time, count_A, count_B))
+    # db_qbba.execute(sql_insert_a, (industry_name, end_time, count_A, count_B))
 
     db_qbba_net.execute(sql_insert_a, (industry_name, end_time, count_A_net, count_B))
 
@@ -187,10 +187,10 @@ def get_industry_keywords():
                 sql_QBBA = "select Word,SimultaneousWord,Excludeword from QBB_A.dbo.TS_Keywords where C_ID={} " \
                            "group by Word,SimultaneousWord,Excludeword".format(dd)
 
-                data_A = db_qbba.execute_query(sql_QBBA)
+                # data_A = db_qbba.execute_query(sql_QBBA)
                 # TODO 后续替换
                 data_A_net = db_qbba_net.execute_query(sql_QBBA)
-                for da in data_A:
+                for da in data_A_net:
                     project_word={
                         "keywords":"(",
                         "simultaneouswords":"",
@@ -401,7 +401,7 @@ def post_data(data_list, industry_name):
         # post_mq.send_to_queue('reptile.stay.process',str(data))
         # print("执行")
         # 插入QBB_A库
-        db_qbba.execute(sql_qbb_a)
+        # db_qbba.execute(sql_qbb_a)
 
         # 入内网的库
         db_qbba_net.execute(sql_qbb_a)
@@ -441,10 +441,12 @@ def match_alone_keyword_(info, d):
     match_data=d['标题'] + d['转发内容'] + d['描述']+d['related_words']
     if info['keywords'] != '':
         if info['excludewords'] == '' and info['simultaneouswords'] == '':
-            if contain_keywords(info['keywords'],match_data ):
+            if contain_keywords(info['keywords'],match_data):
                 d['sort_num'] += 1
                 if info['parent_id'] not in d['parent_id']:
                     d['parent_id'].append(info['parent_id'])
+                    d['class_id'].append(info['class_id'])
+                else:
                     d['class_id'].append(info['class_id'])
 
         elif info['simultaneouswords'] != '' and info['excludewords'] == '':
@@ -454,12 +456,16 @@ def match_alone_keyword_(info, d):
                     if info['parent_id'] not in d['parent_id']:
                         d['parent_id'].append(info['parent_id'])
                         d['class_id'].append(info['class_id'])
+                    else:
+                        d['class_id'].append(info['class_id'])
         elif info['simultaneouswords'] == '' and info['excludewords'] != '':
             if contain_keywords(info['keywords'], match_data):
                 if contain_keywords(info['excludewords'], match_data) != True:
                     d['sort_num'] += 1
                     if info['parent_id'] not in d['parent_id']:
                         d['parent_id'].append(info['parent_id'])
+                        d['class_id'].append(info['class_id'])
+                    else:
                         d['class_id'].append(info['class_id'])
         elif info['simultaneouswords'] != '' and info['excludewords'] != '':
             if contain_keywords(info['keywords'], match_data):
@@ -468,6 +474,8 @@ def match_alone_keyword_(info, d):
                         d['sort_num'] += 1
                         if info['parent_id'] not in d['parent_id']:
                             d['parent_id'].append(info['parent_id'])
+                            d['class_id'].append(info['class_id'])
+                        else:
                             d['class_id'].append(info['class_id'])
     return d
 
@@ -536,7 +544,7 @@ def upload_many_data_java(data_list, industry_name,datacenter_id):
     print("qbba数据量为：",len(tuple_data_list_qbb_a))
     # print(tuple_data_list_qbb_a)
     for d in tuple_data_list_qbb_a:
-        db_qbba.execute(sql_qbb_a,d)
+        # db_qbba.execute(sql_qbb_a,d)
 
         db_qbba_net.execute(sql_qbb_a,d)
     # db_qbba.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
@@ -600,7 +608,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         requests.get(url=url, proxies=proxies, params=tag_data)
 
 
-    #     schemas
+    #schemas
     sql_qbb_a = "insert into QBB_A." + table_name + "(id,industry_id,title,summary,content,url,author,publish_time," \
                                                     "is_original,location,emotion_status) " \
                                                     "values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
@@ -609,7 +617,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     # 插入A库
     # db_a.execute_many(sql_ts_a, tuple_data_list_ts_a)
     # 插入qbba库
-    db_qbba.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
+    # db_qbba.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
 
 
     # 插入内网的库
@@ -626,12 +634,12 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     thream_info_list = []
 
     # First check the topic ID based on the customer ID
-    T_id = db_qbba.execute_query(sql_of_Tid)
+    # T_id = db_qbba.execute_query(sql_of_Tid)
 
     # TODO 后续替换
     T_id_net = db_qbba_net.execute_query(sql_of_Tid)
 
-    for tt in T_id:
+    for tt in T_id_net:
         info_t = {
             'id': info['id'],
             'industry_name': info['industry_name'],
@@ -706,11 +714,11 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         mark_java_match_data(d, thream_info_list)
         print("完成")
 
-    with ThreadPoolExecutor(10) as pool:
-        for index,d in enumerate(data_list):
-            pool.submit(load_data,index,d)
-    # for index, d in enumerate(data_list):
-    #     load_data(index, d)
+    # with ThreadPoolExecutor(10) as pool:
+    #     for index,d in enumerate(data_list):
+    #         pool.submit(load_data,index,d)
+    for index, d in enumerate(data_list):
+        load_data(index, d)
     myredis.close()
     # post_mq.close_mq()
 
@@ -809,6 +817,9 @@ def mark_java_match_data(d,theam_list):
         'Author_Name': '',
         'create_date': ''
     }
+    # print("标题",d['标题'])
+    # print("转发内容",d['转发内容'])
+    # print("描述",d['描述'])
     match_data = d['标题'] + d['转发内容'] + d['描述']
     # 监测主题关键词进行匹配规则
     for info in theam_list:
@@ -848,6 +859,11 @@ def mark_java_match_data(d,theam_list):
                 'queues': 'task.msg.emotion_2.1',
                 'message': str(post_data)
             }
+            # 词云
+            word_post_data = {
+                'queues': 'task.msg.wordcloud_2.1',
+                'message': str({"cid": d['C_Id'], "title": d['标题'], "body": d['转发内容']})
+            }
             url = 'http://localhost:8090/jms/send'
             # 单条
             proxies = {'http': None, 'https': None}
@@ -857,6 +873,9 @@ def mark_java_match_data(d,theam_list):
                 'message': str({"sN": d['SN'], "cId": d['C_Id']})
             }
             requests.get(url=url, proxies=proxies, params=tag_data)
+
+            requests.get(url=url, proxies=proxies, params=word_post_data)
+
             # 数据插入B库
             sql_of_base = 'insert into TS_DataMerge_Base ({}) values ({})'. \
                 format(",".join(iisql.keys()), ",".join(['%s'] * len(iisql.keys())))
@@ -976,8 +995,10 @@ def sub_class_match_data(info,d):
         info['class_id'] = class_info['A_id']
         # LogReaper
         # 是否匹配当前分类 进行处理 sort_num和parent_id
+        pre_data_len=len(data['class_id'])
         curent_class_data = match_alone_keyword_(info, data)
-        if len(curent_class_data['class_id'])!=0:
+
+        if len(curent_class_data['class_id'])>pre_data_len:
             # 获取当前级别的数据
             for i_data in item_sub_class:
                 item_son_data = dict(zip(listdict, list(i_data)))
@@ -1009,10 +1030,10 @@ def get_month_data(time1, time2, industry_name,flushall=False):
         myredis.redis.flushall()
     sql = "select industry_id,url from %s where publish_time between '%s' and '%s'" % (
         tables[industry_name], time1, time2)
-    datas = db_qbba.execute_query(sql)
+    # datas = db_qbba.execute_query(sql)
     datas_net = db_qbba_net.execute_query(sql)
 
-    for d in tqdm(iterable=datas, desc="加载<%s>数据数据" % industry_name, unit='条'):
+    for d in tqdm(iterable=datas_net, desc="加载<%s>数据数据" % industry_name, unit='条'):
         myredis.redis.sadd(d[0], d[1])
 
     sql = "select * from  QBB_B.dbo.TS_MediumURL where id in (select min(id) as mid from QBB_B.dbo.TS_MediumURL group by (domain))"
@@ -1050,7 +1071,7 @@ def record_log(data):
     # A库 每一次抓取的记录
     sql_record = "insert into record_log_table values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
     # data=('3', '2021-4-26 00:00:00','2021-4-26 00:00:00', '2021-4-26 00:00:00', '4', '5', '6', '1')
-    db_qbba.execute(sql_record, data)
+    # db_qbba.execute(sql_record, data)
 
     db_qbba_net.execute(sql_record, data)
     # my_e = my_Email()
@@ -1101,7 +1122,7 @@ def record_day_datas():
     project_name=eval(mycon.getValueByDict('spider_config','project_name'))
     print(project_name)
     # outfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"记录\\", f"{datetime.date.today()}.xlsx")
-    for i in range(0,3):
+    for i in range(0,1):
         date_now = (datetime.datetime.now()- datetime.timedelta(days=i)).strftime('%Y-%m-%d 00:00:00')
         date_yesterday = (datetime.datetime.now() - datetime.timedelta(days=i+1)).strftime("%Y-%m-%d 00:00:00")
         record_time=(datetime.datetime.now() - datetime.timedelta(days=i+1)).strftime("%Y-%m-%d")
@@ -1141,7 +1162,7 @@ def record_day_datas():
                         # print(item)
                         # item_ssql=f"select source_type from QBB_B.dbo.TS_MediumURL where {item[0]}=id"
                         item_ssql=f"select source_type from QBB_B.dbo.TS_MediumURL with (NOLOCK)  where {item[0]}=id"
-                        print(item_ssql)
+                        # print(item_ssql)
                         item_type=db_qbbb.execute_query(item_ssql)
                         sourc_dict={
                             "1":"网媒",
@@ -1157,7 +1178,7 @@ def record_day_datas():
                         }
                         if item_type:
                             # a=str(item_type[0][0])
-                            print(str(item_type[0][0]))
+                            # print(str(item_type[0][0]))
                             # b=sourc_dict[a]
                             c=item[-1]
                             count_source_type[str(item_type[0][0])]+=c
@@ -1168,16 +1189,17 @@ def record_day_datas():
                     print(sq_tsa)
                     try:
                         if sq_tsa:
-                            sql_a=db_qbba.execute_query(sq_tsa)[0][0]
+                            # sql_a=db_qbba.execute_query(sq_tsa)[0][0]
                             # TODO 后续替换
                             sql_a_net=db_qbba_net.execute_query(sq_tsa)[0][0]
                     except Exception as e:
                         print(e)
-                        sql_a=0
+                        sql_a_net=0
                     # sql_a=0
+                    sql_a_net = 0
                     source_type_list=list(count_source_type.values())
                     print(source_type_list)
-                    spide_helper.all_project_save_record_day(outfile,sql_a,sql_num_B,data['customer'],data['industry_name'],source_type_list)
+                    spide_helper.all_project_save_record_day(outfile,sql_a_net,sql_num_B,data['customer'],data['industry_name'],source_type_list)
 
 def Content_correction():
     select_sql="select * from TS_DataMerge_Base where title like '%pre style%' or Summary like '%pre style%' " \
@@ -1207,9 +1229,9 @@ if __name__ == '__main__':
     # for d in merger_industry_data(get_industry_keywords()):
     #     print(d)
     #     print("***"*20)
-    # for data in get_industry_keywords():
-    #     # if data['customer']=='柯尼卡':
-    #         print(data)
+    for data in get_industry_keywords():
+    # if data['customer']=='柯尼卡':
+        print(data)
     # if flag==0:
     #     print("匹配成功")
     # file_name=os.path.join(  os.path.dirname(os.path.abspath(__file__)),f"记录\\" ,f"{datetime.date.today()}.xlsx")
