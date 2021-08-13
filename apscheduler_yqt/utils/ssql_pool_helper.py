@@ -81,6 +81,15 @@ config_QBBA_net = {
     'charset': 'utf8',
     'autocommit': True
 }
+config_test_net = {
+    'host': '192.168.3.140',
+    'user': 'sa',
+    'password': '33221100aA',
+    'database': 'test',
+    'port': '1433',
+    'charset': 'utf8',
+    'autocommit': True
+}
 class DataBase(object):
 
     def __init__(self, db_type, config):
