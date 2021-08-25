@@ -16,20 +16,21 @@
    time：          2021/5/7 11:03
 """
 import os
-from concurrent.futures.thread import ThreadPoolExecutor
-from utils.snowflake import IdWorker
-import redis
 import re
-import requests
-from utils.email_helper import my_Email
-from utils.ssql_pool_helper import DataBase, config_myQBB_A,config_myQBB_B,config_myQBB_A_net
-from utils.redis_helper import my_redis
-from tqdm import tqdm
 import uuid
 import datetime
+import requests
+from tqdm import tqdm
 from urllib import parse
-from utils.spider_helper import SpiderHelper
+from utils.sedn_msg import send_feishu_msg
+from utils.mylogger import logger
+from utils.snowflake import IdWorker
+from utils.redis_helper import my_redis
 from yuqingtong import config as myconfig
+from utils.spider_helper import SpiderHelper
+from concurrent.futures.thread import ThreadPoolExecutor
+from utils.ssql_pool_helper import DataBase, config_myQBB_B,config_myQBB_A_net
+from utils.email_helper import my_Email
 
 myredis=my_redis(host='localhost', port=6379, decode_responses=True,db=1)
 db_my_qbba_net = DataBase('sqlserver', config_myQBB_A_net)
@@ -562,9 +563,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     sql_industry_id = "select id from TS_Industry where name='" + industry_name + "'"
     industry_id = db_my_qbbb.execute_query(sql_industry_id)[0][0]
 
-    tuple_data_list_ts_a = []
-    tuple_data_list_qbb_a = []
-
+    data_filter_emoji=[]
     for work_id, data in enumerate(data_list):
         # 生成雪花id
         # print(data['链接'])
@@ -584,27 +583,24 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         tuple_data_qbb_a = (id, industry_id, data['标题'], data['描述'], data['转发内容'], data['链接'], data['发布人'], data['时间'],
                             data['is_original'], data['area'], data['positive_prob_number'])
 
-        tuple_data_list_qbb_a.append(tuple_data_qbb_a)
         tag_data = {
             'queues': 'qbb.task.msg.event_2.1',
             'message': str(post_data)
         }
-        url = 'http://localhost:8090/jms/send_array'
-        proxies = {'http': None, 'https': None}
-        requests.get(url=url, proxies=proxies, params=tag_data)
+        try:
+            url = 'http://localhost:8090/jms/send_array'
+            proxies = {'http': None, 'https': None}
+            requests.get(url=url, proxies=proxies, params=tag_data)
+        except Exception as e:
+            logger.info(e)
+            logger.info("Java程序未启动")
+            send_feishu_msg("Java程序未启动")
+        sql_qbb_a = "insert into QBB_A." + table_name + "(id,industry_id,title,summary,content,url,author,publish_time," \
+                                                        "is_original,location,emotion_status) " \
+                                                        "values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+        if db_my_qbba_net.execute(sql_qbb_a, tuple_data_qbb_a):
+            data_filter_emoji.append(data)
 
-    #     schemas
-    sql_qbb_a = "insert into myQBB_A." + table_name + "(id,industry_id,title,summary,content,url,author,publish_time," \
-                                                    "is_original,location,emotion_status) " \
-                                                    "values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
-
-    #
-    # 插入A库
-    # db_a.execute_many(sql_ts_a, tuple_data_list_ts_a)
-    # 插入qbba库
-    # db_my_qbba.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
-
-    db_my_qbba_net.execute_many(sql_qbb_a, tuple_data_list_qbb_a)
 
     """
         info['id']:Customer ID
@@ -633,25 +629,25 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         }
         thream_info_list.append(info_t)
 
-    print("数据量为:", len(data_list))
+    logger.info("数据量为:%s"%str(len(data_filter_emoji)))
 
-    def load_data(index, d):
+    def load_data(d):
         """
 
         :param index:
         :param d:
         :return:
         """
-        print("第几个:", index)
         d['sort_num'] = 0
         d['parent_id'] = []
-        d['create_date'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        d['create_date'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
 
         domain_sub = parse.urlparse(d['链接']).netloc.replace("www.", "")
         rx = domain_sub.split(".")
         domain_search = '.'.join(rx)
         # print(domain_search)
         flag = 0
+        # 首先识别子域名，在识别主域名
         for i in range(0, len(rx) - 1):
             url_sql = f"select * from TS_MediumURL where domain='{'.'.join(rx[i:])}'"
             result = db_my_qbbb.execute_query(url_sql)
@@ -667,7 +663,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         if flag == 0:
             # if r.hexists("url", '.'.join(rx[0:])):
             # 插入更新TS_MediumURL数据
-            url_data = (domain_search, "全网", domain_search, 8, 1)
+            url_data = (domain_search, "其它", domain_search, 8, 1)
             sql_MediumSource_Type = "insert into TS_MediumURL (source_name,source_type,domain,medium_type,stat)" \
                                     " values(%s,%s,%s,%d,%d)"
             db_my_qbbb.execute(sql_MediumSource_Type, url_data)
@@ -693,17 +689,16 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
         else:
             d['sort'] = 0
 
-        # print("第几个:",index)
-        mark_java_match_data(d, thream_info_list)
-        print("完成")
 
-    # with ThreadPoolExecutor(4) as pool:
-    #     for index, d in enumerate(data_list):
-    #         pool.submit(load_data, index, d)
-    for index, d in enumerate(data_list):
-        load_data(index, d)
+    for d in data_filter_emoji:
+        load_data(d)
+
+    with ThreadPoolExecutor(4) as pool:
+        for d in data_filter_emoji:
+            pool.submit(mark_java_match_data,d,thream_info_list)
+    # for index, d in enumerate(data_list):
+    #     load_data(index, d)
     myredis.close()
-    # post_mq.close_mq()
 
 
 def match_insert_alone_data(data, info, T_id):
@@ -861,11 +856,12 @@ def mark_java_match_data(d, theam_list):
             db_my_qbbb.execute(sql_of_base, tuple(item_dict.values()))
 
             # TODO 相似新闻处理
-            t2 = datetime.datetime.strptime(item_dict['PublishDate_Std'], '%Y-%m-%d %H:%M:%S')
-            a_month_ago_date = (t2 - datetime.timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
-
+            print(item_dict['PublishDate_Std'])
+            t2 = datetime.datetime.strptime(item_dict['PublishDate_Std'][:16], '%Y-%m-%d %H:%M')
+            a_month_ago_date = (t2 - datetime.timedelta(days=30)).strftime('%Y-%m-%d %H:%M')
+            print(item_dict)
             similar_news_sql = f"select SN from TS_DataMerge_Base with (NOLOCK) where Title like '%{item_dict['Title']}%' " \
-                               f"and PublishDate_Std between '{item_dict['PublishDate_Std']}' and '{a_month_ago_date}' order by PublishDate_Std,SN asc"
+                               f"and PublishDate_Std between   '{a_month_ago_date}' and '{item_dict['PublishDate_Std']}' order by PublishDate_Std,SN asc"
             print(similar_news_sql)
             similar_result = db_my_qbbb.execute_query(similar_news_sql)
             if len(similar_result) > 1:

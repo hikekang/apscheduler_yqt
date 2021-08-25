@@ -36,18 +36,22 @@ def _parse(page_source, info_id):
             'sort': '转发' if int(item['repostsFlg']) == 1 else '原创',
             'related_words': item['referenceKeyword'],
             'site_name': item['captureWebsiteName'],
-            # 'area': item['contentAddress'],
             'area': item['province'],
             'C_Id': info_id  # 客户id
         }
-
+        # 标题处理冒号规则
+        r1 = data['标题'].split(":")
+        r2 = data['标题'].split("：")
+        if len(r1) > 2:
+            data['标题'] = ''.join(r1[1:])
+        elif len(r2) > 2:
+            data['标题'] = ''.join(r2[1:])
         if item['content'] != None:
             data['转发内容'] += item['content']
 
         if 'forwarderContent' in item.keys():
             if item['forwarderContent'] != None:
                 data['转发内容'] += item['forwarderContent']
-            # print('forwarderContent')
 
         # 图像识别
         if 'ocrContents' in item.keys():
@@ -64,9 +68,14 @@ def _parse(page_source, info_id):
             data['positive_prob_number'] = 0.1
         else:
             data['positive_prob_number'] = 0.9
-        data['转发内容']='<pre style="white-space: pre-wrap;white-space: -moz-pre-wrap;' \
-                    'white-space: -pre-wrap;white-space: -o-pre-wrap; ' \
-                    'word-wrap: break-word;"><zhengwen>'+data['转发内容']+"</zhengwen></pre>"
+        if len(data['标题'])<2:
+            if len(data['描述'])>10:
+                data['标题']=data['描述'][:10]
+            else:
+                data['标题'] = data['描述']
+        # data['转发内容']='<pre style="white-space: pre-wrap;white-space: -moz-pre-wrap;' \
+        #             'white-space: -pre-wrap;white-space: -o-pre-wrap; ' \
+        #             'word-wrap: break-word;"><zhengwen>'+data['转发内容']+"</zhengwen></pre>"
         data_list.append(data)
     return data_list
 
@@ -80,11 +89,12 @@ def xpath_page_source(ch, method, properties, body):
     :param body:
     :return:
     """
+
     str_data = body.decode('utf-8')
     # str_data=str_data.replace("true","True").replace("false","False")
     dict_data = eval(str_data)
     list_data = _parse(dict_data['page_source_data'], dict_data['info']['id'])
-    print("解析完毕")
+    logger.info("解析完毕")
 
     # 将源码传入抓取队列，进行抓取
     clear_data_put = {
@@ -92,14 +102,13 @@ def xpath_page_source(ch, method, properties, body):
         'info': dict_data['info'],
         'datacenter_id': dict_data['datacenter_id']
     }
-    print("解析源码完毕，进行发送")
+    logger.info("解析源码完毕，进行发送")
     channel.basic_publish(exchange='',
                           routing_key='qb_clear_data',
                           body=str(clear_data_put),
                           properties=pika.BasicProperties(
                               delivery_mode=2,  # make message persistent
                           )
-
                           )
     # 手动应答，效率会降低
     ch.basic_ack(delivery_tag=method.delivery_tag)

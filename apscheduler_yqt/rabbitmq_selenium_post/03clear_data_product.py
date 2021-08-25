@@ -34,7 +34,7 @@ channel.queue_declare(queue='qb_clear_data',durable=True)
 channel.queue_declare(queue='qb_upload_data',durable=True)
 # 第一次根据爬取链接去重
 def quchong(dir_list, key):
-    logger.info("第一次链接去重之前数据量为：%s",str(len(dir_list)))
+    logger.info("第一次链接去重之前数据量为：%s"%str(len(dir_list)))
     new_dirlist = []
     values = []
     for d in dir_list:
@@ -45,30 +45,30 @@ def quchong(dir_list, key):
 def spider_clear_data(data_list,clear_data_list,info):
     logger.info("数据处理")
     new_data_list = quchong(data_list, "链接")
-    title_pattern = re.compile('<zhengwen>([\s\S.]*)</zhengwen>')
+    # title_pattern = re.compile('<zhengwen>([\s\S.]*)</zhengwen>')
     # 第二次滤重
     new_data_list = ssql_helper.filter_by_url(new_data_list, info['industry_name'])
     for data in new_data_list:
-        # print(data["转发内容"])
-        content = title_pattern.findall(data["转发内容"])[0]
+        # content = title_pattern.findall(data["转发内容"])[0]
+        content=data['转发内容']
         # 1.标题或url为空的舍去
         if data["标题"] == "" and data["链接"] == "":
             # new_data_list.remove(data)
             continue
         #     二层正文处理
         if data["标题"] == "":
-            if len(data["转发内容"]) >= 20:
+            if len(content) >= 20:
                 data["标题"] = content[0:20]
             else:
                 data["标题"] = content
         # 2.转发微博并且转发内容为空的舍去
         elif data["标题"] == "转发微博" and data["转发内容"] == "":
             # new_data_list.remove(data)
-            print("标题为转发微博，转发内容为空")
+            logger.info("标题为转发微博，转发内容为空")
             continue
         # 3.转发类型的微博，取前内容的前20个字符作为标题
-        elif data["标题"] == "转发微博":
-            if len(data["转发内容"]) >= 50:
+        elif "转发微博" in data["标题"]  :
+            if len(content) >= 50:
                 data["标题"] = content[0:20]
                 data['描述'] = content[0:120]
             else:
@@ -79,9 +79,9 @@ def spider_clear_data(data_list,clear_data_list,info):
             data["转发内容"] = data['描述']
 
         if data['转发内容'] != "" and data['描述'] == "" and len(content) != 0:
-            data['描述'] = data['转发内容']
+            data['描述'] = content
 
-        if data['描述'] == "转发微博" and content != "":
+        if  "转发微博" in data['描述'] and content != "":
             if len(content) >= 50:
                 data['描述'] = content[0:120]
             else:

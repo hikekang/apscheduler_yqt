@@ -15,6 +15,7 @@ import datetime
 import os
 import sys
 import threading
+from utils.sedn_msg import send_feishu_msg
 from multiprocessing.dummy import Pool as ThreadPool
 # sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 # sys.path.append(os.path.dirname(os.path.realpath(__file__)))
@@ -154,35 +155,26 @@ class YQTSpider(object):
             yqzcode.send_keys(code)
             time.sleep(0.2)
             submit_buttion.click()
+            time.sleep(1)
 
-        try:
-            wait = self.wait.until(
-                EC.invisibility_of_element_located((By.XPATH, "//input[@formcontrolname='userName']")))
-            print(wait)
-            print("登录成功")
+        # try:
+            # wait = self.wait.until(
+            #     EC.invisibility_of_element_located((By.XPATH, "//input[@formcontrolname='userName']")))
+            # print(wait)
+            # print("登录成功")
+        if driver.current_url=="http://yuqing.sina.com/staticweb/#/yqmonitor/index/yqpage/yqlist":
+            logger.info("登录成功")
             cookies=driver.get_cookies()
             if cookie_login==False:
                 with open('cookie.json',"w+") as f:
                     f.write(str(cookies))
             return True
-        except Exception as e:
-            logger.warning(e)
-
-        try:
-            mobile_code = driver.find_element_by_css_selector(".ant-modal-content .mt20 input")
-            # pyautogui.prompt("需要手机验证")
-            while not driver.is_url_change():
-                print("还没填写验证码")
-                time.sleep(1)
-
-        except NoSuchElementException:
-            pass
-
-        if driver.is_url_change():
-            print("登录成功")
-            return True
         else:
-            return self._login(count=count + 1)
+            send_feishu_msg("登录失败，再次尝试登录")
+            return  self._login(count=count + 1)
+        #     TODO写入数据库
+        # except Exception as e:
+        #     logger.warning(e)
 
     # 解析页面进行数据抓取和保存
     def parse_data(self,datacenter_id):
@@ -190,27 +182,22 @@ class YQTSpider(object):
         解析页面生成数据
         :return: 数据已字典形式存在list中
         """
-        all_data_list=[]
         driver = self.spider_driver
         # i = 2
         post_data=""
         max_page_num = self._maxpage
-        all_data=''
-        for request in driver.requests:
+        for request in driver.requests[::-1]:
             if request.response:
                 if request.url=="http://yuqing.sina.com/gateway/monitor/api/data/search/auth/keyword/getSearchList":
-                    # i+=1
-                    # if i==datacenter_id:
-                    # all_data=request.response.body.decode()
-                    # all_data_list.append(all_data)
                     this_all_data=request.response.body.decode().replace("true","True").replace("false","False").replace("null","None")
                     this_all_data=eval(this_all_data)
                     if this_all_data['data']['maxpage']==max_page_num:
                         if this_all_data['data']['page']==self._currentpage:
-                            print("匹配到了")
+                            logger.info("匹配到了")
                             post_data=this_all_data
+                            break
         if post_data=="":
-            print("没有数据")
+            logger.info("没有数据")
             return False
         else:
             xpath_data={
@@ -222,7 +209,7 @@ class YQTSpider(object):
             self.channel.basic_publish(exchange='',
                                   routing_key='qb_xpath',
                                   body=str(xpath_data))
-            print("发送")
+            logger.info("发送")
     def _is_page_loaded(self, count=1):
         """
         判断页面时候是否加载完全
@@ -241,40 +228,16 @@ class YQTSpider(object):
             if wait_loading_disappear:
                 try:
                     wait_tr_appear = self.wait.until(
-                        EC.presence_of_all_elements_located((By.XPATH, '//tr')))
+                        EC.presence_of_all_elements_located((By.XPATH, '//td')))
                 except TimeoutException:
-                    try:
-                        # 本身就没数据显示没数据
-                        # wait_no_data_appear = self.wait.until(
-                        #     EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'p.noData-word')))
-
-                        # 新版
-                        wait_no_data_appear = self.wait.until(
-                            EC.presence_of_all_elements_located((By.XPATH, '//p[@class="ant-empty-description"]')))
-                    except TimeoutException:
-                        return False
-
+                    send_feishu_msg("%s-----页面加载出现问题"%self.info['customer'])
+                    return False
             logger.info("页面加载完全")
             return True
-
         except TimeoutException as e:
             logger.warning(e)
-            print('再次判断')
+            logger('再次判断')
             return self._is_page_loaded(count=count + 1)
-
-        # if count > 3:
-        #     logger.warning("页面加载可能卡住")
-        #     return False
-        # page_source=self.spider_driver.page_source
-        # if "暂无数据" in page_source:
-        #     print('再次判断')
-        #     return self._is_page_loaded(count=count + 1)
-        # else:
-        #     logger.info("页面加载完全")
-        #     return True
-
-
-
     def _turn_page(self, max_page_num, time_sleep):
         self.post_number = 0
         i=0
@@ -302,8 +265,12 @@ class YQTSpider(object):
                 print("抓取到当前最大页面停止抓取")
                 return True
             else:
-                next_page = self.spider_driver.find_element_by_xpath('//li[contains(@title,"下一页")]')
-                self.spider_driver.execute_script("arguments[0].click();", next_page)
+                try:
+                    next_page = self.spider_driver.find_element_by_xpath('//li[contains(@title,"下一页")]')
+                    self.spider_driver.execute_script("arguments[0].click();", next_page)
+                except Exception as e:
+                    logger(e)
+                    send_feishu_msg("%s------点击下一页出错"%self.info['customer'])
             self.crawl_page_count += 1
         time.sleep(time_sleep)
         return True
@@ -320,85 +287,92 @@ class YQTSpider(object):
             start_time = start_time.strftime(config.DATETIME_FORMAT)
         if not isinstance(end_time, str):
             end_time = end_time.strftime(config.DATETIME_FORMAT)
-        print("选择时间")
-        driver.find_element_by_xpath('//span[contains(text(),"自定义")]').click()
-        time.sleep(0.1)
-        # start_input = driver.find_element_by_xpath('//input[@placeholder="开始时间"]')
-        start_i = driver.find_element_by_xpath('//input[@placeholder="开始时间"]/following-sibling::span/i')
-        start_i.click()
-        time.sleep(0.2)
-        start_input = driver.find_element_by_xpath('//div[@class="ant-calendar-date-input-wrap"]/input')
-        # ant-calendar-picker-input ant-input ng-star-inserted
-        time.sleep(0.2)
-        start_input.clear()
-        time.sleep(0.2)
-        start_input.send_keys(start_time)
-        time.sleep(0.2)
-        start_deal_button=driver.find_element_by_xpath('//a[@class="ant-calendar-ok-btn "]')
-        start_deal_button.click()
-        # end_input=driver.find_element_by_xpath('//input[@placeholder="结束时间"]')
-        end_i = driver.find_element_by_xpath('//input[@placeholder="结束时间"]/following-sibling::span/i')
-        end_i.click()
-        time.sleep(0.1)
-        end_input = driver.find_element_by_xpath('//div[@class="ant-calendar-date-input-wrap"]/input')
-        end_input.clear()
-        time.sleep(0.2)
-        end_input.send_keys(end_time)
-        time.sleep(0.2)
-        end_deal_button = driver.find_element_by_xpath('//a[@class="ant-calendar-ok-btn "]')
-        end_deal_button.click()
-        time.sleep(0.2)
-        primary=driver.find_element_by_xpath('//button[@nztype="primary"]/span[contains(text(),"确认")]')
-        # action = ActionChains(driver)
-        # action.move_to_element(primary).perform()
-        # time.sleep(0.2)
-        # action.click()
-        driver.execute_script("arguments[0].click();", primary)
-        # primary.click()
-        time.sleep(0.2)
-        checkbox_list=[]
-        checkbox_li=self.spider_driver.find_elements_by_xpath('//div[@class="monitor-info-origin rel ng-star-inserted"]//li')
-        for checkbox in checkbox_li:
-            tag=checkbox.text.split('\n')[0]
-            checkbox_list.append({
-                f"{tag}":checkbox
-            })
-        for key,value in eval(self.myconfig.getValueByDict("crawl_condition","static_web_condition")).items():
-            # //li[@class='ng-star-inserted']/label/span/input
-            # //span[@class="ant-checkbox ant-checkbox-checked"]
-            for item in checkbox_list:
-                if key == list(item.keys())[0]:
-                    checkbox = list(item.values())[0].find_element_by_xpath('./label/span/input')
-                    break
-            if value:
-                if not checkbox.is_selected():
-                    # action.move_to_element(checkbox[i]).perform()
-                    # action.click()
-                    # checkbox[i].click()
-                    driver.execute_script("arguments[0].click();",checkbox)
-            else:
-                if checkbox.is_selected():
-                    driver.execute_script("arguments[0].click();", checkbox)
-        allinfo=self.spider_driver.find_element_by_xpath("//span[contains(text(),'全部信息')]")
-        asc_time=self.spider_driver.find_element_by_xpath("//span[contains(text(),'时间升序')]")
-        # allinfo.click()
-        driver.execute_script("arguments[0].click();", allinfo)
-        time.sleep(0.5)
-        # asc_time.click()
-        driver.execute_script("arguments[0].click();", asc_time)
-        time.sleep(0.5)
-        dingxiang_flag=eval(myconfig.getValueByDict("crawl_condition","dingxiang"))
-        if dingxiang_flag:
-            source_dom = self.spider_driver.find_element_by_xpath('//a[text()=" 定向信源 "]')
-            # source_dom.click()
-            driver.execute_script("arguments[0].click();", source_dom)
+        logger.info("%s-----选择时间"%self.info['customer'])
+        try:
+            driver.find_element_by_xpath('//span[contains(text(),"自定义")]').click()
+            time.sleep(0.1)
+            # start_input = driver.find_element_by_xpath('//input[@placeholder="开始时间"]')
+            start_i = driver.find_element_by_xpath('//input[@placeholder="开始时间"]/following-sibling::span/i')
+            start_i.click()
+            time.sleep(0.2)
+            start_input = driver.find_element_by_xpath('//div[@class="ant-calendar-date-input-wrap"]/input')
+            # ant-calendar-picker-input ant-input ng-star-inserted
+            time.sleep(0.2)
+            start_input.clear()
+            time.sleep(0.2)
+            start_input.send_keys(start_time)
+            time.sleep(0.2)
+            start_deal_button=driver.find_element_by_xpath('//a[@class="ant-calendar-ok-btn "]')
+            start_deal_button.click()
+            # end_input=driver.find_element_by_xpath('//input[@placeholder="结束时间"]')
+            end_i = driver.find_element_by_xpath('//input[@placeholder="结束时间"]/following-sibling::span/i')
+            end_i.click()
+            time.sleep(0.1)
+            end_input = driver.find_element_by_xpath('//div[@class="ant-calendar-date-input-wrap"]/input')
+            end_input.clear()
+            time.sleep(0.2)
+            end_input.send_keys(end_time)
+            time.sleep(0.2)
+            end_deal_button = driver.find_element_by_xpath('//a[@class="ant-calendar-ok-btn "]')
+            end_deal_button.click()
+            time.sleep(0.2)
+            primary=driver.find_element_by_xpath('//button[@nztype="primary"]/span[contains(text(),"确认")]')
+            # action = ActionChains(driver)
+            # action.move_to_element(primary).perform()
+            # time.sleep(0.2)
+            # action.click()
+            driver.execute_script("arguments[0].click();", primary)
+            # primary.click()
+            time.sleep(0.2)
+            checkbox_list=[]
+            checkbox_li=self.spider_driver.find_elements_by_xpath('//div[@class="monitor-info-origin rel ng-star-inserted"]//li')
+            for checkbox in checkbox_li:
+                tag=checkbox.text.split('\n')[0]
+                checkbox_list.append({
+                    f"{tag}":checkbox
+                })
+            for key,value in eval(self.myconfig.getValueByDict("crawl_condition","static_web_condition")).items():
+                # //li[@class='ng-star-inserted']/label/span/input
+                # //span[@class="ant-checkbox ant-checkbox-checked"]
+                for item in checkbox_list:
+                    if key == list(item.keys())[0]:
+                        checkbox = list(item.values())[0].find_element_by_xpath('./label/span/input')
+                        break
+                if value:
+                    if not checkbox.is_selected():
+                        # action.move_to_element(checkbox[i]).perform()
+                        # action.click()
+                        # checkbox[i].click()
+                        driver.execute_script("arguments[0].click();",checkbox)
+                else:
+                    if checkbox.is_selected():
+                        driver.execute_script("arguments[0].click();", checkbox)
+            allinfo=self.spider_driver.find_element_by_xpath("//span[contains(text(),'全部信息')]")
+            asc_time=self.spider_driver.find_element_by_xpath("//span[contains(text(),'时间升序')]")
+            # allinfo.click()
+            driver.execute_script("arguments[0].click();", allinfo)
             time.sleep(0.5)
+            # asc_time.click()
+            driver.execute_script("arguments[0].click();", asc_time)
+            time.sleep(0.5)
+            dingxiang_flag=eval(myconfig.getValueByDict("crawl_condition","dingxiang"))
+            if dingxiang_flag:
+                source_dom = self.spider_driver.find_element_by_xpath('//a[text()=" 定向信源 "]')
+                # source_dom.click()
+                driver.execute_script("arguments[0].click();", source_dom)
+                time.sleep(0.5)
 
-        print("点击查询")
-        self.next_page_num = 1
-        find_all=driver.find_element_by_xpath("//span[text()='查询']/parent::button")
-        driver.execute_script("arguments[0].click();", find_all)
-        print("查询完毕")
+            logger.info("点击查询")
+            self.next_page_num = 1
+            find_all=driver.find_element_by_xpath("//span[text()='查询']/parent::button")
+            driver.execute_script("arguments[0].click();", find_all)
+            logger.info("查询完毕")
+            return True
+        except Exception as e:
+            logger.info("%s-----设置查询条件出错"%self.info['customer'])
+            send_feishu_msg("%s-----设置查询条件出错"%self.info['customer'])
+            return False
+
     def _adapt_time_interval(self):
         """
         改变时间的区间
@@ -412,10 +386,12 @@ class YQTSpider(object):
         重新获取时间设置时间
         """
         # 设置时间
-        self._set_conditions(self.last_end_time, self.next_end_time)
+        if self._set_conditions(self.last_end_time, self.next_end_time):
+            return True
 
         if not self._is_page_loaded():
             logger.info("设置时间时页面加载出现问题")
+            return False
         if not self._is_data_count_outside():  # 没有超过5000条，不用调整
             logger.info(f"小于{config.MAX_DATA_COUNT}条,符合条件")
         else:
@@ -428,34 +404,34 @@ class YQTSpider(object):
         点击每页100条按钮
         :return:
         """
-        # self.spider_driver.get("http://yuqing.sina.com/newEdition/yqmonitor")
         if not self._is_page_loaded():
             logger.info("更改100条数据/每页前，页面加载有问题")
             return False
-        print("页面加载完全")
         time.sleep(2)
         self.spider_driver.scroll_to_bottom(10000)
         time.sleep(2)
         self.spider_driver.scroll_to_bottom(10000)
-        # if not self._is_page_loaded():
-        #     logger.info("更改100条数据/每页前，页面加载有问题")
-        #     return False
         time.sleep(1)
-        button_js = 'document.querySelector("body > app-root > layout-default > section > ' \
-                    'app-index > div > div.yqt-yqmonitor-content.p15 > app-yq-yqlist > div > ' \
-                    'div.content > app-monitor-list > nz-card > div > app-info-list >' \
-                    ' nz-spin > div > div > nz-table > nz-spin > div > nz-pagination >' \
-                    ' ul > div > nz-select > div > div > div").click()'
-        self.spider_driver.execute_script(button_js)
-        # self.spider_driver.find_element_by_xpath('//div[contains(@title,"50 条/页")]/following-sibling::span').click()
-        time.sleep(1)
-        self.spider_driver.find_element_by_xpath('//li[contains(text(),"200 条")]').click()
-        print('选择100')
-        # if not self._is_page_loaded():
-        #     logger.info("更改100条数据/每页后，页面加载有问题")
-        #     return False
-        logger.info("更改100条数据/每页")
-        return True
+        try:
+            button_js = 'document.querySelector("body > app-root > layout-default > section > ' \
+                        'app-index > div > div.yqt-yqmonitor-content.p15 > app-yq-yqlist > div > ' \
+                        'div.content > app-monitor-list > nz-card > div > app-info-list >' \
+                        ' nz-spin > div > div > nz-table > nz-spin > div > nz-pagination >' \
+                        ' ul > div > nz-select > div > div > div").click()'
+            self.spider_driver.execute_script(button_js)
+            # self.spider_driver.find_element_by_xpath('//div[contains(@title,"50 条/页")]/following-sibling::span').click()
+            time.sleep(1)
+            self.spider_driver.find_element_by_xpath('//li[contains(text(),"200 条")]').click()
+            print('选择100')
+            # if not self._is_page_loaded():
+            #     logger.info("更改100条数据/每页后，页面加载有问题")
+            #     return False
+            logger.info("更改000条数据/每页")
+            return True
+        except Exception as e:
+            logger.info("%s-------更改页面数量出错"%self.info['customer'])
+            send_feishu_msg("%s-------更改页面数量出错"%self.info['customer'])
+            return False
     def _go_page_num_by_conditions(self, is_reload=False):
         """
         根据条件和页数进入某一特定页面
@@ -469,9 +445,11 @@ class YQTSpider(object):
                         f'第{self.next_page_num}页')
             self._reload()
         # 设置时间
-        self._adapt_time_interval()
-        logger.info("时间和条件设置完毕")
-        return True
+        if self._adapt_time_interval():
+            logger.info("时间和条件设置完毕")
+            return True
+        else:
+            return False
 
     @property
     def _maxpage(self):
@@ -526,7 +504,7 @@ class YQTSpider(object):
         except Exception as e:
             logger.warning(e)
             return True
-    def _crawl2(self, time_sleep):
+    def _crawl(self, time_sleep):
         """
 
         :param time_sleep:
@@ -581,76 +559,66 @@ class YQTSpider(object):
         关键词修改
         :return:
         """
-        print("更改关键词")
-        driver = self.spider_driver
-        # driver.current_url
-        driver.get("http://yuqing.sina.com/staticweb/#/yqmonitor/index/yqpage/yqlist")
-        driver.implicitly_wait(10)
-        span = driver.find_element_by_xpath('//span[@class="yqt_tree_li act ng-star-inserted"]')
-        action = ActionChains(driver)
-        time.sleep(1)
-        # 移动到该元素
-        action.move_to_element(span).perform()
+        try:
+            logger.info("更改关键词")
+            driver = self.spider_driver
+            # driver.current_url
+            driver.get("http://yuqing.sina.com/staticweb/#/yqmonitor/index/yqpage/yqlist")
+            driver.implicitly_wait(10)
+            span = driver.find_element_by_xpath('//span[@class="yqt_tree_li act ng-star-inserted"]')
+            action = ActionChains(driver)
+            time.sleep(1)
+            # 移动到该元素
+            action.move_to_element(span).perform()
 
-        time.sleep(3)
-        banzi = span.find_element_by_xpath('.//i[@class="anticon ant-dropdown-trigger"]')
-        banzi.click()
-        time.sleep(2)
-        driver.find_element_by_xpath('//li[@class="ant-dropdown-menu-item ng-star-inserted"]').click()
-        time.sleep(1)
-        keywords = driver.find_element_by_xpath('//div[@id="senior-area"]')
-        keywords.clear()
-        keywords.clear()
-        time.sleep(0.3)
-        keywords.send_keys(self.info['yqt_keywords'])
-        # print(keyword)
-        time.sleep(0.3)
-        fitler_keywords = driver.find_element_by_xpath('//div[@id="senior-area2"]')
-        fitler_keywords.clear()
-        time.sleep(0.3)
-        fitler_keywords.send_keys(self.excludewords)
-        time.sleep(0.3)
-        # 保存
-        driver.find_element_by_xpath("//button[@class='mr20 ant-btn ant-btn-primary']").click()
-        time.sleep(1)
+            time.sleep(3)
+            banzi = span.find_element_by_xpath('.//i[@class="anticon ant-dropdown-trigger"]')
+            banzi.click()
+            time.sleep(2)
+            driver.find_element_by_xpath('//li[@class="ant-dropdown-menu-item ng-star-inserted"]').click()
+            time.sleep(1)
+            keywords = driver.find_element_by_xpath('//div[@id="senior-area"]')
+            keywords.clear()
+            keywords.clear()
+            time.sleep(0.3)
+            keywords.send_keys(self.info['yqt_keywords'])
+            # print(keyword)
+            time.sleep(0.3)
+            fitler_keywords = driver.find_element_by_xpath('//div[@id="senior-area2"]')
+            fitler_keywords.clear()
+            time.sleep(0.3)
+            fitler_keywords.send_keys(self.excludewords)
+            time.sleep(0.3)
+            # 保存
+            driver.find_element_by_xpath("//button[@class='mr20 ant-btn ant-btn-primary']").click()
+            time.sleep(1)
+        except Exception as e:
+            logger.info(e)
+            logger.info("%s------%s设置关键词出错"%(str(datetime.datetime.now()),self.info['customer']))
+            send_feishu_msg("%s------%s设置关键词出错"%(str(datetime.datetime.now()),self.info['customer']))
 
     def start(self, start_time, end_time, time_sleep, info,channel):
-        # try:
-        #     # 1.登录
-            self.interval = [start_time, end_time]
-            self.last_end_time = self.interval[0]
-            self.next_end_time = self.interval[1]
-            # 抓取数据
-            self.channel=channel
-            logger.info("获取关键词")
-            self.info = info
-            self.keyword = info['keywords']
-            self.SimultaneousWord = info['simultaneouswords']
-            self.excludewords = info['excludewords']
-            # 重新设置项目路径
+        # 1.登录
+        self.interval = [start_time, end_time]
+        self.last_end_time = self.interval[0]
+        self.next_end_time = self.interval[1]
+        # 抓取数据
+        self.channel=channel
+        logger.info("获取关键词")
+        self.info = info
+        self.keyword = info['keywords']
+        self.SimultaneousWord = info['simultaneouswords']
+        self.excludewords = info['excludewords']
+        # 重新设置项目路径
 
-            self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                               f"data\{self.project_name}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
-                                               f"{self}_{self.info['customer']}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
-                                                   ':', '_'))
-            logger.info(self.data_file_path)
-            # 设置关键词
-            # self.modifi_keywords_new()
+        # 设置关键词
+        self.modifi_keywords_new()
 
-            # 抓取数据并记录
-            resp = self._crawl2(time_sleep)
-            if resp:
-                logger.info("全部抓取完毕，结束")
-                    # pyautogui.alert("抓取完成...")
-        # except Exception as e:
-        #     logger.warning(e)
-        # finally:
-        #     print("进入finally")
-        #     if self.spider_driver.service.is_connectable():
-        #         print("进入finally2")
-        #         self.spider_driver.quit()
-        #         self.spider_driver.close()
-        #         print("关闭")
+        # 抓取数据并记录
+        resp = self._crawl(time_sleep)
+        if resp:
+            logger.info("全部抓取完毕，结束")
+
     def _reload(self):
         """
         刷新页面
@@ -677,6 +645,7 @@ def work_it(myconfig, start_time, end_time):
     print(project_name)
     for d in customer_list_data:
         print(d['customer'])
+        print(d)
         if d['industry_name'] in industry_keywords:
             if d['customer'] in project_name:
                 if d['keywords']!='':
@@ -685,9 +654,10 @@ def work_it(myconfig, start_time, end_time):
                     cookie_login = eval(myconfig.getValueByDict('spider_config', 'cookie_login'))
                     # 1.登录
                     if not yqt_spider._login(cookie_login=cookie_login):
-                        raise Exception("登录环节出现问题")
+                        # raise Exception("登录环节出现问题")
+                        send_feishu_msg("登录失败")
                     else:
-                        print("loging_success")
+                        logger.info("登录成功")
                     credentials = pika.PlainCredentials('qb_xpath', '123456')
                     connection = pika.BlockingConnection(pika.ConnectionParameters(
                         host='127.0.0.1', port=5672, virtual_host='/', credentials=credentials, heartbeat=0))
@@ -698,7 +668,7 @@ def work_it(myconfig, start_time, end_time):
                     chrome_service.start()
                     channel.queue_declare(queue='qb_xpath', durable=True)
                     yqt_spider.start(start_time=start_time, end_time=end_time, time_sleep=2, info=d,channel=channel)
-                    print("完成一轮花费时间为：",time.time()-time_1)
+                    logger.info("完成一轮花费时间为：%s"%str(time.time()-time_1))
                     yqt_spider.spider_driver.close()
                     chrome_service.stop()
 
