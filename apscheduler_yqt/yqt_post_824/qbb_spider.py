@@ -1,11 +1,11 @@
 #!/usr/bin/python3.x
 # -*- coding=utf-8 -*-
 """
- Time       : 2021/8/24 11:01
+ Time       : 2021/8/24 16:34
  Author     : hike
  Email      : hikehaidong@gmail.com
- File Name  : main.py
- Description:不使用消息队列进行接口抓取数据
+ File Name  : qbb_spider.py
+ Description:
  Software   : PyCharm
 """
 #!/usr/bin/python3.x
@@ -220,6 +220,7 @@ class YQTSpider(object):
                 if item['forwarderContent'] != None:
                     data['转发内容'] += (item['forwarderContent'])
                 # print('forwarderContent')
+
             # 图像识别
             if 'ocrContents' in item.keys():
                 if item['ocrContents'] != None:

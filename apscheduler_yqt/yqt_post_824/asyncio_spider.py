@@ -12,8 +12,6 @@
 # -*- coding=utf-8 -*-
 import os
 import re
-from concurrent.futures.thread import ThreadPoolExecutor
-
 import pika
 import asyncio
 import time
@@ -207,23 +205,19 @@ class YQTSpider(object):
                 'area': item['province'],
                 'C_Id': self.info['id']  # 客户id
             }
-            r1=data['标题'].split(":")
-            r2=data['标题'].split("：")
-            if len(r1)>2:
-                data['标题']=''.join(r1[1:])
-            elif len(r2) > 2:
-                data['标题'] = ''.join(r2[1:])
+
             if item['content'] != None:
-                data['转发内容'] += (item['content'])
+                data['转发内容'] += ex(item['content'])
 
             if 'forwarderContent' in item.keys():
                 if item['forwarderContent'] != None:
-                    data['转发内容'] += (item['forwarderContent'])
+                    data['转发内容'] += ex(item['forwarderContent'])
                 # print('forwarderContent')
+
             # 图像识别
             if 'ocrContents' in item.keys():
                 if item['ocrContents'] != None:
-                    data['转发内容'] += (item['ocrContents'])
+                    data['转发内容'] += ex(item['ocrContents'])
 
             if item['customFlag1'] == '5':
                 data['positive_prob_number'] = 0.65
@@ -436,9 +430,8 @@ class YQTSpider(object):
                 self.spider_clear_data(data_list,clear_data_list)
             # 上传数据,每页抓取
             if clear_data_list:
-                with ThreadPoolExecutor(10) as pool:
-                    pool.submit(ssql_helper.upload_many_data,clear_data_list, self.industry_name, i, self.info)
-                # ssql_helper.upload_many_data(clear_data_list, self.industry_name, i, self.info)
+
+                ssql_helper.upload_many_data(clear_data_list, self.industry_name, i, self.info)
             if self.next_page_num >= 50:
                 logger.info("抓取到最大页，停止")
                 return True
@@ -665,7 +658,7 @@ class YQTSpider(object):
             number = checkbox.text.split('\n')[-1]
             checkbox_list.append({
                 f"{tag}": checkbox,
-                "number": 0 if number==tag  else int(number)
+                "number": int(number)
             })
         for item in checkbox_list[1:]:
             this_number = item['number']
