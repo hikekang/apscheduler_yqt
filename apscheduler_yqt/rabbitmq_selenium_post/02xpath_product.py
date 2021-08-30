@@ -70,9 +70,9 @@ def _parse(page_source, info_id):
             data['positive_prob_number'] = 0.9
         if len(data['标题'])<2:
             if len(data['描述'])>10:
-                data['标题']=data['描述'][:10]
+                data['标题']=ex(data['描述'])[:10]
             else:
-                data['标题'] = data['描述']
+                data['标题'] = ex(data['描述'])
         # data['转发内容']='<pre style="white-space: pre-wrap;white-space: -moz-pre-wrap;' \
         #             'white-space: -pre-wrap;white-space: -o-pre-wrap; ' \
         #             'word-wrap: break-word;"><zhengwen>'+data['转发内容']+"</zhengwen></pre>"
