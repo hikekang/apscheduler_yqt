@@ -8,6 +8,8 @@
  Description:
  Software   : PyCharm
 """
+import traceback
+
 import pika
 from utils.mylogger import logger
 # from utils import ssql_helper_test as ssql_helper
@@ -39,8 +41,10 @@ def upload_data(ch, method, properties, body):
     try:
         ch.basic_ack(delivery_tag=method.delivery_tag)
     except Exception as e:
-        logger.info("上传到数据库异常")
-        send_feishu_msg("上传数据库异常")
+        error_info="%s-----上传数据库应答异常%s"%(str_body['info']['customer'],traceback.format_exc())
+        logger.info(error_info)
+        send_feishu_msg(error_info)
+        ssql_helper.record_error_info(error_info)
     # 手动应答，效率会降低
 
 channel.basic_qos(prefetch_count=1)

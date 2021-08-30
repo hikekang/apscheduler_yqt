@@ -5,53 +5,42 @@
  Author     : hike
  Email      : hikehaidong@gmail.com
  File Name  : 01pagesouce.py
- Description:
+ Description: 使用接口进行数据抓取seleniumwire+rabbitmq+redis
  Software   : PyCharm
 """
 ### 生产者
+import re
+import os
 import pika
 import time
 import datetime
-import os
+import traceback
 import sys
 import threading
-from utils.sedn_msg import send_feishu_msg
-from multiprocessing.dummy import Pool as ThreadPool
 # sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 # sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 # ab=os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 # path_utils=os.path.join(ab,'utils')
 # sys.path.append(path_utils)
+from yuqingtong import config
+from utils.mylogger import logger
+from gne import GeneralNewsExtractor
+from utils.spider_helper import SpiderHelper
+from utils.sedn_msg import send_feishu_msg
+from selenium.webdriver.common.by import By
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.action_chains import ActionChains
-from utils.mylogger import logger
-from utils.spider_helper import SpiderHelper
-
 from utils.webdriverhelper import MyWebDriver
 from utils.webdriverhelper import WebDriverHelper
-from yuqingtong import config
 from utils import qinbaobing_ssql as ssql_helper
-import re
 from selenium.webdriver.chrome.service import Service
-from gne import GeneralNewsExtractor
 extractor=GeneralNewsExtractor()
-# 教程
-web_url_selenium=re.compile('http[s]://(www.toutiao.com)|(mp.weixin.qq.com)|'
-                            '(dy.163.com/v2/article/detail)|(kuaibao.qq.com)'
-                            '|(www.sohu.com)|(www.360kuai.com)|(view.inews.qq.com)|'
-                            '(tousu.sina.com.cn)|(www.chasfz.com)|(mbd.baidu.com)|'
-                            '(wap.peopleapp.com)|(www.xiaohongshu.com)|'
-                            '(www.laihema.com)|(kuaibao.qq.com).*')
-# web_url_selenium_list=['www.toutiao.com','mp.weixin.qq.com']
-video_url=re.compile('http[s]://(v.qq.com)|(live.kuaishou.com)'
-                     '|(www.iesdouyin.com)|(www.ixigua.com)|(m.toutiaoimg.cn)|'
-                     '(www.dongchedi.com)|(kandianshare.html5.qq.com/v2/video)|(www.dttt.net).*')
+
 class YQTSpider(object):
 
     def __init__(self, myconfig, spider_driver=None, start_time=None, end_time=None, *args, **kwargs):
@@ -67,13 +56,6 @@ class YQTSpider(object):
         self.devide_keywords = False
         self.first_len = 0
         self.redis_len = 0
-        # 需要替换
-        # from xlsx
-        # self.data_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        #                                    f"data\{info['project_name']}\{datetime.datetime.now().strftime('%Y-%m-%d')}",
-        #                                    f"{self}_{info['yuqingtong_username']}_{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}_{start_time}_{end_time}.xlsx".replace(
-        #                                        ':', '_'))
-        # from config.ini
         self.project_name = myconfig.getValueByDict('industry_info', 'project_name')  # 项目名称
         self.industry_name = myconfig.getValueByDict('industry_info', 'industry_name')
 
@@ -121,6 +103,8 @@ class YQTSpider(object):
                 driver.add_cookie(cookie)
             driver.get("http://yuqing.sina.com/staticweb/#/yqmonitor/index/yqpage/yqlist")
         else:
+            driver.delete_all_cookies()
+            time.sleep(1)
             driver.get("http://yuqing.sina.com/staticweb/#/login/login")
             username = driver.find_element_by_xpath("//input[@formcontrolname='userName']")
             password = driver.find_element_by_xpath("//input[@formcontrolname='password']")
@@ -230,7 +214,9 @@ class YQTSpider(object):
                     wait_tr_appear = self.wait.until(
                         EC.presence_of_all_elements_located((By.XPATH, '//td')))
                 except TimeoutException:
-                    send_feishu_msg("%s-----页面加载出现问题"%self.info['customer'])
+                    error_info="%s-----页面加载出现问题%s"%(self.info['customer'],traceback.format_exc())
+                    send_feishu_msg(error_info)
+                    ssql_helper.record_error_info(error_info,self.info['customer'])
                     return False
             logger.info("页面加载完全")
             return True
@@ -269,8 +255,10 @@ class YQTSpider(object):
                     next_page = self.spider_driver.find_element_by_xpath('//li[contains(@title,"下一页")]')
                     self.spider_driver.execute_script("arguments[0].click();", next_page)
                 except Exception as e:
-                    logger(e)
-                    send_feishu_msg("%s------点击下一页出错"%self.info['customer'])
+                    error_info="%s------点击下一页出错%s"%(self.info['customer'],traceback.format_exc())
+                    logger(error_info)
+                    send_feishu_msg(error_info)
+                    ssql_helper.record_error_info(error_info,self.info['customer'])
             self.crawl_page_count += 1
         time.sleep(time_sleep)
         return True
@@ -289,7 +277,9 @@ class YQTSpider(object):
             end_time = end_time.strftime(config.DATETIME_FORMAT)
         logger.info("%s-----选择时间"%self.info['customer'])
         try:
-            driver.find_element_by_xpath('//span[contains(text(),"自定义")]').click()
+            zidingyi=driver.find_element_by_xpath('//span[contains(text(),"自定义")]')
+            time.sleep(1)
+            zidingyi.click()
             time.sleep(0.1)
             # start_input = driver.find_element_by_xpath('//input[@placeholder="开始时间"]')
             start_i = driver.find_element_by_xpath('//input[@placeholder="开始时间"]/following-sibling::span/i')
@@ -309,6 +299,7 @@ class YQTSpider(object):
             end_i.click()
             time.sleep(0.1)
             end_input = driver.find_element_by_xpath('//div[@class="ant-calendar-date-input-wrap"]/input')
+            time.sleep(0.5)
             end_input.clear()
             time.sleep(0.2)
             end_input.send_keys(end_time)
@@ -369,8 +360,10 @@ class YQTSpider(object):
             logger.info("查询完毕")
             return True
         except Exception as e:
-            logger.info("%s-----设置查询条件出错"%self.info['customer'])
-            send_feishu_msg("%s-----设置查询条件出错"%self.info['customer'])
+            error_info="%s-----设置查询条件出错%s"%(self.info['customer'],traceback.format_exc())
+            logger.info(error_info)
+            send_feishu_msg(error_info)
+            ssql_helper.record_error_info(error_info,self.info['customer'])
             return False
 
     def _adapt_time_interval(self):
@@ -426,11 +419,13 @@ class YQTSpider(object):
             # if not self._is_page_loaded():
             #     logger.info("更改100条数据/每页后，页面加载有问题")
             #     return False
-            logger.info("更改000条数据/每页")
+            logger.info("更改200条数据/每页")
             return True
         except Exception as e:
-            logger.info("%s-------更改页面数量出错"%self.info['customer'])
-            send_feishu_msg("%s-------更改页面数量出错"%self.info['customer'])
+            error_info="%s-------更改页面数量出错%s"%(self.info['customer'],traceback.format_exc())
+            logger.info(error_info)
+            send_feishu_msg(error_info)
+            ssql_helper.record_error_info(error_info,self.info['customer'])
             return False
     def _go_page_num_by_conditions(self, is_reload=False):
         """
@@ -454,7 +449,9 @@ class YQTSpider(object):
     @property
     def _maxpage(self):
         # 获取最大页数
-        page_max_num = self.spider_driver.find_element_by_xpath('//li[@class="ant-pagination-simple-pager ng-star-inserted"]').get_attribute("title")
+        page_max_num = self.spider_driver.find_element_by_xpath('//li[@class="ant-pagination-simple-pager ng-star-inserted"]')
+        time.sleep(0.5)
+        page_max_num = page_max_num.get_attribute("title")
         # re.findall("\s(\d+)",page_max_num)
         # print(page_max_num[0])
         page_number=int(page_max_num.split("/")[0])
@@ -534,26 +531,27 @@ class YQTSpider(object):
             if self._is_page_loaded():
                 pass
             max_page_num = self._maxpage
-            # --------------------------翻页并---抓取数据---------------------
-            resp = self._turn_page(max_page_num, time_sleep)
+            if max_page_num!=0:
+                # --------------------------翻页并---抓取数据---------------------
+                resp = self._turn_page(max_page_num, time_sleep)
 
 
-            if resp == "restart_browser":
-                return resp
-            elif not resp:
-                self._turn_page(max_page_num, time_sleep)
-                if turn_page_reload_count >= 3:
-                    logger.warning("翻页时，连续出现问题3次，退出")
-                    return False
-                turn_page_reload_count += 1
-                is_reload = True
-                continue
-            # 翻页并抓取数据
-            if resp:
-                logger.info("全部抓取完毕上传数据，并进行记录")
-                # 舆情通数量
-                print("结束返回")
-                return True
+                if resp == "restart_browser":
+                    return resp
+                elif not resp:
+                    self._turn_page(max_page_num, time_sleep)
+                    if turn_page_reload_count >= 3:
+                        logger.warning("翻页时，连续出现问题3次，退出")
+                        return False
+                    turn_page_reload_count += 1
+                    is_reload = True
+                    continue
+                # 翻页并抓取数据
+                if resp:
+                    logger.info("全部抓取完毕上传数据，并进行记录")
+                    # 舆情通数量
+                    print("结束返回")
+                    return True
     def modifi_keywords_new(self):
         """
         关键词修改
@@ -570,7 +568,6 @@ class YQTSpider(object):
             time.sleep(1)
             # 移动到该元素
             action.move_to_element(span).perform()
-
             time.sleep(3)
             banzi = span.find_element_by_xpath('.//i[@class="anticon ant-dropdown-trigger"]')
             banzi.click()
@@ -578,6 +575,7 @@ class YQTSpider(object):
             driver.find_element_by_xpath('//li[@class="ant-dropdown-menu-item ng-star-inserted"]').click()
             time.sleep(1)
             keywords = driver.find_element_by_xpath('//div[@id="senior-area"]')
+            time.sleep(0.3)
             keywords.clear()
             keywords.clear()
             time.sleep(0.3)
@@ -585,6 +583,7 @@ class YQTSpider(object):
             # print(keyword)
             time.sleep(0.3)
             fitler_keywords = driver.find_element_by_xpath('//div[@id="senior-area2"]')
+            time.sleep(0.3)
             fitler_keywords.clear()
             time.sleep(0.3)
             fitler_keywords.send_keys(self.excludewords)
@@ -594,8 +593,10 @@ class YQTSpider(object):
             time.sleep(1)
         except Exception as e:
             logger.info(e)
-            logger.info("%s------%s设置关键词出错"%(str(datetime.datetime.now()),self.info['customer']))
-            send_feishu_msg("%s------%s设置关键词出错"%(str(datetime.datetime.now()),self.info['customer']))
+            error_info="%s------%s设置关键词出错:%s"%(str(datetime.datetime.now()),self.info['customer'],traceback.format_exc())
+            logger.info(error_info)
+            send_feishu_msg(error_info)
+            ssql_helper.record_error_info(error_info,self.info['customer'])
 
     def start(self, start_time, end_time, time_sleep, info,channel):
         # 1.登录
@@ -655,7 +656,8 @@ def work_it(myconfig, start_time, end_time):
                     # 1.登录
                     if not yqt_spider._login(cookie_login=cookie_login):
                         # raise Exception("登录环节出现问题")
-                        send_feishu_msg("登录失败")
+                        ssql_helper.record_error_info("登录失败",d['customer'])
+                        send_feishu_msg("%s:登录失败"%d['customer'])
                     else:
                         logger.info("登录成功")
                     credentials = pika.PlainCredentials('qb_xpath', '123456')
@@ -682,7 +684,7 @@ def work_it(myconfig, start_time, end_time):
 
 def work_it_hour(myconfig):
     """
-    日常抓取
+    日常抓取：可以用于补抓，调试
     :param myconfig:
     :return:
     """
@@ -766,7 +768,7 @@ def work_it_one_day(myconfig,yqt_spider):
         work_it(myconfig, start_time, end_time,yqt_spider)
 
 
-def apscheduler(myconfig,yqt_spider):
+def apscheduler(myconfig):
     # 日常cron
     print("进来")
     cron_info = myconfig.getDictBySection('cron_info')
@@ -781,15 +783,14 @@ def apscheduler(myconfig,yqt_spider):
     trigger4 = CronTrigger.from_crontab(cron_info['login_cron'])
 
     sched = BlockingScheduler()
-    sched.add_job(work_it_hour, trigger1, max_instances=10, id='my_job_id', kwargs={'myconfig': myconfig,"yqt_spider":yqt_spider})
+    sched.add_job(work_it_hour, trigger1, max_instances=10, id='my_job_id', kwargs={'myconfig': myconfig})
     # 每天进行数据补抓一次
-    sched.add_job(work_it_one_day, tigger_hour, max_instances=10, id='my_job_id_ever', kwargs={'myconfig': myconfig,"yqt_spider":yqt_spider})
+    sched.add_job(work_it_one_day, tigger_hour, max_instances=10, id='my_job_id_ever', kwargs={'myconfig': myconfig})
     # 进行数据统计
     sched.add_job(ssql_helper.find_day_data_count, trigger2, max_instances=10, id='my_job_id_ever_count',
                   kwargs={'myconfig': myconfig})
     # 生成报表
     sched.add_job(ssql_helper.record_day_datas, trigger3, max_instances=10, id='my_job_id_ever_record_count')
-    sched.add_job(yqt_spider._login, trigger4, max_instances=10, id='my_job_id_everday_login',kwargs={'cookie_login':False})
     sched.start()
 
 
@@ -810,21 +811,27 @@ def filter_emoji(desstr,restr=''):
 
 if __name__ == '__main__':
 
-    # try:
-    today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    time1 = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
-    myconfig = config.redconfig()
-    industry_name = myconfig.getValueByDict('industry_info', 'industry_name')
+    try:
+        today = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        time1 = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
+        myconfig = config.redconfig()
+        industry_name = myconfig.getValueByDict('industry_info', 'industry_name')
 
-    # ssql_helper.get_month_data(time1, today, industry_name,flushall=True)
+        ssql_helper.get_month_data(time1, today, industry_name,flushall=True)
+        # 多进程运行程序
+        # p1 = Process(target=java_task, name='java程序')
+        # p2 = Process(target=apscheduler, kwargs={'myconfig': myconfig}, name='定时抓取')
+        # p1.start()
+        # p2.start()
+        # # print("运行结束")
 
-    # p1 = Process(target=java_task, name='java程序')
-    # p2 = Process(target=apscheduler, kwargs={'myconfig': myconfig}, name='定时抓取')
-    # p1.start()
-    # p2.start()
-    # # print("运行结束")
-    work_it_hour(myconfig)
-    # apscheduler(myconfig,yqt_spider)
+
+        work_it_hour(myconfig)
+        apscheduler(myconfig)
+    except:
+        logger.info(traceback.format_exc())
+        send_feishu_msg(traceback.format_exc())
+        ssql_helper.record_error_info(traceback.format_exc())
 
 
 
