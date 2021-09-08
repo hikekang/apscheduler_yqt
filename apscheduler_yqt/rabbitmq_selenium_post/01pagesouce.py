@@ -528,30 +528,33 @@ class YQTSpider(object):
             print(f"最大页数：{max_page_num}")
 
             self.yqt_total_number=self._count_number
-            if self._is_page_loaded():
-                pass
-            max_page_num = self._maxpage
-            if max_page_num!=0:
-                # --------------------------翻页并---抓取数据---------------------
-                resp = self._turn_page(max_page_num, time_sleep)
+            if self.yqt_total_number!=0:
+                if self._is_page_loaded():
+                    pass
+                max_page_num = self._maxpage
+                if max_page_num!=0:
+                    # --------------------------翻页并---抓取数据---------------------
+                    resp = self._turn_page(max_page_num, time_sleep)
 
 
-                if resp == "restart_browser":
-                    return resp
-                elif not resp:
-                    self._turn_page(max_page_num, time_sleep)
-                    if turn_page_reload_count >= 3:
-                        logger.warning("翻页时，连续出现问题3次，退出")
-                        return False
-                    turn_page_reload_count += 1
-                    is_reload = True
-                    continue
-                # 翻页并抓取数据
-                if resp:
-                    logger.info("全部抓取完毕上传数据，并进行记录")
-                    # 舆情通数量
-                    print("结束返回")
-                    return True
+                    if resp == "restart_browser":
+                        return resp
+                    elif not resp:
+                        self._turn_page(max_page_num, time_sleep)
+                        if turn_page_reload_count >= 3:
+                            logger.warning("翻页时，连续出现问题3次，退出")
+                            return False
+                        turn_page_reload_count += 1
+                        is_reload = True
+                        continue
+                    # 翻页并抓取数据
+                    if resp:
+                        logger.info("全部抓取完毕上传数据，并进行记录")
+                        # 舆情通数量
+                        print("结束返回")
+                        return True
+            else:
+                return "数据为0"
     def modifi_keywords_new(self):
         """
         关键词修改
@@ -617,8 +620,12 @@ class YQTSpider(object):
 
         # 抓取数据并记录
         resp = self._crawl(time_sleep)
-        if resp:
+        if resp==True:
             logger.info("全部抓取完毕，结束")
+        elif resp=="数据为0":
+            logger.info("抓取数据为0")
+
+
 
     def _reload(self):
         """
@@ -756,16 +763,16 @@ def work_it_one_day(myconfig,yqt_spider):
     :return:
     """
 
-    now_time=int(time.time())*1000
-    day_time_ago=now_time-43200
+    now_time = int(time.time())
+    day_time_ago = now_time - 86400
     # 一天数据分成3次抓取也就是抓取的间隔时间为4小时
-    for i in range(day_time_ago,now_time,14400):
-        start_time_pre=i
-        end_time_pre=start_time_pre+14400
+    for i in range(day_time_ago, now_time, 14400):
+        start_time_pre = i
+        end_time_pre = start_time_pre + 14400
         start_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time_pre))
         end_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time_pre))
         print(start_time, end_time)
-        work_it(myconfig, start_time, end_time,yqt_spider)
+        work_it(myconfig, start_time, end_time)
 
 
 def apscheduler(myconfig):
