@@ -23,12 +23,14 @@ import tldextract
 
 
 from urllib import parse
+
 url = 'https://www.hike.google.com/spreadsheet/ccc?key=blah-blah-blah-blah#gid=1'
-result = parse.urlparse(url).netloc.replace("www.","")
-rx=result.split(".")
-print(rx)
+result = parse.urlparse(url).netloc.replace("www.", "")
+rx = result.split(".")
+# print(rx)
 print('.'.join(rx))
 
-
 # for i in range(0,len(rx)-1):
-print('.'.join(rx[0:]))
+# print('.'.join(rx[0:]))
+for i in range(0, len(rx) - 1):
+    print('.'.join(rx[i:]))

@@ -54,7 +54,7 @@ def add_number(list:list,number:int):
     print("添加完毕")
 if __name__ == '__main__':
     test_list = []
-    with ThreadPoolExecutor(1000) as pool:
+    with ThreadPoolExecutor(50) as pool:
         for i in range(10000):
             pool.submit(add_number,test_list,i)
     print(test_list)
