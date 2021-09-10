@@ -831,8 +831,6 @@ if __name__ == '__main__':
         # p1.start()
         # p2.start()
         # # print("运行结束")
-
-
         work_it_hour(myconfig)
         apscheduler(myconfig)
     except:

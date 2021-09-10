@@ -109,8 +109,12 @@ def spider_clear_data(data_list,clear_data_list,info):
                 data['is_original'] = 2
         else:
             data['is_original'] = 2
-
+        data['标题'] = data['标题'][0:20]
+        data['标题'] = re.sub('\s+', '', data['标题'])
+        data['描述'] = re.sub('\s+', '', data['描述'])
+        data['转发内容'] = re.sub('\s+', '', data['转发内容'])
         clear_data_list.append(data)
+
 
 def clear_data(ch, method, properties, body):
     """

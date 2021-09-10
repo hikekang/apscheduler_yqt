@@ -76,6 +76,7 @@ def _parse(page_source, info_id):
         # data['转发内容']='<pre style="white-space: pre-wrap;white-space: -moz-pre-wrap;' \
         #             'white-space: -pre-wrap;white-space: -o-pre-wrap; ' \
         #             'word-wrap: break-word;"><zhengwen>'+data['转发内容']+"</zhengwen></pre>"
+        data['标题'] = ex(data['标题'])[0:50]
         data_list.append(data)
     return data_list
 
