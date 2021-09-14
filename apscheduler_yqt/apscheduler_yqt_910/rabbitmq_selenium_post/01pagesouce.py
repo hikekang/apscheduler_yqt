@@ -9,9 +9,11 @@
  Software   : PyCharm
 """
 ### 生产者
-
+import gzip
 import re
 import os
+from io import BytesIO
+
 import pika
 import time
 import datetime
@@ -191,7 +193,12 @@ class YQTSpider(object):
         for request in driver.requests[::-1]:
             if request.response:
                 if request.url=="http://yuqing.sina.com/gateway/monitor/api/data/search/auth/keyword/getSearchList":
-                    this_all_data=request.response.body.decode().replace("true","True").replace("false","False").replace("null","None")
+                    #  压缩数据进行解压
+                    response_data=request.response.body
+                    buff=BytesIO(response_data)
+                    f_data=gzip.GzipFile(fileobj=buff)
+                    # this_all_data=request.response.body.decode().replace("true","True").replace("false","False").replace("null","None")
+                    this_all_data=f_data.read().decode().replace("true","True").replace("false","False").replace("null","None")
                     this_all_data=eval(this_all_data)
                     if this_all_data['data']['maxpage']==max_page_num:
                         if this_all_data['data']['page']==self._currentpage:
@@ -242,7 +249,7 @@ class YQTSpider(object):
             logger.warning(e)
             logger('再次判断')
             return self._is_page_loaded(count=count + 1)
-    def _turn_page(self, max_page_num, time_sleep):
+    def _turn_page(self, max_page_num,time_sleep):
         self.post_number = 0
         i=0
         while 1:
@@ -254,13 +261,11 @@ class YQTSpider(object):
                 if not self._is_page_loaded():
                     return False
             logger.info(f"当前第【{self.next_page_num}】页,共{max_page_num}页")
-            self._is_page_loaded()
-            time.sleep(5)
             self.parse_data(i)
             logger.info('数据抓取完毕')
             # 数据进行处理
             # 上传数据,每页抓取
-            if self.next_page_num >= 50:
+            if self.next_page_num >= 25:
                 logger.info("抓取到最大页，停止")
                 return True
             self.next_page_num += 1
@@ -406,13 +411,13 @@ class YQTSpider(object):
         if self._set_conditions(self.last_end_time, self.next_end_time):
             return True
 
-        if not self._is_page_loaded():
-            logger.info("设置时间时页面加载出现问题")
-            return False
+        # TODO 时间二分进行查询，尽量避免大于5000条数据的时间
         if not self._is_data_count_outside():  # 没有超过5000条，不用调整
             logger.info(f"小于{config.MAX_DATA_COUNT}条,符合条件")
         else:
             logger.info(f"页面数据大于{config.MAX_DATA_COUNT}条，调整时间区段")
+            send_feishu_msg(f"页面数据大于{config.MAX_DATA_COUNT}条，调整时间区段")
+            return False
 
 
     def _switch_data_count_perpage(self):
@@ -451,18 +456,15 @@ class YQTSpider(object):
             send_feishu_msg(error_info)
             ssql_helper.record_error_info(error_info,self.info['customer'])
             return False
-    def _go_page_num_by_conditions(self, is_reload=False):
+    def _go_page_num_by_conditions(self,is_reload):
         """
         根据条件和页数进入某一特定页面
         如：2020-01-01 00:00:00 至2020-01-02 00:00:00 第10页
         :return:
         """
-
         if is_reload:
-            logger.info(f'重新进入此页面：{self.last_end_time.strftime(config.DATETIME_FORMAT)} '
-                        f'- {self.next_end_time.strftime(config.DATETIME_FORMAT)} '
-                        f'第{self.next_page_num}页')
             self._reload()
+
         # 设置时间
         if self._adapt_time_interval():
             logger.info("时间和条件设置完毕")
@@ -551,22 +553,17 @@ class YQTSpider(object):
                 set_conditions_reload_count += 1
                 is_reload = True
                 continue
-            set_conditions_reload_count = 0
-            time.sleep(10)
+            if self._is_page_loaded():
+                pass
             max_page_num = self._maxpage
             print(f"最大页数：{max_page_num}")
 
             self.yqt_total_number=self._count_number
-
-            if self._is_page_loaded():
-                pass
             # max_page_num = self._maxpage
             time.sleep(5)
             if self.yqt_total_number!=0:
                 # --------------------------翻页并---抓取数据---------------------
                 resp = self._turn_page(max_page_num, time_sleep)
-
-
                 if resp == "restart_browser":
                     return resp
                 elif not resp:
@@ -649,7 +646,6 @@ class YQTSpider(object):
 
         # 设置关键词
 
-        modifi_keywords_result=self.modifi_keywords_new()
         # 添加了关键词判断,并且进行重新设置
         i=0;
         while i<3:
@@ -707,7 +703,7 @@ def work_it(myconfig, start_time, end_time):
                         send_feishu_msg("%s:登录失败"%d['customer'])
                     else:
                         logger.info("登录成功")
-                    credentials = pika.PlainCredentials('qb_xpath', '123456')
+                    credentials = pika.PlainCredentials('qb_01', '123456')
                     connection = pika.BlockingConnection(pika.ConnectionParameters(
                         host='127.0.0.1', port=5672, virtual_host='/', credentials=credentials, heartbeat=0))
 
@@ -875,7 +871,7 @@ if __name__ == '__main__':
         # p2.start()
         # # print("运行结束")
         work_it_hour(myconfig)
-        apscheduler(myconfig)
+        # apscheduler(myconfig)
     except:
         logger.info(traceback.format_exc())
         send_feishu_msg(traceback.format_exc())
