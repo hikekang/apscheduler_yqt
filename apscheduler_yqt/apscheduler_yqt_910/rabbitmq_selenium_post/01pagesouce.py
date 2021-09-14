@@ -624,12 +624,14 @@ class YQTSpider(object):
             # 保存
             driver.find_element_by_xpath("//button[@class='mr20 ant-btn ant-btn-primary']").click()
             time.sleep(1)
+            return True
         except Exception as e:
             logger.info(e)
             error_info="%s------%s设置关键词出错:%s"%(str(datetime.datetime.now()),self.info['customer'],traceback.format_exc())
             logger.info(error_info)
             send_feishu_msg(error_info)
             ssql_helper.record_error_info(error_info,self.info['customer'])
+            return False
 
     def start(self, start_time, end_time, time_sleep, info,channel):
         # 1.登录
@@ -646,7 +648,16 @@ class YQTSpider(object):
         # 重新设置项目路径
 
         # 设置关键词
-        self.modifi_keywords_new()
+
+        modifi_keywords_result=self.modifi_keywords_new()
+        # 添加了关键词判断,并且进行重新设置
+        i=0;
+        while i<3:
+            modifi_keywords_result=self.modifi_keywords_new()
+            i+=1
+            if modifi_keywords_result==True:
+                break
+
 
         # 抓取数据并记录
         resp = self._crawl(time_sleep)
