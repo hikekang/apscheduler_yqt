@@ -27,6 +27,7 @@ from concurrent.futures.thread import ThreadPoolExecutor
 from utils.ssql_pool_helper import DataBase,config_myQBB_A_net,config_QBB_B_wei
 
 myredis=my_redis(host='localhost', port=6379, decode_responses=True,db=1)
+# db_my_qbba_net = DataBase('sqlserver', config_myQBB_A_net)
 db_my_qbba_net = DataBase('sqlserver', config_myQBB_A_net)
 # db_my_qbbb = DataBase('sqlserver', config_QBB_B)
 db_my_qbbb = DataBase('sqlserver', config_QBB_B_wei)
@@ -565,7 +566,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     sql_industry_id = "select id from TS_Industry where name='" + industry_name + "'"
     industry_id = db_my_qbbb.execute_query(sql_industry_id)[0][0]
     data_filter_emoji=[]
-    data_list = filter_by_url(data_list, industry_name)
+    # data_list = filter_by_url(data_list, industry_name)
     if data_list:
         for work_id, data in enumerate(data_list):
             # 生成雪花id
@@ -599,7 +600,7 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
                 logger.info(error_info)
                 send_feishu_msg(error_info)
                 record_error_info(error_info,info['customer'])
-            sql_qbb_a = "insert into myQBB_A." + table_name + "(id,industry_id,title,summary,content,url,author,publish_time," \
+            sql_qbb_a = "insert into QBB_A." + table_name + "(id,industry_id,title,summary,content,url,author,publish_time," \
                                                             "is_original,location,emotion_status) " \
                                                             "values (%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
             if db_my_qbba_net.execute(sql_qbb_a, tuple_data_qbb_a):
@@ -697,11 +698,11 @@ def upload_many_data(data_list, industry_name, datacenter_id, info):
     for d in data_filter_emoji:
         load_data(d)
 
-    with ThreadPoolExecutor(4) as pool:
-        for d in data_filter_emoji:
-            pool.submit(mark_java_match_data,d,thream_info_list)
-    # for index, d in enumerate(data_list):
-    #     load_data(index, d)
+    # with ThreadPoolExecutor(4) as pool:
+    #     for d in data_filter_emoji:
+    #         pool.submit(mark_java_match_data,d,thream_info_list)
+    for d in data_filter_emoji:
+        mark_java_match_data(d,thream_info_list)
     myredis.close()
 
 
@@ -720,57 +721,20 @@ def match_insert_alone_data(data, info, T_id):
     y_m = str(year) + "_" + str(month)
     # 只匹配了一级主题
     if data['sort_num'] == 0:
-        post_data = {
-            "cid": info['id'],
-            "sn": data['SN'],
-            # "msld": d['subject_id'],
-            "msid": T_id,
-            "title": data['标题'],
-            "msNodeid": data['subject_id'],
-            "publishDate": data['时间']
-        }
-
-        # proxies = {'http': None, 'https': None}
-        # similar_data = {
-        #     'queues': 'qbb.task.msg.similar_2.1',
-        #     'message': str(post_data)
-        # }
-        # url = 'http://localhost:8090/jms/send'
-        # requests.get(url=url, proxies=proxies, params=similar_data)
 
         insert_b_data = ((data['C_Id'], data['SN'], T_id, 0, 0, 0,data['时间']))
-        sql_DataMerger_Extend_MSubject_Map = "insert into TS_DataMerger_Extend_MSubject_Map_{y_m} " \
+        sql_DataMerger_Extend_MSubject_Map = f"insert into TS_DataMerger_Extend_MSubject_Map_{y_m} " \
                                              "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort,publish_date) " \
                                              "values (%d,%s,%s,%s,%s,%s,%s)"
         db_my_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data)
     # 进行了1次或多次匹配
     elif data['sort_num'] >= 1:
-        post_data = {
-            "cid": info['id'],
-            "sn": data['SN'],
-            "msid": data['subject_id'],
-            "title": data['标题'],
-            "msNodeid": data['class_id'][0],  # 对应分类的id多分类时只发送⼀次即可，分类ID取not_first_sort=0时的数据
-            "publishDate": data['时间']
-        }
-        # proxies = {'http': None, 'https': None}
-        # similar_data = {
-        #     'queues': 'qbb.task.msg.similar_2.1',
-        #     'message': str(post_data)
-        # }
-        # url = 'http://localhost:8090/jms/send'
-        # requests.get(url=url, proxies=proxies, params=similar_data)
-        # post_mq.send_to_queue('qbb.task.msg.similar_2.1', str(post_data))
-
-
-
-
         # 进行了一次匹配
         if len(data['class_id']) == 1:
             insert_b_data = ((data['C_Id'], data['SN'], T_id, data['class_id'][0], 0, 0,data['时间']))
             sql_DataMerger_Extend_MSubject_Map = f"insert into TS_DataMerger_Extend_MSubject_Map_{y_m} " \
                                                  "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort,publish_date) " \
-                                                 "values (%d,%s,%s,%s,%s,%s)"
+                                                 "values (%d,%s,%s,%s,%s,%s,%s)"
             db_my_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data)
         elif len(data['class_id']) > 1:
             for index, p in enumerate(data['class_id']):
@@ -778,13 +742,13 @@ def match_insert_alone_data(data, info, T_id):
                     insert_b_data = ((data['C_Id'], data['SN'], T_id, p, 0, 0,data['时间']))
                     sql_DataMerger_Extend_MSubject_Map = f"insert into TS_DataMerger_Extend_MSubject_Map_{y_m} " \
                                                          "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort,publish_date) " \
-                                                         "values (%d,%s,%s,%s,%s,%s)"
+                                                         "values (%d,%s,%s,%s,%s,%s,%s)"
                     db_my_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data)
                 else:
                     insert_b_data = ((data['C_Id'], data['SN'], T_id, p, 0, 1,data['时间']))
                     sql_DataMerger_Extend_MSubject_Map = f"insert into TS_DataMerger_Extend_MSubject_Map_{y_m} " \
                                                          "(c_id,SN,ms_id,ms_node_id,classMethod,not_first_sort,publish_date) " \
-                                                         "values (%d,%s,%s,%s,%s,%s)"
+                                                         "values (%d,%s,%s,%s,%s,%s,%s)"
                     db_my_qbbb.execute(sql_DataMerger_Extend_MSubject_Map, insert_b_data)
 
 
@@ -881,19 +845,19 @@ def mark_java_match_data(d, theam_list):
             db_my_qbbb.execute(sql_of_base, tuple(item_dict.values()))
             # 插入extent表
             extend_create_date=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            sql_of_extend = 'insert into TS_DataMerge_Extend_{} (SN,create_date,publish_date) values ({})'. \
+            sql_of_extend = 'insert into TS_DataMerge_Extend_{} (SN,create_date,publish_date) values {}'. \
                 format(y_m,(d['SN'],extend_create_date,d['时间']))
 
-            db_my_qbbb.execute(sql_of_base, tuple(item_dict.values()))
+            db_my_qbbb.execute(sql_of_extend)
 
             # TODO 相似新闻处理
             # print(item_dict['PublishDate_Std'])
             t2 = datetime.datetime.strptime(item_dict['PublishDate_Std'][:16], '%Y-%m-%d %H:%M')
             a_month_ago_date = (t2 - datetime.timedelta(days=30)).strftime('%Y-%m-%d %H:%M')
             # print(item_dict)
-
-            year_pre=a_month_ago_date.year
-            month_pre=a_month_ago_date.month
+            a_month_ago_date_type_datetime=t2 - datetime.timedelta(days=30)
+            year_pre=a_month_ago_date_type_datetime.year
+            month_pre=a_month_ago_date_type_datetime.month
             y_m_pre=str(year_pre)+"_"+str(month_pre)
             similar_news_sql_pre = f"select SN,PublishDate_Std from TS_DataMerge_Base_{y_m_pre} with (NOLOCK) where Title like '%{item_dict['Title']}%' " \
                                f"and PublishDate_Std between   '{a_month_ago_date}' and '{item_dict['PublishDate_Std']}' order by PublishDate_Std,SN asc"
@@ -907,8 +871,8 @@ def mark_java_match_data(d, theam_list):
             if len(similar_result) > 1:
                 print("相似新闻匹配")
                 for item in similar_result[1:]:
-                    item_year=datetime.strptime(item[1],"%Y-%m-%d %H:%M:%S").year
-                    item_month=datetime.strptime(item[1],"%Y-%m-%d %H:%M:%S").month
+                    item_year=item[1].year
+                    item_month=item[1].month
                     item_y_m=str(item_year)+"_"+str(item_month)
                     similar_update_sql = f"update TS_DataMerge_Base_{item_y_m} set group_SN='{similar_result[0][0]}' where sn='{item[0]}'"
                     db_my_qbbb.execute(similar_update_sql)
