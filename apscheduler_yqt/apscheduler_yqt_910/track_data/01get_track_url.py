@@ -35,10 +35,18 @@ def get_track_url_qbbb():
     数据库qbbb,track_task中获取数据
     """
     try:
-        sql="select sn,url from TS_track_task where is_done=0"
-        datas=db_qbbb.execute_query(sql)
+        sql="select sn from TS_DataMerge_Extend with(NOLOCK) where is_Track=1"
+        datas_extend_track=db_qbbb.execute_query(sql)
+        data_track_list=[]
+        if datas_extend_track:
+            for item in datas_extend_track:
+                sql_base=f"select sn,url from TS_DataMerge_Base with(NOLOCK) where sn='{item[0]}'"
+                base_result=db_qbbb.execute_query(sql_base)
+                if base_result:
+                    data_track_list.append(base_result[0])
+
         channel.basic_qos(prefetch_count=1)
-        for data in datas[0:20]:
+        for data in data_track_list:
             print(data)
             pattern = re.compile(r'http://weibo.com.*')
             reslut=re.findall(pattern,data[1])
