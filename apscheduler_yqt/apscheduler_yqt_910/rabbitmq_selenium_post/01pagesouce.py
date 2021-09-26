@@ -19,8 +19,7 @@ import time
 import datetime
 import traceback
 from yuqingtong import config
-from utils.mylogger import logger
-from gne import GeneralNewsExtractor
+from loguru import logger
 from utils.sedn_msg import send_feishu_msg
 from selenium.webdriver.common.by import By
 from utils.webdriverhelper import MyWebDriver
@@ -36,18 +35,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
 
-extractor=GeneralNewsExtractor()
-# 教程
-web_url_selenium=re.compile('http[s]://(www.toutiao.com)|(mp.weixin.qq.com)|'
-                            '(dy.163.com/v2/article/detail)|(kuaibao.qq.com)'
-                            '|(www.sohu.com)|(www.360kuai.com)|(view.inews.qq.com)|'
-                            '(tousu.sina.com.cn)|(www.chasfz.com)|(mbd.baidu.com)|'
-                            '(wap.peopleapp.com)|(www.xiaohongshu.com)|'
-                            '(www.laihema.com)|(kuaibao.qq.com).*')
-# web_url_selenium_list=['www.toutiao.com','mp.weixin.qq.com']
-video_url=re.compile('http[s]://(v.qq.com)|(live.kuaishou.com)'
-                     '|(www.iesdouyin.com)|(www.ixigua.com)|(m.toutiaoimg.cn)|'
-                     '(www.dongchedi.com)|(kandianshare.html5.qq.com/v2/video)|(www.dttt.net).*')
+logger.add(sink='hike.log',rotation="10 Mb")
 class YQTSpider(object):
 
     def __init__(self, myconfig, spider_driver=None, start_time=None, end_time=None, *args, **kwargs):
